@@ -1,0 +1,250 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+// Function to generate custom packing slip as HTML (for client-side PDF generation)
+function generateCustomPackingSlipHTML(packageInfo: any, order: any): string {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Packing Slip - ${packageInfo.wbn || 'N/A'}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 2px solid #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            margin: 0;
+            color: #333;
+            font-size: 28px;
+        }
+        .payment-status {
+            margin: 10px 0;
+            color: #666;
+            font-size: 18px;
+        }
+        .waybill-section {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .waybill-label {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .barcode-image {
+            margin: 15px 0;
+        }
+        .barcode-image img {
+            max-width: 200px;
+            height: auto;
+        }
+        .waybill-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            font-family: monospace;
+        }
+        .recipient-section {
+            margin: 30px 0;
+        }
+        .recipient-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .recipient-details {
+            line-height: 1.6;
+            color: #555;
+        }
+        .sender-section {
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f0f8ff;
+            border-radius: 5px;
+            border-left: 4px solid #0066cc;
+        }
+        .reference {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Delhivery Courier</h1>
+            <div class="payment-status">Payment: ${packageInfo.pt || 'Pre-paid'}</div>
+        </div>
+        
+        <div class="waybill-section">
+            <div class="waybill-label">Waybill Number:</div>
+            ${packageInfo.barcode ? `
+            <div class="barcode-image">
+                <img src="${packageInfo.barcode}" alt="Barcode" />
+            </div>
+            ` : ''}
+            <div class="waybill-number">${packageInfo.wbn || 'N/A'}</div>
+        </div>
+        
+        <div class="recipient-section">
+            <div class="recipient-title">Recipient Details:</div>
+            <div class="recipient-details">
+                <strong>Name:</strong> ${order.name || 'N/A'}<br>
+                <strong>Address:</strong> ${order.address || 'N/A'}<br>
+                <strong>City:</strong> ${order.city || 'N/A'}<br>
+                <strong>State:</strong> ${order.state || 'N/A'}<br>
+                <strong>Pincode:</strong> ${order.pincode || 'N/A'}<br>
+                <strong>Mobile:</strong> ${order.mobile || 'N/A'}
+            </div>
+        </div>
+        
+        ${order.reseller_name && 
+          order.reseller_name.trim() !== '' && 
+          order.reseller_name.toLowerCase() !== 'no name' ? `
+        <div class="sender-section">
+            <div class="recipient-title">From:</div>
+            <div class="recipient-details">
+                <strong>Name:</strong> ${order.reseller_name}<br>
+                ${order.reseller_mobile && 
+                  order.reseller_mobile.trim() !== '' && 
+                  order.reseller_mobile.toLowerCase() !== 'no number' ? `<strong>Mobile:</strong> ${order.reseller_mobile}` : ''}
+            </div>
+        </div>
+        ` : ''}
+        
+        <div class="reference">
+            <strong>Reference:</strong> ${packageInfo.oid || 'N/A'}
+        </div>
+    </div>
+</body>
+</html>
+  `
+  return html
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const orderId = parseInt(id)
+    
+    // Get order details
+    const order = await prisma.order.findUnique({
+      where: { id: orderId }
+    })
+
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    // Check if this is a Delhivery order with a waybill number
+    if (order.courier_service.toLowerCase() !== 'delhivery') {
+      return NextResponse.json({ error: 'Order is not a Delhivery order' }, { status: 400 })
+    }
+
+    if (!order.delhivery_waybill_number) {
+      return NextResponse.json({ error: 'No waybill number available for this order' }, { status: 400 })
+    }
+
+    // Get Delhivery API configuration from pickup location
+    const { getDelhiveryApiKey } = await import('@/lib/pickup-location-config');
+    const apiKey = await getDelhiveryApiKey(order.pickup_location);
+    const baseUrl = process.env.DELHIVERY_BASE_URL || 'https://track.delhivery.com'
+
+    if (!apiKey) {
+      return NextResponse.json({ 
+        error: `Delhivery API key not configured for pickup location: ${order.pickup_location}. Please configure it in the client settings.` 
+      }, { status: 500 })
+    }
+
+    // Generate shipping label URL - get JSON response for custom PDF generation
+    const shippingLabelUrl = `${baseUrl}/api/p/packing_slip?wbns=${order.delhivery_waybill_number}&pdf=false`
+
+    console.log('🚀 Fetching packing slip data for waybill:', order.delhivery_waybill_number)
+    console.log('📋 API URL:', shippingLabelUrl)
+
+    try {
+      // Fetch packing slip data from Delhivery
+      const response = await fetch(shippingLabelUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Delhivery API returned ${response.status}: ${response.statusText}`)
+      }
+
+      // Get JSON response with packing slip details
+      const jsonResponse = await response.json()
+      console.log('📋 Packing slip data received:', jsonResponse)
+
+      // Check if we have package information
+      if (!jsonResponse.packages || jsonResponse.packages.length === 0) {
+        throw new Error('No package information found in Delhivery response')
+      }
+
+      const packageInfo = jsonResponse.packages[0]
+      console.log('📋 Package info:', packageInfo)
+
+      // Generate custom HTML packing slip
+      const htmlContent = generateCustomPackingSlipHTML(packageInfo, order)
+      console.log('✅ Custom HTML packing slip generated')
+
+      return new NextResponse(htmlContent, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html',
+          'Content-Disposition': `attachment; filename="packing-slip-${order.delhivery_waybill_number}.html"`
+        }
+      })
+
+    } catch (error) {
+      console.error('❌ Error generating shipping label:', error)
+      return NextResponse.json({ 
+        error: 'Failed to generate shipping label',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 })
+    }
+
+  } catch (error) {
+    console.error('Error in shipping label generation:', error)
+    return NextResponse.json({ 
+      error: 'Failed to generate shipping label',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}

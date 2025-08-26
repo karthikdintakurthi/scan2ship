@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id                       Int              @id @default(autoincrement())
+  clientId                 String
+  name                     String
+  mobile                   String
+  phone                    String?
+  address                  String
+  city                     String
+  state                    String
+  country                  String
+  pincode                  String
+  courier_service          String
+  pickup_location          String
+  package_value            Float
+  weight                   Float
+  total_items              Int
+  tracking_id              String?
+  reference_number         String?
+  is_cod                   Boolean          @default(false)
+  cod_amount               Float?
+  reseller_name            String?
+  reseller_mobile          String?
+  created_at               DateTime         @default(now())
+  updated_at               DateTime         @updatedAt
+  delhivery_waybill_number String?
+  delhivery_order_id       String?
+  delhivery_api_status     String?
+  delhivery_api_error      String?
+  delhivery_retry_count    Int              @default(0)
+  last_delhivery_attempt   DateTime?
+  shipment_length          Float?
+  shipment_breadth         Float?
+  shipment_height          Float?
+  product_description      String?
+  return_address           String?
+  return_pincode           String?
+  fragile_shipment         Boolean          @default(false)
+  seller_name              String?
+  seller_address           String?
+  seller_gst               String?
+  invoice_number           String?
+  commodity_value          Float?
+  tax_value                Float?
+  category_of_goods        String?
+  vendor_pickup_location   String?
+  hsn_code                 String?
+  seller_cst_no            String?
+  seller_tin               String?
+  invoice_date             String?
+  return_reason            String?
+  ewbn                     String?
+  order_analytics          order_analytics?
+  clients                  clients          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("orders")
+}
+
+model analytics_events {
+  id        String   @id
+  eventType String
+  eventData Json?
+  clientId  String?
+  userId    String?
+  createdAt DateTime @default(now())
+  clients   clients? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users     users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model client_config {
+  id          String   @id
+  clientId    String
+  key         String
+  value       String
+  type        String   @default("string")
+  category    String   @default("general")
+  description String?
+  isEncrypted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, key])
+}
+
+model client_order_configs {
+  id                        String  @id
+  defaultProductDescription String  @default("ARTIFICAL JEWELLERY")
+  defaultPackageValue       Float   @default(5000)
+  defaultWeight             Float   @default(100)
+  defaultTotalItems         Int     @default(1)
+  codEnabledByDefault       Boolean @default(false)
+  defaultCodAmount          Float?
+  minPackageValue           Float   @default(100)
+  maxPackageValue           Float   @default(100000)
+  minWeight                 Float   @default(1)
+  maxWeight                 Float   @default(50000)
+  minTotalItems             Int     @default(1)
+  maxTotalItems             Int     @default(100)
+  requireProductDescription Boolean @default(true)
+  requirePackageValue       Boolean @default(true)
+  requireWeight             Boolean @default(true)
+  requireTotalItems         Boolean @default(true)
+  clientId                  String  @unique
+  clients                   clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model clients {
+  id                    String                @id
+  name                  String
+  companyName           String
+  email                 String                @unique
+  phone                 String?
+  address               String?
+  city                  String?
+  state                 String?
+  country               String                @default("India")
+  pincode               String?
+  subscriptionPlan      String                @default("basic")
+  subscriptionStatus    String                @default("active")
+  subscriptionExpiresAt DateTime?
+  isActive              Boolean               @default(true)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime
+  analytics_events      analytics_events[]
+  client_config         client_config[]
+  client_order_configs  client_order_configs?
+  courier_services      courier_services[]
+  order_analytics       order_analytics[]
+  orders                Order[]
+  pickup_locations      pickup_locations[]
+  sessions              sessions[]
+  users                 users[]
+}
+
+model courier_services {
+  id       String  @id
+  value    String
+  label    String
+  isActive Boolean @default(true)
+  clientId String
+  clients  clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([value, clientId])
+}
+
+model order_analytics {
+  id              String   @id
+  orderId         Int      @unique
+  creationPattern String
+  clientId        String
+  userId          String?
+  createdAt       DateTime @default(now())
+  clients         clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orders          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  users           users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model pickup_locations {
+  id              String  @id
+  value           String
+  label           String
+  delhiveryApiKey String?
+  clientId        String
+  clients         clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([value, clientId])
+}
+
+model sessions {
+  id        String   @id
+  userId    String
+  clientId  String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  clients   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model system_config {
+  id          String   @id
+  key         String   @unique
+  value       String
+  type        String   @default("string")
+  category    String   @default("general")
+  description String?
+  isEncrypted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+}
+
+model users {
+  id               String             @id
+  email            String
+  name             String
+  password         String?
+  role             String             @default("user")
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  clientId         String
+  analytics_events analytics_events[]
+  order_analytics  order_analytics[]
+  sessions         sessions[]
+  clients          clients            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([email, clientId])
+}

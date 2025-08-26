@@ -1,0 +1,169 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
+
+const prisma = new PrismaClient();
+
+async function getAuthenticatedAdmin(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ [ADMIN_AUTH] No authorization header');
+      return null;
+    }
+
+    const token = authHeader.substring(7);
+    
+    // Verify JWT token directly instead of calling verify endpoint
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    } catch (error) {
+      console.log('❌ [ADMIN_AUTH] Invalid JWT token');
+      return null;
+    }
+
+    // Get user from database
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      include: {
+        client: true
+      }
+    });
+
+    if (!user || !user.isActive || (user.role !== 'admin' && user.role !== 'master_admin')) {
+      console.log('❌ [ADMIN_AUTH] User is not admin or master_admin, role:', user?.role);
+      return null;
+    }
+
+    console.log(`✅ [ADMIN_AUTH] Authenticated admin: ${user.email} (${user.role})`);
+    return { user };
+
+  } catch (error) {
+    console.error('❌ [ADMIN_AUTH] Error:', error);
+    return null;
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    // Authenticate admin user
+    const auth = await getAuthenticatedAdmin(request);
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    console.log('📊 [API_ADMIN_CLIENT_CONFIGS_GET] Fetching all clients with configurations for admin:', auth.user.email);
+
+    // Get all clients with their complete configurations
+    const clients = await prisma.client.findMany({
+      include: {
+        _count: {
+          select: {
+            users: true,
+            orders: true
+          }
+        },
+        // Include all client configurations
+        clientConfigs: {
+          orderBy: {
+            category: 'asc'
+          }
+        },
+        // Include pickup locations
+        pickupLocations: {
+          orderBy: {
+            label: 'asc'
+          }
+        },
+        // Include courier services
+        courierServices: {
+          orderBy: {
+            label: 'asc'
+          }
+        },
+        // Include order configuration
+        clientOrderConfig: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    console.log(`✅ [API_ADMIN_CLIENT_CONFIGS_GET] Found ${clients.length} clients with configurations`);
+
+    return NextResponse.json({
+      clients: clients.map((client: any) => ({
+        id: client.id,
+        name: client.name,
+        companyName: client.companyName,
+        email: client.email,
+        phone: client.phone,
+        address: client.address,
+        city: client.city,
+        state: client.state,
+        country: client.country,
+        pincode: client.pincode,
+        subscriptionPlan: client.subscriptionPlan,
+        subscriptionStatus: client.subscriptionStatus,
+        subscriptionExpiresAt: client.subscriptionExpiresAt,
+        isActive: client.isActive,
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt,
+        _count: client._count,
+        // Include all configurations
+        clientConfigs: client.clientConfigs.map((config: any) => ({
+          id: config.id,
+          key: config.key,
+          value: config.value,
+          type: config.type,
+          category: config.category,
+          description: config.description,
+          isEncrypted: config.isEncrypted,
+          createdAt: config.createdAt,
+          updatedAt: config.updatedAt
+        })),
+        // Include pickup locations
+        pickupLocations: client.pickupLocations.map((location: any) => ({
+          id: location.id,
+          value: location.value,
+          label: location.label,
+          delhiveryApiKey: location.delhiveryApiKey
+        })),
+        // Include courier services
+        courierServices: client.courierServices.map((service: any) => ({
+          id: service.id,
+          value: service.value,
+          label: service.label,
+          isActive: service.isActive
+        })),
+        // Include order configuration
+        clientOrderConfig: client.clientOrderConfig ? {
+          id: client.clientOrderConfig.id,
+          defaultPackageValue: client.clientOrderConfig.defaultPackageValue,
+          defaultProductDescription: client.clientOrderConfig.defaultProductDescription,
+          defaultCodAmount: client.clientOrderConfig.defaultCodAmount,
+          codEnabledByDefault: client.clientOrderConfig.codEnabledByDefault,
+          minPackageValue: client.clientOrderConfig.minPackageValue,
+          maxPackageValue: client.clientOrderConfig.maxPackageValue,
+          minWeight: client.clientOrderConfig.minWeight,
+          maxWeight: client.clientOrderConfig.maxWeight,
+          minTotalItems: client.clientOrderConfig.minTotalItems,
+          maxTotalItems: client.clientOrderConfig.maxTotalItems,
+          requireProductDescription: client.clientOrderConfig.requireProductDescription,
+          requirePackageValue: client.clientOrderConfig.requirePackageValue,
+          requireWeight: client.clientOrderConfig.requireWeight,
+          requireTotalItems: client.clientOrderConfig.requireTotalItems
+        } : null
+      }))
+    });
+
+  } catch (error) {
+    console.error('❌ [API_ADMIN_CLIENT_CONFIGS_GET] Error fetching client configurations:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch client configurations' },
+      { status: 500 }
+    );
+  }
+}
