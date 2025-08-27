@@ -104,10 +104,10 @@ export async function GET(
       client = await prisma.clients.findUnique({
         where: { id: clientId },
         include: {
-          pickupLocations: true,
-          courierServices: true,
-          clientOrderConfig: true,
-          clientConfigs: true,
+          pickup_locations: true,
+          courier_services: true,
+          client_order_configs: true,
+          client_config: true,
           _count: {
             select: {
               users: true,
@@ -128,10 +128,10 @@ export async function GET(
 
     console.log(`✅ [API_ADMIN_CLIENT_CONFIG_GET] Client found: ${client.companyName}`);
     console.log(`📊 [API_ADMIN_CLIENT_CONFIG_GET] Client data:`, {
-      pickupLocations: client.pickupLocations.length,
-      courierServices: client.courierServices.length,
-      clientConfigs: client.clientConfigs.length,
-      hasOrderConfig: !!client.clientOrderConfig
+      pickupLocations: client.pickup_locations.length,
+      courierServices: client.courier_services.length,
+      clientConfigs: client.client_config.length,
+      hasOrderConfig: !!client.client_order_configs
     });
 
     // Process client configurations and decrypt sensitive data
@@ -146,7 +146,7 @@ export async function GET(
       isEncrypted: boolean;
     }>;
     try {
-      processedConfigs = client.clientConfigs.map(config => {
+      processedConfigs = client.client_config.map(config => {
         let displayValue = config.value;
         
         if (config.isEncrypted && config.value) {
@@ -208,44 +208,44 @@ export async function GET(
           isActive: client.isActive,
           _count: client._count
         },
-        pickupLocations: client.pickupLocations.map(location => ({
+        pickupLocations: client.pickup_locations.map(location => ({
           id: location.id,
           name: location.label,
           value: location.value,
           delhiveryApiKey: location.delhiveryApiKey ? '••••••••••••••••' : null,
           isActive: true
         })),
-        courierServices: client.courierServices.map(service => ({
+        courierServices: client.courier_services.map(service => ({
           id: service.id,
           name: service.label,
           code: service.value,
           isActive: service.isActive,
           isDefault: false
         })),
-        clientOrderConfig: client.clientOrderConfig ? {
+        clientOrderConfig: client.client_order_configs ? {
           // Default values
-          defaultProductDescription: client.clientOrderConfig.defaultProductDescription,
-          defaultPackageValue: client.clientOrderConfig.defaultPackageValue,
-          defaultWeight: client.clientOrderConfig.defaultWeight,
-          defaultTotalItems: client.clientOrderConfig.defaultTotalItems,
+          defaultProductDescription: client.client_order_configs.defaultProductDescription,
+          defaultPackageValue: client.client_order_configs.defaultPackageValue,
+          defaultWeight: client.client_order_configs.defaultWeight,
+          defaultTotalItems: client.client_order_configs.defaultTotalItems,
           
           // COD settings
-          codEnabledByDefault: client.clientOrderConfig.codEnabledByDefault,
-          defaultCodAmount: client.clientOrderConfig.defaultCodAmount,
+          codEnabledByDefault: client.client_order_configs.codEnabledByDefault,
+          defaultCodAmount: client.client_order_configs.defaultCodAmount,
           
           // Validation rules
-          minPackageValue: client.clientOrderConfig.minPackageValue,
-          maxPackageValue: client.clientOrderConfig.maxPackageValue,
-          minWeight: client.clientOrderConfig.minWeight,
-          maxWeight: client.clientOrderConfig.maxWeight,
-          minTotalItems: client.clientOrderConfig.minTotalItems,
-          maxTotalItems: client.clientOrderConfig.maxTotalItems,
+          minPackageValue: client.client_order_configs.minPackageValue,
+          maxPackageValue: client.client_order_configs.maxPackageValue,
+          minWeight: client.client_order_configs.minWeight,
+          maxWeight: client.client_order_configs.maxWeight,
+          minTotalItems: client.client_order_configs.minTotalItems,
+          maxTotalItems: client.client_order_configs.maxTotalItems,
           
           // Field requirements
-          requireProductDescription: client.clientOrderConfig.requireProductDescription,
-          requirePackageValue: client.clientOrderConfig.requirePackageValue,
-          requireWeight: client.clientOrderConfig.requireWeight,
-          requireTotalItems: client.clientOrderConfig.requireTotalItems
+          requireProductDescription: client.client_order_configs.requireProductDescription,
+          requirePackageValue: client.client_order_configs.requirePackageValue,
+          requireWeight: client.client_order_configs.requireWeight,
+          requireTotalItems: client.client_order_configs.requireTotalItems
         } : null,
 
         orderConfig: {
@@ -346,13 +346,15 @@ export async function PUT(
             updatedAt: new Date()
           },
           create: {
+            id: `config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             clientId,
             key: config.key,
             value: valueToStore,
             type: config.type,
             category: config.category,
             description: config.description,
-            isEncrypted: false // Don't encrypt any keys
+            isEncrypted: false, // Don't encrypt any keys
+            updatedAt: new Date()
           }
         });
       });
@@ -456,6 +458,7 @@ export async function PUT(
           requireTotalItems: updateData.clientOrderConfig.requireTotalItems
         },
         create: {
+          id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           clientId,
           // Default values
           defaultProductDescription: updateData.clientOrderConfig.defaultProductDescription,
