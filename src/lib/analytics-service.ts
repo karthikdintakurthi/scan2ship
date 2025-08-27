@@ -20,7 +20,7 @@ export class AnalyticsService {
    */
   static async trackEvent(data: AnalyticsEventData): Promise<void> {
     try {
-      await prisma.analyticsEvent.create({
+      await prisma.analytics_events.create({
         data: {
           eventType: data.eventType,
           clientId: data.clientId,
@@ -43,7 +43,7 @@ export class AnalyticsService {
    */
   static async trackOrderCreation(data: OrderAnalyticsData): Promise<void> {
     try {
-      await prisma.orderAnalytics.create({
+      await prisma.order_analytics.create({
         data: {
           orderId: data.orderId,
           clientId: data.clientId,
@@ -68,13 +68,13 @@ export class AnalyticsService {
   static async getPlatformAnalytics() {
     try {
       const [openaiImageCount, openaiAddressCount, createOrderCount] = await Promise.all([
-        prisma.analyticsEvent.count({
+        prisma.analytics_events.count({
           where: { eventType: 'openai_image' }
         }),
-        prisma.analyticsEvent.count({
+        prisma.analytics_events.count({
           where: { eventType: 'openai_address' }
         }),
-        prisma.analyticsEvent.count({
+        prisma.analytics_events.count({
           where: { eventType: 'create_order' }
         })
       ]);
@@ -100,25 +100,25 @@ export class AnalyticsService {
   static async getClientAnalytics(clientId: string) {
     try {
       const [openaiImageCount, openaiAddressCount, createOrderCount, orderPatterns] = await Promise.all([
-        prisma.analyticsEvent.count({
+        prisma.analytics_events.count({
           where: { 
             eventType: 'openai_image',
             clientId 
           }
         }),
-        prisma.analyticsEvent.count({
+        prisma.analytics_events.count({
           where: { 
             eventType: 'openai_address',
             clientId 
           }
         }),
-        prisma.analyticsEvent.count({
+        prisma.analytics_events.count({
           where: { 
             eventType: 'create_order',
             clientId 
           }
         }),
-        prisma.orderAnalytics.groupBy({
+        prisma.order_analytics.groupBy({
           by: ['creationPattern'],
           where: { clientId },
           _count: {

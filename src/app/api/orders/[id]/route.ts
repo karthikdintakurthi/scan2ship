@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id } = await params
     const orderId = parseInt(id)
-    const order = await prisma.order.findUnique({
+    const order = await prisma.Order.findUnique({
       where: { id: orderId }
     })
 
@@ -38,7 +38,7 @@ export async function PUT(
     const orderId = parseInt(id)
     const body = await request.json()
     
-    const order = await prisma.order.update({
+    const order = await prisma.Order.update({
       where: { id: orderId },
       data: body
     })
@@ -60,7 +60,7 @@ export async function DELETE(
   try {
     const { id } = await params
     const orderId = parseInt(id)
-    await prisma.order.delete({
+    await prisma.Order.delete({
       where: { id: orderId }
     })
 

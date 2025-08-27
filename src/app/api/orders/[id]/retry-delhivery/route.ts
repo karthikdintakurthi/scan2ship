@@ -12,7 +12,7 @@ export async function POST(
   try {
     
     // Get the order
-    const order = await prisma.order.findUnique({
+    const order = await prisma.Order.findUnique({
       where: { id: orderId }
     })
 
@@ -77,7 +77,7 @@ export async function POST(
 
       let updatedOrder;
       try {
-        updatedOrder = await prisma.order.update({
+        updatedOrder = await prisma.Order.update({
           where: { id: orderId },
           data: {
             delhivery_waybill_number: delhiveryResponse.waybill_number,
@@ -105,7 +105,7 @@ export async function POST(
       });
 
       // Verify the update actually worked by fetching the order again
-      const verificationOrder = await prisma.order.findUnique({
+              const verificationOrder = await prisma.Order.findUnique({
         where: { id: orderId },
         select: {
           id: true,
@@ -125,7 +125,7 @@ export async function POST(
       })
     } else {
       // Update order with failure details
-      await prisma.order.update({
+      await prisma.Order.update({
         where: { id: orderId },
         data: {
           delhivery_api_status: 'failed',
@@ -146,7 +146,7 @@ export async function POST(
     console.error('Error retrying Delhivery order:', error)
     
     // Update order with error details
-    await prisma.order.update({
+    await prisma.Order.update({
       where: { id: orderId },
       data: {
         delhivery_api_status: 'failed',

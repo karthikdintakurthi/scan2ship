@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     console.log('🔍 [API_ORDERS_POST] Processed order data:', processedOrderData);
 
     // Create order with client ID
-    const order = await prisma.order.create({
+    const order = await prisma.Order.create({
       data: processedOrderData
     });
 
@@ -118,29 +118,29 @@ export async function POST(request: NextRequest) {
         const delhiveryResponse = await delhiveryService.createOrder(order);
         
         if (delhiveryResponse.success) {
-          // Update order with Delhivery data
-          await prisma.order.update({
-            where: { id: order.id },
-            data: {
-              delhivery_waybill_number: delhiveryResponse.waybill_number,
-              delhivery_order_id: delhiveryResponse.order_id,
-              delhivery_api_status: 'success',
-              tracking_id: delhiveryResponse.waybill_number,
-              last_delhivery_attempt: new Date()
-            }
-          });
+                  // Update order with Delhivery data
+        await prisma.Order.update({
+          where: { id: order.id },
+          data: {
+            delhivery_waybill_number: delhiveryResponse.waybill_number,
+            delhivery_order_id: delhiveryResponse.order_id,
+            delhivery_api_status: 'success',
+            tracking_id: delhiveryResponse.waybill_number,
+            last_delhivery_attempt: new Date()
+          }
+        });
           
           console.log('✅ [API_ORDERS_POST] Delhivery order created successfully');
         } else {
-          // Update order with error status
-          await prisma.order.update({
-            where: { id: order.id },
-            data: {
-              delhivery_api_status: 'failed',
-              delhivery_api_error: delhiveryResponse.error,
-              last_delhivery_attempt: new Date()
-            }
-          });
+                  // Update order with error status
+        await prisma.Order.update({
+          where: { id: order.id },
+          data: {
+            delhivery_api_status: 'failed',
+            delhivery_api_error: delhiveryResponse.error,
+            last_delhivery_attempt: new Date()
+          }
+        });
           
           console.log('❌ [API_ORDERS_POST] Delhivery order failed:', delhiveryResponse.error);
         }
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
         console.error('❌ [API_ORDERS_POST] Delhivery API error:', error);
         
         // Update order with error status
-        await prisma.order.update({
+        await prisma.Order.update({
           where: { id: order.id },
           data: {
             delhivery_api_status: 'failed',
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch updated order data to get latest tracking number
-    const updatedOrder = await prisma.order.findUnique({
+    const updatedOrder = await prisma.Order.findUnique({
       where: { id: order.id }
     });
 
@@ -298,13 +298,13 @@ export async function GET(request: NextRequest) {
     
     // Get orders with pagination
     const [orders, totalCount] = await Promise.all([
-      prisma.order.findMany({
+      prisma.Order.findMany({
         where: whereClause,
         orderBy: { created_at: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.order.count({ where: whereClause })
+      prisma.Order.count({ where: whereClause })
     ]);
     
     const totalPages = Math.ceil(totalCount / limit);
@@ -380,7 +380,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if all orders belong to the authenticated client (security check)
-    const existingOrders = await prisma.order.findMany({
+    const existingOrders = await prisma.Order.findMany({
       where: {
         id: { in: validOrderIds },
         clientId: client.id // Ensure client isolation
