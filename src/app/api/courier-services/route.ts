@@ -15,12 +15,12 @@ async function getAuthenticatedUser(request: NextRequest) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
     
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
-        client: {
+        clients: {
           include: {
-            courierServices: true
+            courier_services: true
           }
         }
       }
@@ -45,11 +45,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📊 [API_COURIER_SERVICES_GET] Fetching courier services for client: ${user.client.companyName} (ID: ${user.client.id})`);
+    console.log(`📊 [API_COURIER_SERVICES_GET] Fetching courier services for client: ${user.clients.companyName} (ID: ${user.clients.id})`);
 
     // Get courier services for the current client
-    const courierServices = await prisma.courierService.findMany({
-      where: { clientId: user.client.id },
+    const courierServices = await prisma.courier_services.findMany({
+      where: { clientId: user.clients.id },
       orderBy: { label: 'asc' }
     });
 
@@ -62,13 +62,13 @@ export async function GET(request: NextRequest) {
       isActive: service.isActive
     }));
 
-    console.log(`✅ [API_COURIER_SERVICES_GET] Found ${formattedServices.length} courier services for client ${user.client.companyName}`);
+    console.log(`✅ [API_COURIER_SERVICES_GET] Found ${formattedServices.length} courier services for client ${user.clients.companyName}`);
     console.log(`📋 [API_COURIER_SERVICES_GET] Formatted services:`, formattedServices);
 
     return NextResponse.json({
       courierServices: formattedServices,
-      clientId: user.client.id,
-      clientName: user.client.companyName
+      clientId: user.clients.id,
+      clientName: user.clients.companyName
     });
 
   } catch (error) {

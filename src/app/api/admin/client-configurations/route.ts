@@ -28,7 +28,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
-        client: true
+        clients: true
       }
     });
 
@@ -66,25 +66,25 @@ export async function GET(request: NextRequest) {
           }
         },
         // Include all client configurations
-        clientConfigs: {
+        client_config: {
           orderBy: {
             category: 'asc'
           }
         },
         // Include pickup locations
-        pickupLocations: {
+        pickup_locations: {
           orderBy: {
             label: 'asc'
           }
         },
         // Include courier services
-        courierServices: {
+        courier_services: {
           orderBy: {
             label: 'asc'
           }
         },
         // Include order configuration
-        clientOrderConfig: true
+        client_order_configs: true
       },
       orderBy: {
         createdAt: 'desc'
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
         updatedAt: client.updatedAt,
         _count: client._count,
         // Include all configurations
-        clientConfigs: client.clientConfigs.map((config: any) => ({
+        clientConfigs: client.client_config.map((config: any) => ({
           id: config.id,
           key: config.key,
           value: config.value,
@@ -125,36 +125,36 @@ export async function GET(request: NextRequest) {
           updatedAt: config.updatedAt
         })),
         // Include pickup locations
-        pickupLocations: client.pickupLocations.map((location: any) => ({
+        pickupLocations: client.pickup_locations.map((location: any) => ({
           id: location.id,
           value: location.value,
           label: location.label,
           delhiveryApiKey: location.delhiveryApiKey
         })),
         // Include courier services
-        courierServices: client.courierServices.map((service: any) => ({
+        courierServices: client.courier_services.map((service: any) => ({
           id: service.id,
           value: service.value,
           label: service.label,
           isActive: service.isActive
         })),
         // Include order configuration
-        clientOrderConfig: client.clientOrderConfig ? {
-          id: client.clientOrderConfig.id,
-          defaultPackageValue: client.clientOrderConfig.defaultPackageValue,
-          defaultProductDescription: client.clientOrderConfig.defaultProductDescription,
-          defaultCodAmount: client.clientOrderConfig.defaultCodAmount,
-          codEnabledByDefault: client.clientOrderConfig.codEnabledByDefault,
-          minPackageValue: client.clientOrderConfig.minPackageValue,
-          maxPackageValue: client.clientOrderConfig.maxPackageValue,
-          minWeight: client.clientOrderConfig.minWeight,
-          maxWeight: client.clientOrderConfig.maxWeight,
-          minTotalItems: client.clientOrderConfig.minTotalItems,
-          maxTotalItems: client.clientOrderConfig.maxTotalItems,
-          requireProductDescription: client.clientOrderConfig.requireProductDescription,
-          requirePackageValue: client.clientOrderConfig.requirePackageValue,
-          requireWeight: client.clientOrderConfig.requireWeight,
-          requireTotalItems: client.clientOrderConfig.requireTotalItems
+        clientOrderConfig: client.client_order_configs ? {
+          id: client.client_order_configs.id,
+          defaultPackageValue: client.client_order_configs.defaultPackageValue,
+          defaultProductDescription: client.client_order_configs.defaultProductDescription,
+          defaultCodAmount: client.client_order_configs.defaultCodAmount,
+          codEnabledByDefault: client.client_order_configs.codEnabledByDefault,
+          minPackageValue: client.client_order_configs.minPackageValue,
+          maxPackageValue: client.client_order_configs.maxPackageValue,
+          minWeight: client.client_order_configs.minWeight,
+          maxWeight: client.client_order_configs.maxWeight,
+          minTotalItems: client.client_order_configs.minTotalItems,
+          maxTotalItems: client.client_order_configs.maxTotalItems,
+          requireProductDescription: client.client_order_configs.requireProductDescription,
+          requirePackageValue: client.client_order_configs.requirePackageValue,
+          requireWeight: client.client_order_configs.requireWeight,
+          requireTotalItems: client.client_order_configs.requireTotalItems
         } : null
       }))
     });

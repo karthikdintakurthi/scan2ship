@@ -32,12 +32,12 @@ async function getAuthenticatedUser(request: NextRequest) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
     
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
-        client: {
+        clients: {
           include: {
-            pickupLocations: true
+            pickup_locations: true
           }
         }
       }
@@ -61,11 +61,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📊 [API_PICKUP_LOCATIONS_GET] Fetching pickup locations for client: ${user.client.companyName}`);
+    console.log(`📊 [API_PICKUP_LOCATIONS_GET] Fetching pickup locations for client: ${user.clients.companyName}`);
 
     // Get pickup locations for the current client
-    const pickupLocations = await prisma.pickupLocation.findMany({
-      where: { clientId: user.client.id },
+    const pickupLocations = await prisma.pickup_locations.findMany({
+      where: { clientId: user.clients.id },
       orderBy: { label: 'asc' }
     });
 
@@ -128,12 +128,12 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log(`✅ [API_PICKUP_LOCATIONS_GET] Found ${formattedLocations.length} pickup locations for client ${user.client.companyName}`);
+    console.log(`✅ [API_PICKUP_LOCATIONS_GET] Found ${formattedLocations.length} pickup locations for client ${user.clients.companyName}`);
 
     return NextResponse.json({
       pickupLocations: formattedLocations,
-      clientId: user.client.id,
-      clientName: user.client.companyName
+      clientId: user.clients.id,
+      clientName: user.clients.companyName
     });
 
   } catch (error) {
