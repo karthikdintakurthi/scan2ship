@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
     console.log('🔍 [API_ORDERS_POST] Processed order data:', processedOrderData);
 
     // Create order with client ID
-    const order = await prisma.orders.create({
+    const order = await prisma.Order.create({
       data: processedOrderData
     });
 
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
         
         if (delhiveryResponse.success) {
           // Update order with Delhivery data
-          await prisma.orders.update({
+          await prisma.Order.update({
             where: { id: order.id },
             data: {
               delhivery_waybill_number: delhiveryResponse.waybill_number,
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
           console.log('✅ [API_ORDERS_POST] Delhivery order created successfully');
         } else {
           // Update order with error status
-          await prisma.orders.update({
+          await prisma.Order.update({
             where: { id: order.id },
             data: {
               delhivery_api_status: 'failed',
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
         console.error('❌ [API_ORDERS_POST] Delhivery API error:', error);
         
         // Update order with error status
-        await prisma.orders.update({
+        await prisma.Order.update({
           where: { id: order.id },
           data: {
             delhivery_api_status: 'failed',
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch updated order data to get latest tracking number
-    const updatedOrder = await prisma.orders.findUnique({
+    const updatedOrder = await prisma.Order.findUnique({
       where: { id: order.id }
     });
 
@@ -325,13 +325,13 @@ export async function GET(request: NextRequest) {
     
     // Get orders with pagination
     const [orders, totalCount] = await Promise.all([
-      prisma.orders.findMany({
+      prisma.Order.findMany({
         where: whereClause,
         orderBy: { created_at: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.orders.count({ where: whereClause })
+      prisma.Order.count({ where: whereClause })
     ]);
     
     const totalPages = Math.ceil(totalCount / limit);
@@ -407,7 +407,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if all orders belong to the authenticated client (security check)
-    const existingOrders = await prisma.orders.findMany({
+    const existingOrders = await prisma.Order.findMany({
       where: {
         id: { in: validOrderIds },
         clientId: client.id // Ensure client isolation
@@ -427,7 +427,7 @@ export async function DELETE(request: NextRequest) {
       const deletedOrders = [];
       
       for (const orderId of validOrderIds) {
-        const deletedOrder = await tx.orders.delete({
+        const deletedOrder = await tx.Order.delete({
           where: { id: parseInt(orderId) }
         });
         deletedOrders.push(deletedOrder);
