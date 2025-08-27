@@ -32,7 +32,8 @@ async function getAuthenticatedUser(request: NextRequest) {
     }
 
     // Check if user has access to analytics tracking
-    if (user.role !== 'admin' && user.role !== 'master_admin') {
+    // Regular users can track their own events, admins can track all events
+    if (user.role !== 'admin' && user.role !== 'master_admin' && user.role !== 'user') {
       return null;
     }
 

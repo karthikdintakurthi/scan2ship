@@ -22,6 +22,7 @@ export class AnalyticsService {
     try {
       await prisma.analytics_events.create({
         data: {
+          id: `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           eventType: data.eventType,
           clientId: data.clientId,
           userId: data.userId,
@@ -45,6 +46,7 @@ export class AnalyticsService {
     try {
       await prisma.order_analytics.create({
         data: {
+          id: `order-analytics-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           orderId: data.orderId,
           clientId: data.clientId,
           userId: data.userId,

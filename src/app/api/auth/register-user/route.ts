@@ -72,25 +72,42 @@ export async function POST(request: NextRequest) {
            }
          });
 
-    // Create default pickup locations for the client
+    // Create default pickup locations for the client (only if they don't exist)
     const defaultPickupLocations = [
       { value: 'main-warehouse', label: 'Main Warehouse', delhiveryApiKey: null },
       { value: 'branch-office', label: 'Branch Office', delhiveryApiKey: null }
     ];
 
     for (const location of defaultPickupLocations) {
-      await prisma.pickup_locations.create({
-        data: {
-          id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      // Check if this pickup location already exists for this client
+      const existingLocation = await prisma.pickup_locations.findFirst({
+        where: {
           clientId: client.id,
-          value: location.value,
-          label: location.label,
-          delhiveryApiKey: location.delhiveryApiKey
+          value: location.value
         }
       });
+
+      if (!existingLocation) {
+        try {
+          await prisma.pickup_locations.create({
+            data: {
+              id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              clientId: client.id,
+              value: location.value,
+              label: location.label,
+              delhiveryApiKey: location.delhiveryApiKey
+            }
+          });
+          console.log(`Created pickup location: ${location.label} for client ${client.id}`);
+        } catch (error: any) {
+          console.log(`Failed to create pickup location ${location.label}:`, error.message);
+        }
+      } else {
+        console.log(`Pickup location ${location.label} already exists for client ${client.id}, skipping...`);
+      }
     }
 
-    // Create default courier services for the client
+    // Create default courier services for the client (only if they don't exist)
     const defaultCourierServices = [
       { value: 'delhivery', label: 'Delhivery', isActive: true },
       { value: 'dtdc', label: 'DTDC', isActive: true },
@@ -99,15 +116,32 @@ export async function POST(request: NextRequest) {
     ];
 
     for (const service of defaultCourierServices) {
-      await prisma.courier_services.create({
-        data: {
-          id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      // Check if this courier service already exists for this client
+      const existingService = await prisma.courier_services.findFirst({
+        where: {
           clientId: client.id,
-          value: service.value,
-          label: service.label,
-          isActive: service.isActive
+          value: service.value
         }
       });
+
+      if (!existingService) {
+        try {
+          await prisma.courier_services.create({
+            data: {
+              id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              clientId: client.id,
+              value: service.value,
+              label: service.label,
+              isActive: service.isActive
+            }
+          });
+          console.log(`Created courier service: ${service.label} for client ${client.id}`);
+        } catch (error: any) {
+          console.log(`Failed to create courier service ${service.label}:`, error.message);
+        }
+      } else {
+        console.log(`Courier service ${service.label} already exists for client ${client.id}, skipping...`);
+      }
     }
 
     return NextResponse.json({
@@ -121,7 +155,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('User registration error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },

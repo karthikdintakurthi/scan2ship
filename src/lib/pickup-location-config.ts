@@ -165,10 +165,20 @@ export async function getDelhiveryApiKey(pickupLocation: string): Promise<string
         });
         
         if (pickupLocationRecord?.delhiveryApiKey) {
-          console.log(`🔑 [SERVER] Found encrypted Delhivery API key for pickup location: ${pickupLocation}`);
+          console.log(`🔑 [SERVER] Found Delhivery API key for pickup location: ${pickupLocation}`);
+          
+          let apiKey = pickupLocationRecord.delhiveryApiKey;
+          
+          // Extract API key if it's wrapped in JavaScript code
+          if (apiKey.includes("'") && apiKey.includes('clientKeyD')) {
+            const match = apiKey.match(/'([^']+)'/);
+            if (match) {
+              apiKey = match[1];
+              console.log(`🔑 [SERVER] Extracted clean API key from JavaScript code: ${apiKey}`);
+            }
+          }
           
           // Check if the API key is encrypted (96 characters) or plain text (40 characters for Delhivery)
-          const apiKey = pickupLocationRecord.delhiveryApiKey;
           if (apiKey.length === 96) {
             // Likely encrypted - try to decrypt
             try {
@@ -215,7 +225,19 @@ export async function getDelhiveryApiKey(pickupLocation: string): Promise<string
       const config = await getPickupLocationConfig(pickupLocation);
       if (config?.delhiveryApiKey) {
         console.log(`🔑 [CLIENT] Found Delhivery API key for pickup location: ${pickupLocation}`);
-        return config.delhiveryApiKey;
+        
+        let apiKey = config.delhiveryApiKey;
+        
+        // Extract API key if it's wrapped in JavaScript code
+        if (apiKey.includes("'") && apiKey.includes('clientKeyD')) {
+          const match = apiKey.match(/'([^']+)'/);
+          if (match) {
+            apiKey = match[1];
+            console.log(`🔑 [CLIENT] Extracted clean API key from JavaScript code: ${apiKey}`);
+          }
+        }
+        
+        return apiKey;
       }
       
       console.warn(`⚠️ [CLIENT] No Delhivery API key found for pickup location: ${pickupLocation}`);

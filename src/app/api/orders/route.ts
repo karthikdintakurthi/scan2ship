@@ -90,7 +90,6 @@ export async function POST(request: NextRequest) {
 
     // Convert string values to appropriate data types and map fields
     const processedOrderData = {
-      id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ...orderData,
       package_value: parseFloat(orderData.package_value) || 0,
       weight: parseFloat(orderData.weight) || 0,
@@ -141,8 +140,12 @@ export async function POST(request: NextRequest) {
     if (orderData.courier_service.toLowerCase() === 'delhivery') {
       try {
         console.log('🚚 [API_ORDERS_POST] Calling Delhivery API for order:', order.id);
+        console.log('🚚 [API_ORDERS_POST] Order data being sent to Delhivery:', JSON.stringify(order, null, 2));
+        console.log('🚚 [API_ORDERS_POST] Pickup location:', order.pickup_location);
         
         const delhiveryResponse = await delhiveryService.createOrder(order);
+        
+        console.log('🚚 [API_ORDERS_POST] Delhivery API response received:', JSON.stringify(delhiveryResponse, null, 2));
         
         if (delhiveryResponse.success) {
           // Update order with Delhivery data
@@ -173,6 +176,11 @@ export async function POST(request: NextRequest) {
         }
       } catch (error) {
         console.error('❌ [API_ORDERS_POST] Delhivery API error:', error);
+        console.error('❌ [API_ORDERS_POST] Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          orderId: order.id
+        });
         
         // Update order with error status
         await prisma.Order.update({

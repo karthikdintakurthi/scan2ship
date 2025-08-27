@@ -62,8 +62,11 @@ export class DelhiveryService {
 
   private async makeRequest(endpoint: string, options: RequestInit, apiKey: string, retryCount = 0): Promise<any> {
     try {
+      // Ensure the correct header format for Delhivery API
       const finalHeaders = {
         'Authorization': `Token ${apiKey.trim()}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         ...options.headers,
       };
       
@@ -84,25 +87,40 @@ export class DelhiveryService {
         throw new Error(`Invalid API key: Contains invalid characters at position ${invalidChars.index}`);
       }
       
-      console.log('🌐 Making Delhivery API request:')
-      console.log('  URL:', `${this.baseUrl}${endpoint}`)
-      console.log('  API Key:', apiKey ? `${apiKey.substring(0, 8)}***` : 'NOT SET')
-      console.log('  Headers:', JSON.stringify(finalHeaders, null, 2))
+      const fullUrl = `${this.baseUrl}${endpoint}`;
       
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      console.log('🌐 Delhivery API Request Details:');
+      console.log('  Full URL:', fullUrl);
+      console.log('  Method:', options.method || 'GET');
+      console.log('  Raw API Key:', apiKey);
+      console.log('  Clean API Key:', trimmedApiKey);
+      console.log('  Final Headers:', JSON.stringify(finalHeaders, null, 2));
+      console.log('  Request Body:', options.body || 'No body');
+      console.log('  Retry Count:', retryCount);
+      
+      const response = await fetch(fullUrl, {
         ...options,
         headers: finalHeaders,
       });
 
+      console.log('📡 Delhivery API Response Details:');
+      console.log('  Status:', response.status);
+      console.log('  Status Text:', response.statusText);
+      console.log('  Response Headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        console.log('  Error Response Body:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
+      console.log('  Response Body:', JSON.stringify(result, null, 2));
       return result;
     } catch (error) {
+      console.error('❌ Delhivery API request failed:', error);
       if (retryCount < this.maxRetries) {
-        console.log(`Delhivery API request failed, retrying... (${retryCount + 1}/${this.maxRetries})`);
+        console.log(`🔄 Retrying Delhivery API request... (${retryCount + 1}/${this.maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
         return this.makeRequest(endpoint, options, apiKey, retryCount + 1);
       }

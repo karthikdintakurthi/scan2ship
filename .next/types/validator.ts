@@ -89,12 +89,6 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies AppPageConfig<"/admin/clients">
 }
 
-// Validate ../../src/app/admin/login-as-client/page.tsx
-{
-  const handler = {} as typeof import("../../src/app/admin/login-as-client/page.js")
-  handler satisfies AppPageConfig<"/admin/login-as-client">
-}
-
 // Validate ../../src/app/admin/page.tsx
 {
   const handler = {} as typeof import("../../src/app/admin/page.js")
@@ -191,6 +185,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/admin/system-config">
 }
 
+// Validate ../../src/app/api/admin/users/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/admin/users/route.js")
+  handler satisfies RouteHandlerConfig<"/api/admin/users">
+}
+
 // Validate ../../src/app/api/analytics/clients/[id]/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/analytics/clients/[id]/route.js")
@@ -231,12 +231,6 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   const handler = {} as typeof import("../../src/app/api/auth/register-user/route.js")
   handler satisfies RouteHandlerConfig<"/api/auth/register-user">
-}
-
-// Validate ../../src/app/api/auth/switch-to-client/route.ts
-{
-  const handler = {} as typeof import("../../src/app/api/auth/switch-to-client/route.js")
-  handler satisfies RouteHandlerConfig<"/api/auth/switch-to-client">
 }
 
 // Validate ../../src/app/api/auth/verify/route.ts
@@ -315,6 +309,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   const handler = {} as typeof import("../../src/app/api/test-whatsapp/route.js")
   handler satisfies RouteHandlerConfig<"/api/test-whatsapp">
+}
+
+// Validate ../../src/app/api/users/profile/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/users/profile/route.js")
+  handler satisfies RouteHandlerConfig<"/api/users/profile">
 }
 
 // Validate ../../src/app/api/validate-pincode/route.ts
