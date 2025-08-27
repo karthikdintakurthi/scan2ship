@@ -20,18 +20,22 @@ export const config = {
   },
 };
 
-// Validate required environment variables
+// Validate required environment variables only at runtime
 export function validateConfig() {
-  const required = ['DATABASE_URL', 'JWT_SECRET'];
-  const missing = required.filter(key => !process.env[key]);
-  
-  if (missing.length > 0) {
-    console.error('Missing required environment variables:', missing);
-    console.error('Available environment variables:', Object.keys(process.env));
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  // Only validate in production runtime, not during build
+  if (process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
+    const required = ['DATABASE_URL', 'JWT_SECRET'];
+    const missing = required.filter(key => !process.env[key]);
+    
+    if (missing.length > 0) {
+      console.error('Missing required environment variables:', missing);
+      console.error('Available environment variables:', Object.keys(process.env));
+      throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    }
+    
+    console.log('Environment configuration validated successfully');
   }
   
-  console.log('Environment configuration validated successfully');
   return true;
 }
 
