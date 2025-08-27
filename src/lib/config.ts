@@ -22,8 +22,10 @@ export const config = {
 
 // Validate required environment variables only at runtime
 export function validateConfig() {
-  // Only validate in production runtime, not during build
-  if (process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
+  // Skip validation during build time completely
+  if (process.env.NODE_ENV === 'production' && 
+      typeof window === 'undefined' && 
+      !process.env.VERCEL_BUILD) {
     const required = ['DATABASE_URL', 'JWT_SECRET'];
     const missing = required.filter(key => !process.env[key]);
     

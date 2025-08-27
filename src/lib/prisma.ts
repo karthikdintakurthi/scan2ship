@@ -1,13 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { config, validateConfig } from './config';
-
-// Validate configuration before initializing Prisma
-try {
-  validateConfig();
-} catch (error) {
-  console.error('Configuration validation failed:', error);
-  throw error;
-}
+import { config } from './config';
 
 // Debug environment variables
 console.log('Prisma initialization - Environment check:', {
