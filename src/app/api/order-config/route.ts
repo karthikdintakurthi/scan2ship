@@ -17,7 +17,7 @@ async function getAuthenticatedUser(request: NextRequest) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
     
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
         client: {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     if (!orderConfig) {
       console.log(`📝 [API_ORDER_CONFIG_GET] No order config found, creating default for client ${user.client.companyName}`);
       
-      orderConfig = await prisma.clientOrderConfig.create({
+      orderConfig = await prisma.client_order_configs.create({
         data: {
           clientId: user.client.id,
           // Default values

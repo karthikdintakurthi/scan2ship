@@ -265,7 +265,7 @@ async function loadWhatsAppConfigFromDB(): Promise<WhatsAppConfig> {
     const prisma = new PrismaClient();
 
     try {
-      const whatsappConfig = await prisma.systemConfig.findMany({
+      const whatsappConfig = await prisma.system_config.findMany({
         where: { category: 'whatsapp' }
       });
 

@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     console.log('📊 [API_ADMIN_SYSTEM_CONFIG_GET] Fetching system configuration from database');
 
     // Get all system configurations from database
-    const configs = await prisma.systemConfig.findMany({
+    const configs = await prisma.system_config.findMany({
       orderBy: [
         { category: 'asc' },
         { key: 'asc' }
@@ -147,7 +147,7 @@ export async function PUT(request: NextRequest) {
       //   valueToStore = encrypt(config.value);
       // }
       
-      return prisma.systemConfig.update({
+      return prisma.system_config.update({
         where: { id: config.id },
         data: {
           value: valueToStore,

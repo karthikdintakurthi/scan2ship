@@ -363,13 +363,13 @@ export async function PUT(
     // Update pickup locations
     if (updateData.pickupLocations) {
       // First, delete existing pickup locations
-      await prisma.pickupLocation.deleteMany({
+      await prisma.pickup_locations.deleteMany({
         where: { clientId }
       });
 
       // Then create new ones
       if (updateData.pickupLocations.length > 0) {
-        await prisma.pickupLocation.createMany({
+        await prisma.pickup_locations.createMany({
           data: updateData.pickupLocations.map((location: any) => ({
             clientId,
             value: location.value,
@@ -396,13 +396,13 @@ export async function PUT(
     // Update courier services
     if (updateData.courierServices) {
       // First, delete existing courier services
-      await prisma.courierService.deleteMany({
+      await prisma.courier_services.deleteMany({
         where: { clientId }
       });
 
       // Then create new ones
       if (updateData.courierServices.length > 0) {
-        await prisma.courierService.createMany({
+        await prisma.courier_services.createMany({
           data: updateData.courierServices.map((service: any) => ({
             clientId,
             value: service.code,

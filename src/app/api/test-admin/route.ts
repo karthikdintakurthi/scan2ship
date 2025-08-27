@@ -17,7 +17,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
     
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: decoded.userId }
     });
 
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     console.log('✅ [TEST_ADMIN] Admin authenticated:', auth.user.email);
 
     // Get all clients
-    const clients = await prisma.client.findMany({
+    const clients = await prisma.clients.findMany({
       select: {
         id: true,
         companyName: true,

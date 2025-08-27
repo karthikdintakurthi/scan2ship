@@ -41,7 +41,7 @@ export async function getSystemConfig(key: string): Promise<string | null> {
     }
 
     // Get from database
-    const config = await prisma.systemConfig.findUnique({
+    const config = await prisma.system_config.findUnique({
       where: { key }
     });
 
@@ -72,7 +72,7 @@ export async function getSystemConfig(key: string): Promise<string | null> {
 // Get multiple system configurations
 export async function getSystemConfigs(keys: string[]): Promise<Record<string, string | null>> {
   try {
-    const configs = await prisma.systemConfig.findMany({
+    const configs = await prisma.system_config.findMany({
       where: {
         key: {
           in: keys
@@ -116,7 +116,7 @@ export async function getSystemConfigs(keys: string[]): Promise<Record<string, s
 // Get all configurations by category
 export async function getSystemConfigsByCategory(category: string): Promise<Record<string, string>> {
   try {
-    const configs = await prisma.systemConfig.findMany({
+    const configs = await prisma.system_config.findMany({
       where: { category },
       orderBy: { key: 'asc' }
     });
@@ -150,7 +150,7 @@ export async function getSystemConfigsByCategory(category: string): Promise<Reco
 // Update a system configuration
 export async function updateSystemConfig(key: string, value: string): Promise<boolean> {
   try {
-    const config = await prisma.systemConfig.findUnique({
+    const config = await prisma.system_config.findUnique({
       where: { key }
     });
 
@@ -165,7 +165,7 @@ export async function updateSystemConfig(key: string, value: string): Promise<bo
       valueToStore = encrypt(value);
     }
 
-    await prisma.systemConfig.update({
+    await prisma.system_config.update({
       where: { key },
       data: {
         value: valueToStore,
@@ -194,7 +194,7 @@ export function clearConfigCache(): void {
 // Get all system configurations (for admin interface)
 export async function getAllSystemConfigs() {
   try {
-    const configs = await prisma.systemConfig.findMany({
+    const configs = await prisma.system_config.findMany({
       orderBy: [
         { category: 'asc' },
         { key: 'asc' }
