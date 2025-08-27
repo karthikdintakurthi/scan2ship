@@ -167,6 +167,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/admin/clients/[id]">
 }
 
+// Validate ../../src/app/api/admin/clients/[id]/update-password/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/admin/clients/[id]/update-password/route.js")
+  handler satisfies RouteHandlerConfig<"/api/admin/clients/[id]/update-password">
+}
+
 // Validate ../../src/app/api/admin/clients/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/admin/clients/route.js")
@@ -183,6 +189,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   const handler = {} as typeof import("../../src/app/api/admin/system-config/route.js")
   handler satisfies RouteHandlerConfig<"/api/admin/system-config">
+}
+
+// Validate ../../src/app/api/admin/users/[id]/update-password/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/admin/users/[id]/update-password/route.js")
+  handler satisfies RouteHandlerConfig<"/api/admin/users/[id]/update-password">
 }
 
 // Validate ../../src/app/api/admin/users/route.ts

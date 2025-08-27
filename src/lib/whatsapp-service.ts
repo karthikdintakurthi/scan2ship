@@ -251,7 +251,7 @@ class WhatsAppService {
 }
 
 // Helper function to load WhatsApp configuration from database (server-side)
-async function loadWhatsAppConfigFromDB(): Promise<WhatsAppConfig> {
+async function loadWhatsAppConfigFromDB(clientId?: string): Promise<WhatsAppConfig> {
   try {
     // Only run on server side
     if (typeof window !== 'undefined') {
@@ -302,11 +302,11 @@ const whatsappService = new WhatsAppService({
 });
 
 // Function to initialize WhatsApp service with database config
-export async function initializeWhatsAppService(): Promise<void> {
+export async function initializeWhatsAppService(clientId?: string): Promise<void> {
   try {
-    const config = await loadWhatsAppConfigFromDB();
+    const config = await loadWhatsAppConfigFromDB(clientId);
     whatsappService.updateConfig(config);
-    console.log('📱 [WHATSAPP_SERVICE] Initialized with database configuration');
+    console.log('📱 [WHATSAPP_SERVICE] Initialized with database configuration', clientId ? `for client: ${clientId}` : '');
   } catch (error) {
     console.error('❌ [WHATSAPP_SERVICE] Failed to initialize with database config:', error);
   }

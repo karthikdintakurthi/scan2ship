@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import WhatsAppConfig from '@/components/WhatsAppConfig';
 import { authenticatedGet, authenticatedPost } from '@/lib/api-client';
 
 interface Client {
@@ -490,11 +489,6 @@ export default function SystemSettingsPage() {
                   </div>
                 </Link>
               </div>
-            </div>
-
-            {/* WhatsApp Configuration */}
-            <div className="mt-8">
-              <WhatsAppConfig />
             </div>
           </div>
         </div>

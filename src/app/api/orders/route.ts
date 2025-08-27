@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize WhatsApp service with database configuration
-    await initializeWhatsAppService();
+    await initializeWhatsAppService(client.id);
 
     // Send WhatsApp notifications with updated tracking number
     try {

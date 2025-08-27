@@ -119,6 +119,21 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
     isDefault: false
   });
 
+  // Data for editing courier service
+  const [editingCourierServiceData, setEditingCourierServiceData] = useState({
+    name: '',
+    code: '',
+    isActive: true,
+    isDefault: false
+  });
+
+  // Data for editing pickup location
+  const [editingPickupLocationData, setEditingPickupLocationData] = useState({
+    name: '',
+    value: '',
+    delhiveryApiKey: ''
+  });
+
   // Check if user is admin or master admin
   useEffect(() => {
     if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'master_admin') {
@@ -510,34 +525,140 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
             <div className="space-y-3">
               {config.courierServices.map((service) => (
                 <div key={service.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h3 className="font-medium text-gray-900">{service.name}</h3>
-                      <p className="text-sm text-gray-600">Code: {service.code}</p>
+                  {editingCourierService === service.id ? (
+                    // Edit mode
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-medium text-gray-900">Editing: {service.name}</h3>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              // Save changes
+                              const updatedService = {
+                                ...service,
+                                name: editingCourierServiceData.name,
+                                code: editingCourierServiceData.code,
+                                isActive: editingCourierServiceData.isActive,
+                                isDefault: editingCourierServiceData.isDefault
+                              };
+                              
+                              // If setting this as default, uncheck all others
+                              if (editingCourierServiceData.isDefault) {
+                                setConfig({
+                                  ...config,
+                                  courierServices: config.courierServices.map(s => 
+                                    s.id === service.id ? updatedService : { ...s, isDefault: false }
+                                  )
+                                });
+                              } else {
+                                setConfig({
+                                  ...config,
+                                  courierServices: config.courierServices.map(s => 
+                                    s.id === service.id ? updatedService : s
+                                  )
+                                });
+                              }
+                              
+                              setEditingCourierService(null);
+                              setEditingCourierServiceData({ name: '', code: '', isActive: true, isDefault: false });
+                            }}
+                            className="text-green-600 hover:text-green-800 text-sm font-medium"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingCourierService(null);
+                              setEditingCourierServiceData({ name: '', code: '', isActive: true, isDefault: false });
+                            }}
+                            className="text-gray-600 hover:text-gray-800 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Service Name"
+                        value={editingCourierServiceData.name}
+                        onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, name: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Service Code"
+                        value={editingCourierServiceData.code}
+                        onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, code: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <div className="flex items-center space-x-4">
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={editingCourierServiceData.isActive}
+                            onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, isActive: e.target.checked})}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <span className="ml-2 text-sm text-gray-900">Active</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={editingCourierServiceData.isDefault}
+                            onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, isDefault: e.target.checked})}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <span className="ml-2 text-sm text-gray-900">Default</span>
+                        </label>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      {service.isDefault && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Default
-                        </span>
-                      )}
-                      <button
-                        onClick={() => handleRemoveCourierService(service.id)}
-                        className="text-red-600 hover:text-red-800 text-sm"
-                      >
-                        Remove
-                      </button>
+                  ) : (
+                    // View mode
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h3 className="font-medium text-gray-900">{service.name}</h3>
+                        <p className="text-sm text-gray-600">Code: {service.code}</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {service.isDefault && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Default
+                          </span>
+                        )}
+                        <button
+                          onClick={() => {
+                            setEditingCourierService(service.id);
+                            setEditingCourierServiceData({
+                              name: service.name,
+                              code: service.code,
+                              isActive: service.isActive,
+                              isDefault: service.isDefault
+                            });
+                          }}
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleRemoveCourierService(service.id)}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="mt-2">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      service.isActive 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {service.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
+                  )}
+                  {editingCourierService !== service.id && (
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        service.isActive 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {service.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
               
@@ -579,7 +700,16 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <input
                         type="checkbox"
                         checked={newCourierService.isDefault}
-                        onChange={(e) => setNewCourierService({...newCourierService, isDefault: e.target.checked})}
+                        onChange={(e) => {
+                          // If setting this as default, uncheck all others
+                          if (e.target.checked) {
+                            setConfig({
+                              ...config,
+                              courierServices: config.courierServices.map(s => ({ ...s, isDefault: false }))
+                            });
+                          }
+                          setNewCourierService({...newCourierService, isDefault: e.target.checked});
+                        }}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                       <span className="ml-2 text-sm text-gray-900">Default</span>
@@ -605,28 +735,113 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
             <div className="space-y-3">
               {config.pickupLocations.map((location) => (
                 <div key={location.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-gray-900">{location.name}</h3>
-                    <button
-                      onClick={() => handleRemovePickupLocation(location.id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">Value: {location.value}</p>
-                  {location.delhiveryApiKey && (
-                    <p className="text-sm text-gray-600">API Key: {location.delhiveryApiKey}</p>
+                  {editingPickupLocation === location.id ? (
+                    // Edit mode
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-medium text-gray-900">Editing: {location.name}</h3>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              // Save changes
+                              const updatedLocation = {
+                                ...location,
+                                name: editingPickupLocationData.name,
+                                value: editingPickupLocationData.value,
+                                delhiveryApiKey: editingPickupLocationData.delhiveryApiKey
+                              };
+                              
+                              setConfig({
+                                ...config,
+                                pickupLocations: config.pickupLocations.map(l => 
+                                  l.id === location.id ? updatedLocation : l
+                                )
+                              });
+                              
+                              setEditingPickupLocation(null);
+                              setEditingPickupLocationData({ name: '', value: '', delhiveryApiKey: '' });
+                            }}
+                            className="text-green-600 hover:text-green-800 text-sm font-medium"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingPickupLocation(null);
+                              setEditingPickupLocationData({ name: '', value: '', delhiveryApiKey: '' });
+                            }}
+                            className="text-gray-600 hover:text-gray-800 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Location Name"
+                        value={editingPickupLocationData.name}
+                        onChange={(e) => setEditingPickupLocationData({...editingPickupLocationData, name: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Location Value"
+                        value={editingPickupLocationData.value}
+                        onChange={(e) => setEditingPickupLocationData({...editingPickupLocationData, value: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <input
+                        type="password"
+                        placeholder="Delhivery API Key (optional)"
+                        value={editingPickupLocationData.delhiveryApiKey}
+                        onChange={(e) => setEditingPickupLocationData({...editingPickupLocationData, delhiveryApiKey: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  ) : (
+                    // View mode
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h3 className="font-medium text-gray-900">{location.name}</h3>
+                        <p className="text-sm text-gray-600 mb-2">Value: {location.value}</p>
+                        {location.delhiveryApiKey && (
+                          <p className="text-sm text-gray-600">API Key: {location.delhiveryApiKey}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => {
+                            setEditingPickupLocation(location.id);
+                            setEditingPickupLocationData({
+                              name: location.name,
+                              value: location.value,
+                              delhiveryApiKey: location.delhiveryApiKey || ''
+                            });
+                          }}
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleRemovePickupLocation(location.id)}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
                   )}
-                  <div className="mt-2">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      location.isActive 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {location.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
+                  {editingPickupLocation !== location.id && (
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        location.isActive 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {location.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
               
@@ -793,7 +1008,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                             ...config.clientOrderConfig,
                             defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
                             defaultPackageValue: parseFloat(e.target.value) || 0,
-                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
+                            defaultWeight: parseFloat(e.target.value) || 0,
                             defaultTotalItems: parseInt(e.target.value) || 0,
                             codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
                             minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
