@@ -9,26 +9,11 @@ import Image from 'next/image';
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pathname = usePathname();
-  const { currentUser, currentClient, originalAdminUser, isAdminSwitchMode, logout, resetAdminSwitchMode } = useAuth();
-
-  // Check if this is an admin switch session
-  const isAdminSwitch = localStorage.getItem('isAdminSwitch') === 'true';
-  
-  // Use original admin user info when in admin switch mode
-  const displayUser = isAdminSwitchMode && originalAdminUser ? originalAdminUser : currentUser;
-
-
+  const { currentUser, currentClient, logout } = useAuth();
 
   // Determine navigation based on context
   let navigation;
-  if (isAdminSwitch) {
-    // Admin switched to client view - show client navigation
-    navigation = [
-      { name: 'Create Order', href: '/orders', current: pathname === '/orders' },
-      { name: 'View Orders', href: '/view-orders', current: pathname === '/view-orders' },
-      { name: 'Settings', href: '/settings', current: pathname === '/settings' },
-    ];
-  } else if (currentUser?.role === 'master_admin') {
+  if (currentUser?.role === 'master_admin') {
     // Master Admin view - full system access
     navigation = [
       { name: 'Master Dashboard', href: '/admin', current: pathname === '/admin' },
@@ -52,11 +37,6 @@ export default function Navigation() {
 
   const handleLogout = () => {
     logout();
-  };
-
-  const handleBackToAdmin = () => {
-    localStorage.removeItem('isAdminSwitch');
-    resetAdminSwitchMode();
   };
 
   return (
@@ -107,28 +87,12 @@ export default function Navigation() {
                   {/* User Info */}
                   <div className="text-right">
                     <p className="text-sm font-medium text-gray-900">
-                      {displayUser?.name || 'User'}
+                      {currentUser?.name || 'User'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {displayUser?.role || 'user'} • {displayUser?.email}
+                      {currentUser?.role || 'user'} • {currentUser?.email}
                     </p>
-                    {isAdminSwitch && (
-                      <p className="text-xs text-blue-600 font-medium">
-                        Admin View
-                      </p>
-                    )}
                   </div>
-                  
-                  {/* Back to Admin Button (if admin switch) */}
-                  {isAdminSwitch && (
-                    <Link
-                      href="/admin"
-                      onClick={handleBackToAdmin}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                    >
-                      Back to Admin
-                    </Link>
-                  )}
                   
                   {/* Logout Button */}
                   <button
@@ -185,34 +149,15 @@ export default function Navigation() {
             {/* Mobile User Info */}
             <div className="px-3 py-2 border-t border-gray-200">
               <p className="text-sm font-medium text-gray-900">
-                {displayUser?.name || 'User'}
+                {currentUser?.name || 'User'}
               </p>
               <p className="text-xs text-gray-500">
-                {displayUser?.role || 'user'} • {displayUser?.email}
+                {currentUser?.role || 'user'} • {currentUser?.email}
               </p>
               {currentClient && (
                 <p className="text-xs text-gray-500 mt-1">
                   {currentClient.companyName}
                 </p>
-              )}
-              {isAdminSwitch && (
-                <p className="text-xs text-blue-600 font-medium mt-1">
-                  Admin View
-                </p>
-              )}
-              
-              {/* Back to Admin Button (if admin switch) */}
-              {isAdminSwitch && (
-                <Link
-                  href="/admin"
-                  onClick={() => {
-                    handleBackToAdmin();
-                    setIsMenuOpen(false);
-                  }}
-                  className="mt-2 w-full bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-center block"
-                >
-                  Back to Admin
-                </Link>
               )}
               
               <button

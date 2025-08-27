@@ -53,10 +53,6 @@ interface AuthContextType {
   currentClient: Client | null;
   currentSession: Session | null;
   
-  // Admin switch state
-  originalAdminUser: User | null;
-  isAdminSwitchMode: boolean;
-  
   // Authentication methods
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -66,11 +62,6 @@ interface AuthContextType {
   // Session management
   checkAuth: () => Promise<boolean>;
   refreshSession: () => Promise<boolean>;
-  
-  // Client management
-  switchClient: (clientId: string) => Promise<boolean>;
-  switchToClient: (clientId: string, userId: string) => Promise<boolean>;
-  resetAdminSwitchMode: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -93,8 +84,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
-  const [originalAdminUser, setOriginalAdminUser] = useState<User | null>(null);
-  const [isAdminSwitchMode, setIsAdminSwitchMode] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   const checkAuth = async (): Promise<boolean> => {
@@ -167,14 +156,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('authToken');
-      localStorage.removeItem('isAdminSwitch');
     }
     setIsAuthenticated(false);
     setCurrentUser(null);
     setCurrentClient(null);
     setCurrentSession(null);
-    setOriginalAdminUser(null);
-    setIsAdminSwitchMode(false);
   };
 
   const registerClient = async (clientData: any): Promise<{ success: boolean; error?: string }> => {
@@ -255,106 +241,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const switchClient = async (clientId: string): Promise<boolean> => {
-    try {
-      if (typeof window === 'undefined') {
-        return false;
-      }
-      
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        return false;
-      }
-
-      const response = await fetch('/api/auth/switch-client', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ clientId }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentClient(data.client);
-        return true;
-      } else {
-        return false;
-      }
-    } catch (error) {
-      return false;
-    }
-  };
-
-  const switchToClient = async (clientId: string, userId: string): Promise<boolean> => {
-    try {
-      if (typeof window === 'undefined') {
-        return false;
-      }
-      
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        return false;
-      }
-
-      // Store the original admin user before switching
-      setOriginalAdminUser(currentUser);
-      setIsAdminSwitchMode(true);
-
-      // Create a new session for the admin user as the client user
-      const response = await fetch('/api/auth/switch-to-client', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ clientId, userId }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Update the current session and user context
-        setCurrentUser(data.user);
-        setCurrentClient(data.client);
-        setCurrentSession(data.session);
-        
-        // Store the new token
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('authToken', data.session.token);
-          
-          // Set admin switch flag if this is an admin switch
-          if (data.session.token) {
-            try {
-              const decoded = decodeJWT(data.session.token);
-              if (decoded?.isAdminSwitch) {
-                localStorage.setItem('isAdminSwitch', 'true');
-              }
-            } catch (error) {
-              // Ignore decode errors
-            }
-          }
-        }
-        
-        return true;
-      } else {
-        return false;
-      }
-    } catch (error) {
-      return false;
-    }
-  };
-
-  const resetAdminSwitchMode = () => {
-    if (originalAdminUser) {
-      setCurrentUser(originalAdminUser);
-      setCurrentClient(null); // Reset to admin's client context
-      setOriginalAdminUser(null);
-      setIsAdminSwitchMode(false);
-    }
-  };
-
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -384,17 +270,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     currentUser,
     currentClient,
     currentSession,
-    originalAdminUser,
-    isAdminSwitchMode,
     login,
     logout,
     registerClient,
     registerUser,
     checkAuth,
     refreshSession,
-    switchClient,
-    switchToClient,
-    resetAdminSwitchMode,
   };
 
   return (
