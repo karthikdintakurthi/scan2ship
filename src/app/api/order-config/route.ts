@@ -25,30 +25,13 @@ async function getAuthenticatedUser(request: NextRequest) {
       }
     });
 
-    if (!user || !user.isActive) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user || !user.isActive || !user.clients.isActive) {
+      return null;
     }
 
     console.log(`📊 [API_ORDER_CONFIG_GET] Fetching order config for user: ${user.email} (${user.role})`);
 
-    // Get order configuration for the user's client
-    let orderConfig = await prisma.client_order_configs.findUnique({
-      where: { clientId: user.clients.id }
-    });
-
-    if (!orderConfig) {
-      console.log(`📝 [API_ORDER_CONFIG_GET] No order config found, creating default for client ${user.clients.companyName}`);
-      
-      orderConfig = await prisma.client_order_configs.create({
-        data: {
-          id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          clientId: user.clients.id,
-          // Default values will be used from schema
-        }
-      });
-    }
-
-    return user;
+    return { user, client: user.clients };
   } catch (error) {
     return null;
   }
@@ -57,24 +40,29 @@ async function getAuthenticatedUser(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     // Authenticate user
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
+    const auth = await getAuthenticatedUser(request);
+    if (!auth) {
       console.log('❌ [API_ORDER_CONFIG_GET] Authentication failed');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📊 [API_ORDER_CONFIG_GET] Fetching order config for client: ${user.client.companyName} (ID: ${user.client.id})`);
+    const { user, client } = auth;
+
+    console.log(`📊 [API_ORDER_CONFIG_GET] Fetching order config for client: ${client.companyName} (ID: ${client.id})`);
 
     // Get order configuration for the current client
-    let orderConfig = user.client.clientOrderConfig;
+    let orderConfig = await prisma.client_order_configs.findUnique({
+      where: { clientId: client.id }
+    });
 
     // If no order config exists, create a default one
     if (!orderConfig) {
-      console.log(`📝 [API_ORDER_CONFIG_GET] No order config found, creating default for client ${user.client.companyName}`);
+      console.log(`📝 [API_ORDER_CONFIG_GET] No order config found, creating default for client ${client.companyName}`);
       
       orderConfig = await prisma.client_order_configs.create({
         data: {
-          clientId: user.client.id,
+          id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          clientId: client.id,
           // Default values
           defaultProductDescription: 'ARTIFICAL JEWELLERY',
           defaultPackageValue: 5000,
@@ -102,7 +90,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    console.log(`✅ [API_ORDER_CONFIG_GET] Order config retrieved for client ${user.client.companyName}:`, {
+    console.log(`✅ [API_ORDER_CONFIG_GET] Order config retrieved for client ${client.companyName}:`, {
       defaultProductDescription: orderConfig.defaultProductDescription,
       defaultPackageValue: orderConfig.defaultPackageValue,
       defaultWeight: orderConfig.defaultWeight,
@@ -136,8 +124,8 @@ export async function GET(request: NextRequest) {
         requireWeight: orderConfig.requireWeight,
         requireTotalItems: orderConfig.requireTotalItems
       },
-      clientId: user.client.id,
-      clientName: user.client.companyName
+      clientId: client.id,
+      clientName: client.companyName
     });
 
   } catch (error) {
