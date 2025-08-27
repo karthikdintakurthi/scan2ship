@@ -74,35 +74,29 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ [REGISTER_CLIENT] Created client user: ${clientUser.email} with role: ${clientUser.role}`);
 
-    // Create default pickup locations for the client
-    const defaultPickupLocations = [
-      { value: 'main-warehouse', label: 'Main Warehouse', delhiveryApiKey: null },
-      { value: 'branch-office', label: 'Branch Office', delhiveryApiKey: null }
-    ];
-
-    for (const location of defaultPickupLocations) {
-      await prisma.pickupLocation.create({
-        data: {
-          ...location,
-          clientId: client.id
-        }
+    // Create pickup locations
+    if (pickupLocations && pickupLocations.length > 0) {
+      await prisma.pickup_locations.createMany({
+        data: pickupLocations.map((location: any) => ({
+          id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          clientId: client.id,
+          value: location.value,
+          label: location.label,
+          delhiveryApiKey: location.delhiveryApiKey || null
+        }))
       });
     }
 
-    // Create default courier services for the client
-    const defaultCourierServices = [
-      { value: 'delhivery', label: 'Delhivery', isActive: true },
-      { value: 'dtdc', label: 'DTDC', isActive: true },
-      { value: 'india_post', label: 'India Post', isActive: true },
-      { value: 'manual', label: 'Manual', isActive: true }
-    ];
-
-    for (const service of defaultCourierServices) {
-      await prisma.courierService.create({
-        data: {
-          ...service,
-          clientId: client.id
-        }
+    // Create courier services
+    if (courierServices && courierServices.length > 0) {
+      await prisma.courier_services.createMany({
+        data: courierServices.map((service: any) => ({
+          id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          clientId: client.id,
+          value: service.value,
+          label: service.label,
+          isActive: true
+        }))
       });
     }
 

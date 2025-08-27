@@ -23,29 +23,21 @@ async function getAuthenticatedUser(request: NextRequest) {
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
-        client: true
+        clients: true
       }
     });
 
-    console.log('🔐 [AUTH] User lookup result:', user ? 'Found' : 'Not found');
-    if (user) {
-      console.log('🔐 [AUTH] User active:', user.isActive, 'Client active:', user.client?.isActive);
-    }
-
-    if (!user || !user.isActive || !user.client.isActive) {
-      console.log('🔐 [AUTH] User validation failed:', { 
-        userExists: !!user, 
-        userActive: user?.isActive, 
-        clientActive: user?.client?.isActive 
-      });
+    if (!user || !user.isActive) {
       return null;
     }
 
-    console.log('🔐 [AUTH] Authentication successful for user:', user.email, 'Client:', user.client.companyName);
-    return {
-      user: user,
-      client: user.client
-    };
+    // Check if user has access to client analytics
+    if (user.role !== 'admin' && user.role !== 'master_admin') {
+      return null;
+    }
+
+    console.log(`🔐 [AUTH] Authentication successful for user: ${user.email} (${user.role})`);
+    return { user };
   } catch (error) {
     console.log('🔐 [AUTH] JWT verification failed:', error);
     return null;

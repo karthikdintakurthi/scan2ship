@@ -35,11 +35,11 @@ async function getAuthenticatedAdmin(request: NextRequest) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
     
-    // Get user and client data from database
+    // Get user from database
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
-        client: true
+        clients: true
       }
     });
 

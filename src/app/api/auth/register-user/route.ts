@@ -61,14 +61,54 @@ export async function POST(request: NextRequest) {
              // Create user
          const user = await prisma.users.create({
            data: {
+             id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
              email,
              name,
              password: hashedPassword,
              role,
              isActive: true,
-             clientId
+             clientId,
+             updatedAt: new Date()
            }
          });
+
+    // Create default pickup locations for the client
+    const defaultPickupLocations = [
+      { value: 'main-warehouse', label: 'Main Warehouse', delhiveryApiKey: null },
+      { value: 'branch-office', label: 'Branch Office', delhiveryApiKey: null }
+    ];
+
+    for (const location of defaultPickupLocations) {
+      await prisma.pickup_locations.create({
+        data: {
+          id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          clientId: client.id,
+          value: location.value,
+          label: location.label,
+          delhiveryApiKey: location.delhiveryApiKey
+        }
+      });
+    }
+
+    // Create default courier services for the client
+    const defaultCourierServices = [
+      { value: 'delhivery', label: 'Delhivery', isActive: true },
+      { value: 'dtdc', label: 'DTDC', isActive: true },
+      { value: 'india_post', label: 'India Post', isActive: true },
+      { value: 'manual', label: 'Manual', isActive: true }
+    ];
+
+    for (const service of defaultCourierServices) {
+      await prisma.courier_services.create({
+        data: {
+          id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          clientId: client.id,
+          value: service.value,
+          label: service.label,
+          isActive: service.isActive
+        }
+      });
+    }
 
     return NextResponse.json({
       message: 'User registered successfully',

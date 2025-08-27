@@ -17,19 +17,35 @@ async function getAuthenticatedUser(request: NextRequest) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
     
+    // Get user and client data from database
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
-        client: {
-          include: {
-            clientOrderConfig: true
-          }
-        }
+        clients: true
       }
     });
 
     if (!user || !user.isActive) {
-      return null;
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    console.log(`📊 [API_ORDER_CONFIG_GET] Fetching order config for user: ${user.email} (${user.role})`);
+
+    // Get order configuration for the user's client
+    let orderConfig = await prisma.client_order_configs.findUnique({
+      where: { clientId: user.clients.id }
+    });
+
+    if (!orderConfig) {
+      console.log(`📝 [API_ORDER_CONFIG_GET] No order config found, creating default for client ${user.clients.companyName}`);
+      
+      orderConfig = await prisma.client_order_configs.create({
+        data: {
+          id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          clientId: user.clients.id,
+          // Default values will be used from schema
+        }
+      });
     }
 
     return user;
