@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
     // Create session
     const session = await prisma.sessions.create({
       data: {
+        id: crypto.randomUUID(), // Generate unique ID for session
         userId: user.id,
         clientId: user.clientId,
         token: jwt.sign(
