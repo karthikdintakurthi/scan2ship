@@ -59,6 +59,7 @@ model Order {
   return_reason            String?
   ewbn                     String?
   order_analytics          order_analytics?
+  credit_transactions      credit_transactions[]
   clients                  clients          @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("orders")
@@ -139,6 +140,9 @@ model clients {
   pickup_locations      pickup_locations[]
   sessions              sessions[]
   users                 users[]
+  client_credits        client_credits?
+  client_credit_costs   client_credit_costs[]
+  credit_transactions   credit_transactions[]
 }
 
 model courier_services {
@@ -200,19 +204,61 @@ model system_config {
 }
 
 model users {
-  id               String             @id
-  email            String
-  name             String
-  password         String?
-  role             String             @default("user")
-  isActive         Boolean            @default(true)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime
-  clientId         String
-  analytics_events analytics_events[]
-  order_analytics  order_analytics[]
-  sessions         sessions[]
-  clients          clients            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id                 String             @id
+  email              String
+  name               String
+  password           String?
+  role               String             @default("user")
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime
+  clientId           String
+  analytics_events   analytics_events[]
+  order_analytics    order_analytics[]
+  sessions           sessions[]
+  credit_transactions credit_transactions[]
+  clients            clients            @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([email, clientId])
+}
+
+// Credit System Models
+model client_credits {
+  id          String   @id
+  clientId    String   @unique
+  balance     Int      @default(0)
+  totalAdded  Int      @default(0)
+  totalUsed   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model client_credit_costs {
+  id          String   @id
+  clientId    String
+  feature     String   // "ORDER", "WHATSAPP", "IMAGE_PROCESSING", "TEXT_PROCESSING"
+  cost        Float    // Cost in credits (can be 0.5, 1.0, 1.5, etc.)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, feature])
+}
+
+model credit_transactions {
+  id          String   @id
+  clientId    String
+  userId      String?
+  type        String   // "ADD", "DEDUCT", "RESET"
+  amount      Int
+  balance     Int      // Balance after transaction
+  description String
+  feature     String?  // "ORDER", "WHATSAPP", "IMAGE_PROCESSING", "TEXT_PROCESSING", "MANUAL"
+  orderId     Int?     // Reference to order if applicable
+  createdAt   DateTime @default(now())
+  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users       users?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  orders      Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
 }

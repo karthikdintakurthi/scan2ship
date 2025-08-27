@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import AuthWrapper from '@/components/AuthWrapper';
+import AuthErrorBoundary from '@/components/AuthErrorBoundary';
 import PWAScript from '@/components/PWAScript';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -84,11 +85,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>
-          <AuthWrapper>
-            {children}
-          </AuthWrapper>
-        </AuthProvider>
+        <AuthErrorBoundary>
+          <AuthProvider>
+            <AuthWrapper>
+              {children}
+            </AuthWrapper>
+          </AuthProvider>
+        </AuthErrorBoundary>
         <PWAScript />
       </body>
     </html>

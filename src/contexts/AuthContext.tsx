@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { safeLocalStorage } from '@/lib/browser-utils';
 
 // Browser-compatible JWT decode function
 function decodeJWT(token: string): any {
@@ -43,6 +44,16 @@ interface Session {
   expiresAt: string;
 }
 
+interface ClientCredits {
+  id: string;
+  clientId: string;
+  balance: number;
+  totalAdded: number;
+  totalUsed: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface AuthContextType {
   // Authentication state
   isAuthenticated: boolean;
@@ -53,6 +64,9 @@ interface AuthContextType {
   currentClient: Client | null;
   currentSession: Session | null;
   
+  // Credit balance
+  creditBalance: ClientCredits | null;
+  
   // Authentication methods
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -62,6 +76,10 @@ interface AuthContextType {
   // Session management
   checkAuth: () => Promise<boolean>;
   refreshSession: () => Promise<boolean>;
+  
+  // Credit management
+  refreshCredits: () => Promise<void>;
+  updateCredits: (newBalance: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -84,16 +102,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [creditBalance, setCreditBalance] = useState<ClientCredits | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Safe localStorage access using utility functions
+  const getStoredToken = (): string | null => {
+    return safeLocalStorage.getItem('authToken');
+  };
+
+  const setStoredToken = (token: string): void => {
+    safeLocalStorage.setItem('authToken', token);
+  };
+
+  const removeStoredToken = (): void => {
+    safeLocalStorage.removeItem('authToken');
+  };
 
   const checkAuth = async (): Promise<boolean> => {
     try {
-      // Check if we're on the client side before accessing localStorage
-      if (typeof window === 'undefined') {
-        return false;
-      }
-      
-      const token = localStorage.getItem('authToken');
+      const token = getStoredToken();
       if (!token) {
         return false;
       }
@@ -113,9 +141,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return true;
       } else {
         // Clear invalid session
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('authToken');
-        }
+        removeStoredToken();
         return false;
       }
     } catch (error) {
@@ -137,9 +163,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const data = await response.json();
 
       if (response.ok) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('authToken', data.session.token);
-        }
+        setStoredToken(data.session.token);
         setCurrentUser(data.user);
         setCurrentClient(data.client);
         setCurrentSession(data.session);
@@ -154,13 +178,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('authToken');
-    }
+    removeStoredToken();
     setIsAuthenticated(false);
     setCurrentUser(null);
     setCurrentClient(null);
     setCurrentSession(null);
+    setCreditBalance(null);
+  };
+
+  const refreshCredits = async (): Promise<void> => {
+    if (!isAuthenticated || !currentUser) {
+      return;
+    }
+
+    try {
+      const token = getStoredToken();
+      if (!token) {
+        return;
+      }
+
+      const response = await fetch('/api/credits', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCreditBalance(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to refresh credits:', error);
+    }
+  };
+
+  const updateCredits = (newBalance: number) => {
+    if (creditBalance) {
+      setCreditBalance({
+        ...creditBalance,
+        balance: newBalance
+      });
+    }
   };
 
   const registerClient = async (clientData: any): Promise<{ success: boolean; error?: string }> => {
@@ -209,11 +267,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const refreshSession = async (): Promise<boolean> => {
     try {
-      if (typeof window === 'undefined') {
-        return false;
-      }
-      
-      const token = localStorage.getItem('authToken');
+      const token = getStoredToken();
       if (!token) {
         return false;
       }
@@ -226,9 +280,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (response.ok) {
         const data = await response.json();
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('authToken', data.token);
-        }
+        setStoredToken(data.token);
         setCurrentSession(data.session);
         return true;
       } else {
@@ -242,11 +294,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     setIsClient(true);
   }, []);
 
   useEffect(() => {
-    if (!isClient) return;
+    // Only run on client side
+    if (!isClient || typeof window === 'undefined') {
+      return;
+    }
     
     const initializeAuth = async () => {
       setIsLoading(true);
@@ -270,12 +330,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     currentUser,
     currentClient,
     currentSession,
+    creditBalance,
     login,
     logout,
     registerClient,
     registerUser,
     checkAuth,
     refreshSession,
+    refreshCredits,
+    updateCredits,
   };
 
   return (

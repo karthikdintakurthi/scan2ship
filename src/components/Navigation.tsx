@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Image from 'next/image';
+import CreditWallet from './CreditWallet';
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -12,26 +13,38 @@ export default function Navigation() {
   const { currentUser, currentClient, logout } = useAuth();
 
   // Determine navigation based on context
+  console.log('🔍 [NAVIGATION] Current user:', currentUser);
+  console.log('🔍 [NAVIGATION] User role:', currentUser?.role);
+  
   let navigation;
+  let clientDropdownItems;
+  
   if (currentUser?.role === 'master_admin') {
+    console.log('✅ [NAVIGATION] Setting up master admin navigation');
     // Master Admin view - full system access
     navigation = [
       { name: 'Master Dashboard', href: '/admin', current: pathname === '/admin' },
       { name: 'System Settings', href: '/admin/settings', current: pathname === '/admin/settings' },
+      { name: 'Credit Management', href: '/admin/credits', current: pathname === '/admin/credits' },
+    ];
+    clientDropdownItems = [
       { name: 'Client Management', href: '/admin/clients', current: pathname === '/admin/clients' },
       { name: 'Client Configurations', href: '/admin/client-configurations', current: pathname === '/admin/client-configurations' },
     ];
   } else if (currentUser?.role === 'admin') {
+    console.log('✅ [NAVIGATION] Setting up admin navigation');
     // Regular admin view
     navigation = [
       { name: 'Admin Dashboard', href: '/admin', current: pathname === '/admin' },
     ];
   } else {
+    console.log('✅ [NAVIGATION] Setting up regular user navigation');
     // Regular client user view
     navigation = [
       { name: 'Dashboard', href: '/', current: pathname === '/' },
       { name: 'Create Order', href: '/orders', current: pathname === '/orders' },
       { name: 'View Orders', href: '/view-orders', current: pathname === '/view-orders' },
+      { name: 'Wallet', href: '/credits', current: pathname === '/credits' },
     ];
   }
 
@@ -84,6 +97,11 @@ export default function Navigation() {
             <div className="hidden md:ml-4 md:flex md:items-center">
               <div className="ml-3 relative">
                 <div className="flex items-center space-x-4">
+                  {/* Credit Wallet - Only show for non-master-admin users */}
+                  {currentUser && currentUser.role !== 'master_admin' && (
+                    <CreditWallet />
+                  )}
+                  
                   {/* User Info */}
                   <div className="text-right">
                     <p className="text-sm font-medium text-gray-900">
@@ -148,6 +166,13 @@ export default function Navigation() {
             
             {/* Mobile User Info */}
             <div className="px-3 py-2 border-t border-gray-200">
+              {/* Credit Wallet - Only show for non-master-admin users */}
+              {currentUser && currentUser.role !== 'master_admin' && (
+                <div className="mb-3">
+                  <CreditWallet />
+                </div>
+              )}
+              
               <p className="text-sm font-medium text-gray-900">
                 {currentUser?.name || 'User'}
               </p>

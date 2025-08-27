@@ -1,11 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server'
+import jwt from 'jsonwebtoken'
+import { prisma } from '@/lib/prisma'
+import { CreditService } from '@/lib/credit-service'
+
+// Helper function to get authenticated user and client
+async function getAuthenticatedUser(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = authHeader.substring(7);
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    
+    const user = await prisma.users.findUnique({
+      where: { id: decoded.userId },
+      include: {
+        clients: true
+      }
+    });
+
+    if (!user || !user.isActive || !user.clients.isActive) {
+      return null;
+    }
+
+    return {
+      user: user,
+      client: user.clients
+    };
+  } catch (error) {
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user
+    const auth = await getAuthenticatedUser(request);
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { client, user } = auth;
     const { addressText } = await request.json()
     
     if (!addressText) {
       return NextResponse.json({ error: 'Address text is required' }, { status: 400 })
+    }
+
+    // Check if client has sufficient credits for text processing
+    const textProcessingCreditCost = CreditService.getCreditCost('TEXT_PROCESSING');
+    const hasSufficientCredits = await CreditService.hasSufficientCredits(client.id, textProcessingCreditCost);
+
+    if (!hasSufficientCredits) {
+      return NextResponse.json({
+        error: 'Insufficient credits',
+        details: `Text processing requires ${textProcessingCreditCost} credits. Please contact your administrator to add more credits.`
+      }, { status: 402 });
     }
 
     // Check if OpenAI API key is configured
@@ -164,6 +218,14 @@ Examples of tracking number extraction:
     }
 
     console.log('🎉 Final Response Sent to Client:', JSON.stringify(parsedAddress, null, 2))
+    
+    // Deduct credits for successful text processing
+    try {
+      await CreditService.deductTextProcessingCredits(client.id, user.id);
+      console.log('💳 [API_FORMAT_ADDRESS] Credits deducted for text processing: 1 credit');
+    } catch (creditError) {
+      console.error('❌ [API_FORMAT_ADDRESS] Failed to deduct credits for text processing:', creditError);
+    }
     
     return NextResponse.json({ 
       success: true, 

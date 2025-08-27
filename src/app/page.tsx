@@ -12,7 +12,10 @@ export default function Home() {
 
   // Redirect admin and master_admin users to admin dashboard
   useEffect(() => {
+    console.log('🔍 [HOME_PAGE] Auth check:', { isAuthenticated, currentUser: currentUser?.email, role: currentUser?.role });
+    
     if (isAuthenticated && currentUser && (currentUser.role === 'admin' || currentUser.role === 'master_admin')) {
+      console.log('✅ [HOME_PAGE] Redirecting admin user to /admin');
       router.push('/admin');
     }
   }, [isAuthenticated, currentUser, router]);

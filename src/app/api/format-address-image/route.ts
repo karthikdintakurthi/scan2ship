@@ -1,12 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server'
+import jwt from 'jsonwebtoken'
+import { prisma } from '@/lib/prisma'
+import { CreditService } from '@/lib/credit-service'
+
+// Helper function to get authenticated user and client
+async function getAuthenticatedUser(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = authHeader.substring(7);
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    
+    const user = await prisma.users.findUnique({
+      where: { id: decoded.userId },
+      include: {
+        clients: true
+      }
+    });
+
+    if (!user || !user.isActive || !user.clients.isActive) {
+      return null;
+    }
+
+    return {
+      user: user,
+      client: user.clients
+    };
+  } catch (error) {
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user
+    const auth = await getAuthenticatedUser(request);
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { client, user } = auth;
     const formData = await request.formData()
     const imageFile = formData.get('image') as File
     
     if (!imageFile) {
       return NextResponse.json({ error: 'Image file is required' }, { status: 400 })
+    }
+
+    // Check if client has sufficient credits for image processing
+    const imageProcessingCreditCost = CreditService.getCreditCost('IMAGE_PROCESSING');
+    const hasSufficientCredits = await CreditService.hasSufficientCredits(client.id, imageProcessingCreditCost);
+
+    if (!hasSufficientCredits) {
+      return NextResponse.json({
+        error: 'Insufficient credits',
+        details: `Image processing requires ${imageProcessingCreditCost} credits. Please contact your administrator to add more credits.`
+      }, { status: 402 });
     }
 
     // Check if OpenAI API key is configured
@@ -204,6 +258,14 @@ Examples of tracking number extraction:
         }
 
         console.log('🎉 Final Response Sent to Client:', JSON.stringify(parsedAddress, null, 2))
+        
+        // Deduct credits for successful image processing
+        try {
+          await CreditService.deductImageProcessingCredits(client.id, user.id);
+          console.log('💳 [API_FORMAT_ADDRESS_IMAGE] Credits deducted for image processing: 2 credits');
+        } catch (creditError) {
+          console.error('❌ [API_FORMAT_ADDRESS_IMAGE] Failed to deduct credits for image processing:', creditError);
+        }
         
         return NextResponse.json({ 
           success: true, 

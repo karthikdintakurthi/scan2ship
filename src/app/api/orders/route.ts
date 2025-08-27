@@ -5,6 +5,7 @@ import { DelhiveryService } from '@/lib/delhivery';
 import whatsappService, { initializeWhatsAppService } from '@/lib/whatsapp-service';
 import { generateReferenceNumber, formatReferenceNumber } from '@/lib/reference-number';
 import AnalyticsService from '@/lib/analytics-service';
+import { CreditService } from '@/lib/credit-service';
 
 const delhiveryService = new DelhiveryService();
 
@@ -65,10 +66,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { client } = auth;
+    const { client, user } = auth;
     const orderData = await request.json();
 
     console.log('📦 [API_ORDERS_POST] Creating order for client:', client.companyName);
+
+    // Check if client has sufficient credits for order creation
+    const orderCreditCost = CreditService.getCreditCost('ORDER');
+    const hasSufficientCredits = await CreditService.hasSufficientCredits(client.id, orderCreditCost);
+    
+    if (!hasSufficientCredits) {
+      return NextResponse.json({ 
+        error: 'Insufficient credits',
+        details: `Order creation requires ${orderCreditCost} credits. Please contact your administrator to add more credits.`
+      }, { status: 402 });
+    }
 
     // Validate required fields
     const requiredFields = ['name', 'mobile', 'address', 'city', 'state', 'country', 'pincode', 'courier_service', 'pickup_location', 'package_value', 'weight', 'total_items'];
@@ -115,6 +127,16 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('✅ [API_ORDERS_POST] Order created successfully:', order.id);
+
+    // Deduct credits for order creation
+    try {
+      await CreditService.deductOrderCredits(client.id, user.id, order.id);
+      console.log('💳 [API_ORDERS_POST] Credits deducted for order creation:', orderCreditCost);
+    } catch (creditError) {
+      console.error('❌ [API_ORDERS_POST] Failed to deduct credits:', creditError);
+      // Note: We don't fail the order creation if credit deduction fails
+      // The order is already created, but we log the error
+    }
 
     // Track order creation analytics
     try {
@@ -234,6 +256,14 @@ export async function POST(request: NextRequest) {
       const customerWhatsAppResult = await whatsappService.sendCustomerOrderWhatsApp(whatsappData);
       if (customerWhatsAppResult.success) {
         console.log('📱 [API_ORDERS_POST] Customer WhatsApp message sent for order:', updatedOrder.id);
+        
+        // Deduct credits for successful WhatsApp message
+        try {
+          await CreditService.deductWhatsAppCredits(client.id, user.id, updatedOrder.id);
+          console.log('💳 [API_ORDERS_POST] Credits deducted for customer WhatsApp message: 1 credit');
+        } catch (creditError) {
+          console.error('❌ [API_ORDERS_POST] Failed to deduct credits for customer WhatsApp:', creditError);
+        }
       } else {
         console.warn('⚠️ [API_ORDERS_POST] Customer WhatsApp message failed for order:', updatedOrder.id, customerWhatsAppResult.error);
       }
@@ -243,6 +273,14 @@ export async function POST(request: NextRequest) {
         const resellerWhatsAppResult = await whatsappService.sendResellerOrderWhatsApp(whatsappData);
         if (resellerWhatsAppResult.success) {
           console.log('📱 [API_ORDERS_POST] Reseller WhatsApp message sent for order:', updatedOrder.id);
+          
+          // Deduct credits for successful reseller WhatsApp message
+          try {
+            await CreditService.deductWhatsAppCredits(client.id, user.id, updatedOrder.id);
+            console.log('💳 [API_ORDERS_POST] Credits deducted for reseller WhatsApp message: 1 credit');
+          } catch (creditError) {
+            console.error('❌ [API_ORDERS_POST] Failed to deduct credits for reseller WhatsApp:', creditError);
+          }
         } else {
           console.warn('⚠️ [API_ORDERS_POST] Reseller WhatsApp message failed for order:', updatedOrder.id, resellerWhatsAppResult.error);
         }

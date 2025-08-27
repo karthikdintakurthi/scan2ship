@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { getOrderFormConfig } from '@/lib/order-form-config'
 import { usePickupLocation } from '@/hooks/usePickupLocation'
+import { useAuth } from '@/contexts/AuthContext'
 import { getPickupLocationConfig } from '@/lib/pickup-location-config'
 import { getCourierServiceByValue, validateCourierServiceRestrictions } from '@/lib/courier-service-config'
 import { getOrderConfig, validateOrderData } from '@/lib/order-config'
@@ -31,6 +32,7 @@ interface AddressFormData {
 }
 
 export default function OrderForm() {
+  const { refreshCredits } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentStep, setCurrentStep] = useState<'idle' | 'creating' | 'completed'>('idle')
   const [error, setError] = useState('')
@@ -224,6 +226,7 @@ export default function OrderForm() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
         body: JSON.stringify({ addressText: addressDetail }),
       })
@@ -254,6 +257,9 @@ export default function OrderForm() {
         
         setSuccess('Address processed successfully! Form fields have been auto-filled.')
         setTimeout(() => setSuccess(''), 5000)
+        
+        // Refresh credit balance after successful text processing
+        refreshCredits();
       } else {
         throw new Error(data.error || 'Failed to process address')
       }
@@ -302,6 +308,9 @@ export default function OrderForm() {
 
       const response = await fetch('/api/format-address-image', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
         body: formData,
       })
 
@@ -331,6 +340,9 @@ export default function OrderForm() {
         
         setSuccess('Image processed successfully! Form fields have been auto-filled.')
         setTimeout(() => setSuccess(''), 5000)
+        
+        // Refresh credit balance after successful image processing
+        refreshCredits();
       } else {
         throw new Error(data.error || 'Failed to process image')
       }
@@ -541,6 +553,9 @@ export default function OrderForm() {
       if (result.success) {
         setCurrentStep('completed')
         setSuccess(`Order created successfully! Order Number: ${result.order.referenceNumber}`)
+        
+        // Refresh credit balance immediately after successful order creation
+        refreshCredits();
         
         // Scroll to top of the page for better UX when entering next order
         window.scrollTo({ top: 0, behavior: 'smooth' })

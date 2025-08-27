@@ -1,13 +1,11 @@
 {
-  "/api/admin/clients/route": "app/api/admin/clients/route.js",
-  "/api/admin/system-config/route": "app/api/admin/system-config/route.js",
+  "/api/admin/credits/route": "app/api/admin/credits/route.js",
+  "/api/admin/credits/[clientId]/route": "app/api/admin/credits/[clientId]/route.js",
   "/favicon.ico/route": "app/favicon.ico/route.js",
   "/api/auth/verify/route": "app/api/auth/verify/route.js",
-  "/api/admin/client-configurations/route": "app/api/admin/client-configurations/route.js",
-  "/page": "app/page.js",
-  "/view-orders/page": "app/view-orders/page.js",
   "/orders/page": "app/orders/page.js",
   "/admin/page": "app/admin/page.js",
   "/admin/settings/page": "app/admin/settings/page.js",
-  "/admin/client-configurations/page": "app/admin/client-configurations/page.js"
+  "/admin/settings/clients/[id]/page": "app/admin/settings/clients/[id]/page.js",
+  "/admin/credits/page": "app/admin/credits/page.js"
 }

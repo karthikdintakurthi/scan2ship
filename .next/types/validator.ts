@@ -89,6 +89,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies AppPageConfig<"/admin/clients">
 }
 
+// Validate ../../src/app/admin/credits/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/credits/page.js")
+  handler satisfies AppPageConfig<"/admin/credits">
+}
+
 // Validate ../../src/app/admin/page.tsx
 {
   const handler = {} as typeof import("../../src/app/admin/page.js")
@@ -111,6 +117,18 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   const handler = {} as typeof import("../../src/app/admin/settings/page.js")
   handler satisfies AppPageConfig<"/admin/settings">
+}
+
+// Validate ../../src/app/admin/test/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/test/page.js")
+  handler satisfies AppPageConfig<"/admin/test">
+}
+
+// Validate ../../src/app/credits/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/credits/page.js")
+  handler satisfies AppPageConfig<"/credits">
 }
 
 // Validate ../../src/app/login/page.tsx
@@ -149,6 +167,18 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies AppPageConfig<"/test-login">
 }
 
+// Validate ../../src/app/test-page/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/test-page/page.js")
+  handler satisfies AppPageConfig<"/test-page">
+}
+
+// Validate ../../src/app/test-ssr/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/test-ssr/page.js")
+  handler satisfies AppPageConfig<"/test-ssr">
+}
+
 // Validate ../../src/app/view-orders/page.tsx
 {
   const handler = {} as typeof import("../../src/app/view-orders/page.js")
@@ -177,6 +207,30 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   const handler = {} as typeof import("../../src/app/api/admin/clients/route.js")
   handler satisfies RouteHandlerConfig<"/api/admin/clients">
+}
+
+// Validate ../../src/app/api/admin/credits/[clientId]/costs/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/admin/credits/[clientId]/costs/route.js")
+  handler satisfies RouteHandlerConfig<"/api/admin/credits/[clientId]/costs">
+}
+
+// Validate ../../src/app/api/admin/credits/[clientId]/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/admin/credits/[clientId]/route.js")
+  handler satisfies RouteHandlerConfig<"/api/admin/credits/[clientId]">
+}
+
+// Validate ../../src/app/api/admin/credits/[clientId]/transactions/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/admin/credits/[clientId]/transactions/route.js")
+  handler satisfies RouteHandlerConfig<"/api/admin/credits/[clientId]/transactions">
+}
+
+// Validate ../../src/app/api/admin/credits/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/admin/credits/route.js")
+  handler satisfies RouteHandlerConfig<"/api/admin/credits">
 }
 
 // Validate ../../src/app/api/admin/settings/clients/[id]/route.ts
@@ -257,6 +311,18 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/courier-services">
 }
 
+// Validate ../../src/app/api/credits/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/credits/route.js")
+  handler satisfies RouteHandlerConfig<"/api/credits">
+}
+
+// Validate ../../src/app/api/credits/transactions/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/credits/transactions/route.js")
+  handler satisfies RouteHandlerConfig<"/api/credits/transactions">
+}
+
 // Validate ../../src/app/api/format-address-image/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/format-address-image/route.js")
@@ -303,6 +369,18 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   const handler = {} as typeof import("../../src/app/api/pickup-locations/route.js")
   handler satisfies RouteHandlerConfig<"/api/pickup-locations">
+}
+
+// Validate ../../src/app/api/process-image/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/process-image/route.js")
+  handler satisfies RouteHandlerConfig<"/api/process-image">
+}
+
+// Validate ../../src/app/api/process-text/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/process-text/route.js")
+  handler satisfies RouteHandlerConfig<"/api/process-text">
 }
 
 // Validate ../../src/app/api/test-admin/route.ts

@@ -11,8 +11,14 @@ export default function AdminDashboardPage() {
 
   // Check if user is admin or master admin
   useEffect(() => {
+    console.log('🔍 [ADMIN_DASHBOARD] Current user:', currentUser);
+    console.log('🔍 [ADMIN_DASHBOARD] User role:', currentUser?.role);
+    
     if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'master_admin') {
+      console.log('❌ [ADMIN_DASHBOARD] User not authorized, redirecting to home');
       router.push('/');
+    } else if (currentUser) {
+      console.log('✅ [ADMIN_DASHBOARD] User authorized as:', currentUser.role);
     }
   }, [currentUser, router]);
 
@@ -181,6 +187,30 @@ export default function AdminDashboardPage() {
             className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
           >
             View Analytics
+            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
+
+        {/* Client Wallet Management */}
+        <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 ml-3">Client Wallet Management</h3>
+          </div>
+          <p className="text-gray-600 mb-4">
+            Manage client credit balances, add credits, reset wallets, and view transaction history.
+          </p>
+          <Link
+            href="/admin/credits"
+            className="inline-flex items-center px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+          >
+            Manage Wallets
             <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
