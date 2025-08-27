@@ -1,3 +1,10 @@
 node_modules
 .vercel
 .env*.local
+next/
+/.next
+/.next/static
+/.next/static/chunks
+/.next/**/*.js
+.next/static/chunks/app/layout.js
+.next/static/chunks/webpack.js
