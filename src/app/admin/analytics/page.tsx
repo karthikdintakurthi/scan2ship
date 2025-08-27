@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { authenticatedGet } from '@/lib/api-client';
 
 interface PlatformAnalytics {
   openaiImageCount: number;
@@ -49,8 +50,8 @@ export default function AnalyticsPage() {
     const fetchAnalytics = async () => {
       try {
         const [platformResponse, clientsResponse] = await Promise.all([
-          fetch('/api/analytics/platform'),
-          fetch('/api/analytics/clients')
+          authenticatedGet('/api/analytics/platform'),
+          authenticatedGet('/api/analytics/clients')
         ]);
 
         if (platformResponse.ok) {
@@ -64,6 +65,10 @@ export default function AnalyticsPage() {
         }
       } catch (error) {
         console.error('Failed to fetch analytics:', error);
+        // Handle authentication errors
+        if (error instanceof Error && error.message.includes('Authentication failed')) {
+          router.push('/login');
+        }
       } finally {
         setLoading(false);
       }
@@ -72,7 +77,7 @@ export default function AnalyticsPage() {
     if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'master_admin')) {
       fetchAnalytics();
     }
-  }, [currentUser]);
+  }, [currentUser, router]);
 
   // Show loading if checking authentication
   if (!currentUser) {

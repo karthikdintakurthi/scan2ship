@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { authenticatedGet } from '@/lib/api-client';
 
 interface ClientConfig {
   id: string;
@@ -94,36 +95,34 @@ export default function ClientConfigurationsPage() {
     }
   }, [currentUser, router]);
 
-  // Fetch clients with all configurations
+  // Fetch client configurations
   useEffect(() => {
-    if (currentUser?.role === 'admin' || currentUser?.role === 'master_admin') {
-      fetchClientsWithConfigs();
-    }
-  }, [currentUser]);
-
-  const fetchClientsWithConfigs = async () => {
-    try {
-      setIsLoading(true);
-      const token = localStorage.getItem('authToken');
-      
-      const response = await fetch('/api/admin/client-configurations', {
-        headers: {
-          'Authorization': `Bearer ${token}`
+    const fetchClientConfigs = async () => {
+      try {
+        setIsLoading(true);
+        const response = await authenticatedGet('/api/admin/client-configurations');
+        
+        if (response.ok) {
+          const data = await response.json();
+          setClients(data.clients);
+        } else {
+          setError('Failed to fetch client configurations');
         }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setClients(data.clients);
-      } else {
-        setError('Failed to fetch client configurations');
+      } catch (error) {
+        setError('Error fetching client configurations');
+        // Handle authentication errors
+        if (error instanceof Error && error.message.includes('Authentication failed')) {
+          router.push('/login');
+        }
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      setError('Error fetching client configurations');
-    } finally {
-      setIsLoading(false);
+    };
+
+    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'master_admin')) {
+      fetchClientConfigs();
     }
-  };
+  }, [currentUser, router]);
 
   // Filter clients based on search and status
   const filteredClients = clients.filter(client => {

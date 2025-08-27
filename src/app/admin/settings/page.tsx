@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import WhatsAppConfig from '@/components/WhatsAppConfig';
+import { authenticatedGet, authenticatedPost } from '@/lib/api-client';
 
 interface Client {
   id: string;
@@ -56,46 +57,69 @@ export default function SystemSettingsPage() {
     }
   }, [currentUser, router]);
 
-  // Fetch clients and system config
+  // Fetch initial data
   useEffect(() => {
-    if (currentUser?.role === 'admin' || currentUser?.role === 'master_admin') {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch clients
+        const clientsResponse = await authenticatedGet('/api/admin/clients');
+        if (clientsResponse.ok) {
+          const clientsData = await clientsResponse.json();
+          setClients(clientsData.clients);
+        }
+
+        // Fetch system config
+        const configResponse = await authenticatedGet('/api/admin/system-config');
+        if (configResponse.ok) {
+          const configData = await configResponse.json();
+          setConfigs(configData.configs);
+          setConfigByCategory(configData.configByCategory);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        // Handle authentication errors
+        if (error instanceof Error && error.message.includes('Authentication failed')) {
+          router.push('/login');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'master_admin')) {
       fetchData();
     }
-  }, [currentUser]);
+  }, [currentUser, router]);
 
-  const fetchData = async () => {
+  // Update system config
+  const updateSystemConfig = async (key: string, value: string) => {
     try {
-      setIsLoading(true);
-      const token = localStorage.getItem('authToken');
-      
-      // Fetch clients
-      const clientsResponse = await fetch('/api/admin/clients', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await authenticatedPost('/api/admin/system-config', {
+        key,
+        value
       });
 
-      if (clientsResponse.ok) {
-        const clientsData = await clientsResponse.json();
-        setClients(clientsData.clients);
-      }
-
-      // Fetch system configuration
-      const configResponse = await fetch('/api/admin/system-config', {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      if (response.ok) {
+        // Refresh the configs
+        const configResponse = await authenticatedGet('/api/admin/system-config');
+        if (configResponse.ok) {
+          const configData = await configResponse.json();
+          setConfigs(configData.configs);
         }
-      });
-
-      if (configResponse.ok) {
-        const configData = await configResponse.json();
-        setConfigs(configData.configs);
-        setConfigByCategory(configData.configByCategory);
+        setSuccess('Configuration updated successfully!');
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to update configuration');
       }
     } catch (error) {
-      setError('Error fetching data');
-    } finally {
-      setIsLoading(false);
+      console.error('Error updating config:', error);
+      setError('Error updating configuration');
+      // Handle authentication errors
+      if (error instanceof Error && error.message.includes('Authentication failed')) {
+        router.push('/login');
+      }
     }
   };
 
@@ -112,18 +136,9 @@ export default function SystemSettingsPage() {
 
       const token = localStorage.getItem('authToken');
       
-      const response = await fetch('/api/admin/system-config', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          configs: [{
-            id: configId,
-            value: editValue
-          }]
-        })
+      const response = await authenticatedPost('/api/admin/system-config', {
+        key: configId,
+        value: editValue
       });
 
       if (response.ok) {
@@ -131,7 +146,6 @@ export default function SystemSettingsPage() {
         setEditingConfig(null);
         setEditValue('');
         // Refresh data
-        fetchData();
         setTimeout(() => setSuccess(''), 3000);
       } else {
         const data = await response.json();

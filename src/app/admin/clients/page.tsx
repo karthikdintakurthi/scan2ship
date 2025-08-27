@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { authenticatedGet } from '@/lib/api-client';
 
 interface Client {
   id: string;
@@ -46,34 +47,33 @@ export default function ViewClientsPage() {
 
   // Fetch clients
   useEffect(() => {
-    if (currentUser?.role === 'admin' || currentUser?.role === 'master_admin') {
+    const fetchClients = async () => {
+      try {
+        setIsLoading(true);
+        const response = await authenticatedGet('/api/admin/clients');
+        
+        if (response.ok) {
+          const data = await response.json();
+          setClients(data.clients);
+        } else {
+          setError('Failed to fetch clients');
+        }
+      } catch (error) {
+        console.error('Error fetching clients:', error);
+        setError('Error fetching clients');
+        // Handle authentication errors
+        if (error instanceof Error && error.message.includes('Authentication failed')) {
+          router.push('/login');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'master_admin')) {
       fetchClients();
     }
-  }, [currentUser]);
-
-  const fetchClients = async () => {
-    try {
-      setIsLoading(true);
-      const token = localStorage.getItem('authToken');
-      
-      const response = await fetch('/api/admin/clients', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setClients(data.clients);
-      } else {
-        setError('Failed to fetch clients');
-      }
-    } catch (error) {
-      setError('Error fetching clients');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [currentUser, router]);
 
   // Filter clients based on search and status
   const filteredClients = clients.filter(client => {
