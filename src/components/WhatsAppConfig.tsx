@@ -1,51 +1,191 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import whatsappService from '@/lib/whatsapp-service';
 
+interface WhatsAppConfigData {
+  apiKey: string;
+  messageId: string;
+  configured: boolean;
+}
+
 export default function WhatsAppConfig() {
+  const { currentUser } = useAuth();
   const [apiKey, setApiKey] = useState('');
   const [messageId, setMessageId] = useState('');
   const [isEnabled, setIsEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
   const [testPhone, setTestPhone] = useState('');
+  const [configStatus, setConfigStatus] = useState<{ configured: boolean; missingFields: string[] }>({
+    configured: false,
+    missingFields: []
+  });
 
   useEffect(() => {
-    // Load configuration from environment variables or localStorage
-    const loadConfig = () => {
-      const config = {
-        apiKey: process.env.NEXT_PUBLIC_FAST2SMS_WHATSAPP_API_KEY || localStorage.getItem('whatsapp_api_key') || '',
-        messageId: process.env.NEXT_PUBLIC_FAST2SMS_WHATSAPP_MESSAGE_ID || localStorage.getItem('whatsapp_message_id') || '',
-        enabled: localStorage.getItem('whatsapp_enabled') === 'true'
-      };
+    // Load configuration from database via API
+    const loadConfig = async () => {
+      try {
+        setIsLoadingConfig(true);
+        
+        // Get authentication token
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+        
+        if (!token) {
+          console.error('📱 [WHATSAPP_CONFIG] No authentication token found');
+          throw new Error('No authentication token');
+        }
+        
+        // Fetch WhatsApp configuration from API
+        const response = await fetch('/api/admin/system-config', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const whatsappConfigs = data.configs?.filter((config: any) => config.category === 'whatsapp') || [];
+          
+          const apiKeyConfig = whatsappConfigs.find((config: any) => config.key === 'FAST2SMS_WHATSAPP_API_KEY');
+          const messageIdConfig = whatsappConfigs.find((config: any) => config.key === 'FAST2SMS_WHATSAPP_MESSAGE_ID');
+          
+          const configData: WhatsAppConfigData = {
+            apiKey: apiKeyConfig?.value || '',
+            messageId: messageIdConfig?.value || '',
+            configured: !!(apiKeyConfig?.value && messageIdConfig?.value)
+          };
 
-      setApiKey(config.apiKey);
-      setMessageId(config.messageId);
-      setIsEnabled(config.enabled);
+          setApiKey(configData.apiKey);
+          setMessageId(configData.messageId);
+          setIsEnabled(configData.configured);
+          
+          // Update service configuration
+          whatsappService.updateConfig({
+            apiKey: configData.apiKey,
+            messageId: configData.messageId
+          });
+          
+          // Get service status
+          const status = whatsappService.getStatus();
+          setConfigStatus(status);
+          
+          console.log('📱 [WHATSAPP_CONFIG] Configuration loaded from database:', {
+            hasApiKey: !!configData.apiKey,
+            hasMessageId: !!configData.messageId,
+            configured: configData.configured,
+            serviceStatus: status
+          });
+        } else {
+          console.error('📱 [WHATSAPP_CONFIG] Failed to load configuration from API:', response.status, response.statusText);
+          
+          if (response.status === 401) {
+            console.error('📱 [WHATSAPP_CONFIG] Authentication failed - user needs to login');
+            setMessage('Authentication failed. Please refresh the page and login again.');
+            setMessageType('error');
+          } else {
+            console.error('📱 [WHATSAPP_CONFIG] API error - falling back to localStorage');
+            // Fallback to localStorage if API fails
+            const fallbackConfig = {
+              apiKey: localStorage.getItem('whatsapp_api_key') || '',
+              messageId: localStorage.getItem('whatsapp_message_id') || '',
+              enabled: localStorage.getItem('whatsapp_enabled') === 'true'
+            };
+            
+            setApiKey(fallbackConfig.apiKey);
+            setMessageId(fallbackConfig.messageId);
+            setIsEnabled(fallbackConfig.enabled);
+          }
+        }
+      } catch (error) {
+        console.error('📱 [WHATSAPP_CONFIG] Error loading configuration:', error);
+        // Fallback to localStorage
+        const fallbackConfig = {
+          apiKey: localStorage.getItem('whatsapp_api_key') || '',
+          messageId: localStorage.getItem('whatsapp_message_id') || '',
+          enabled: localStorage.getItem('whatsapp_enabled') === 'true'
+        };
+        
+        setApiKey(fallbackConfig.apiKey);
+        setMessageId(fallbackConfig.messageId);
+        setIsEnabled(fallbackConfig.enabled);
+      } finally {
+        setIsLoadingConfig(false);
+      }
     };
 
     loadConfig();
   }, []);
 
-  const saveConfig = () => {
+  const saveConfig = async () => {
     try {
-      localStorage.setItem('whatsapp_api_key', apiKey);
-      localStorage.setItem('whatsapp_message_id', messageId);
-      localStorage.setItem('whatsapp_enabled', isEnabled.toString());
-
-      // Update service configuration
-      whatsappService.updateConfig({
-        apiKey,
-        messageId
+      setIsLoading(true);
+      
+      // Get authentication token
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+      
+      if (!token) {
+        throw new Error('No authentication token');
+      }
+      
+      // Save to database via API
+      const response = await fetch('/api/admin/system-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          configs: [
+            {
+              key: 'FAST2SMS_WHATSAPP_API_KEY',
+              value: apiKey,
+              category: 'whatsapp',
+              type: 'string',
+              description: 'Fast2SMS WhatsApp API Key'
+            },
+            {
+              key: 'FAST2SMS_WHATSAPP_MESSAGE_ID',
+              value: messageId,
+              category: 'whatsapp',
+              type: 'string',
+              description: 'Fast2SMS WhatsApp Message ID'
+            }
+          ]
+        })
       });
 
-      setMessage('WhatsApp configuration saved successfully!');
-      setMessageType('success');
+      if (response.ok) {
+        // Also save to localStorage as backup
+        localStorage.setItem('whatsapp_api_key', apiKey);
+        localStorage.setItem('whatsapp_message_id', messageId);
+        localStorage.setItem('whatsapp_enabled', isEnabled.toString());
+
+        // Update service configuration
+        whatsappService.updateConfig({
+          apiKey,
+          messageId
+        });
+
+        // Update status
+        const status = whatsappService.getStatus();
+        setConfigStatus(status);
+
+        setMessage('WhatsApp configuration saved successfully!');
+        setMessageType('success');
+        
+        console.log('📱 [WHATSAPP_CONFIG] Configuration saved successfully:', status);
+      } else {
+        throw new Error('Failed to save configuration to database');
+      }
     } catch (error) {
+      console.error('📱 [WHATSAPP_CONFIG] Error saving configuration:', error);
       setMessage('Failed to save configuration');
       setMessageType('error');
+    } finally {
+      setIsLoading(false);
     }
 
     setTimeout(() => {
@@ -87,7 +227,16 @@ export default function WhatsAppConfig() {
     }, 5000);
   };
 
-  const serviceStatus = whatsappService.getStatus();
+  if (isLoadingConfig) {
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-gray-600">Loading WhatsApp configuration...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
@@ -95,11 +244,11 @@ export default function WhatsAppConfig() {
         <h3 className="text-lg font-semibold text-gray-900">📱 WhatsApp Service Configuration</h3>
         <div className="flex items-center space-x-2">
           <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-            serviceStatus.configured 
+            configStatus.configured 
               ? 'bg-green-100 text-green-800' 
               : 'bg-red-100 text-red-800'
           }`}>
-            {serviceStatus.configured ? 'Configured' : 'Not Configured'}
+            {configStatus.configured ? 'Configured' : 'Not Configured'}
           </span>
         </div>
       </div>
@@ -216,9 +365,10 @@ export default function WhatsAppConfig() {
         <div className="flex justify-end">
           <button
             onClick={saveConfig}
-            className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            disabled={isLoading}
+            className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Save Configuration
+            {isLoading ? 'Saving...' : 'Save Configuration'}
           </button>
         </div>
       </div>

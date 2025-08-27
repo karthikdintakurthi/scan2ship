@@ -219,7 +219,7 @@ class WhatsAppService {
    */
   private generateResellerVariables(data: OrderWhatsAppData): string[] {
     return [
-      data.resellerName + ' (Your Customer -' + data.customerName + ')' || 'Reseller',
+      data.resellerName + ' (' + data.customerName + ')' || 'Reseller',
       data.clientCompanyName || 'Scan2Ship',
       data.courierService.replace('_', ' ').toUpperCase(),
       data.trackingNumber || 'Will be assigned'
@@ -256,7 +256,7 @@ async function loadWhatsAppConfigFromDB(clientId?: string): Promise<WhatsAppConf
     // Only run on server side
     if (typeof window !== 'undefined') {
       return {
-        apiKey: process.env.FAST2SMS_API_KEY || '',
+        apiKey: process.env.FAST2SMS_WHATSAPP_API_KEY || '',
         messageId: '4697'
       };
     }
@@ -270,13 +270,13 @@ async function loadWhatsAppConfigFromDB(clientId?: string): Promise<WhatsAppConf
       });
 
       const config: WhatsAppConfig = {
-        apiKey: process.env.FAST2SMS_API_KEY || '',
+        apiKey: process.env.FAST2SMS_WHATSAPP_API_KEY || '',
         messageId: '4697'
       };
 
       for (const item of whatsappConfig) {
-        if (item.key === 'FAST2SMS_API_KEY') {
-          config.apiKey = item.value || process.env.FAST2SMS_API_KEY || '';
+        if (item.key === 'FAST2SMS_WHATSAPP_API_KEY') {
+          config.apiKey = item.value || process.env.FAST2SMS_WHATSAPP_API_KEY || '';
         } else if (item.key === 'FAST2SMS_WHATSAPP_MESSAGE_ID') {
           config.messageId = item.value;
         }
@@ -297,7 +297,7 @@ async function loadWhatsAppConfigFromDB(clientId?: string): Promise<WhatsAppConf
 
 // Create and export default instance
 const whatsappService = new WhatsAppService({
-  apiKey: process.env.FAST2SMS_API_KEY || '',
+  apiKey: process.env.FAST2SMS_WHATSAPP_API_KEY || '',
   messageId: process.env.FAST2SMS_WHATSAPP_MESSAGE_ID || '4697'
 });
 

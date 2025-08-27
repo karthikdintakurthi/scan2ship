@@ -50,15 +50,15 @@ export async function GET(request: NextRequest) {
     // Get courier services for the current client
     const courierServices = await prisma.courier_services.findMany({
       where: { clientId: user.clients.id },
-      orderBy: { label: 'asc' }
+      orderBy: { name: 'asc' }
     });
 
     console.log(`🔍 [API_COURIER_SERVICES_GET] Raw courier services from DB:`, courierServices);
 
     // Transform courier services to match the expected format
     const formattedServices = courierServices.map(service => ({
-      value: service.value,
-      label: service.label,
+      value: service.code,
+      label: service.name,
       isActive: service.isActive
     }));
 

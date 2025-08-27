@@ -109,10 +109,10 @@ export async function POST(request: NextRequest) {
 
     // Create default courier services for the client (only if they don't exist)
     const defaultCourierServices = [
-      { value: 'delhivery', label: 'Delhivery', isActive: true },
-      { value: 'dtdc', label: 'DTDC', isActive: true },
-      { value: 'india_post', label: 'India Post', isActive: true },
-      { value: 'manual', label: 'Manual', isActive: true }
+      { code: 'delhivery', name: 'Delhivery', isActive: true },
+      { code: 'dtdc', name: 'DTDC', isActive: true },
+      { code: 'india_post', name: 'India Post', isActive: true },
+      { code: 'manual', name: 'Manual', isActive: true }
     ];
 
     for (const service of defaultCourierServices) {
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       const existingService = await prisma.courier_services.findFirst({
         where: {
           clientId: client.id,
-          value: service.value
+          code: service.code
         }
       });
 
@@ -130,17 +130,17 @@ export async function POST(request: NextRequest) {
             data: {
               id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               clientId: client.id,
-              value: service.value,
-              label: service.label,
+              code: service.code,
+              name: service.name,
               isActive: service.isActive
             }
           });
-          console.log(`Created courier service: ${service.label} for client ${client.id}`);
+          console.log(`Created courier service: ${service.name} for client ${client.id}`);
         } catch (error: any) {
-          console.log(`Failed to create courier service ${service.label}:`, error.message);
+          console.log(`Failed to create courier service ${service.name}:`, error.message);
         }
       } else {
-        console.log(`Courier service ${service.label} already exists for client ${client.id}, skipping...`);
+        console.log(`Courier service ${service.name} already exists for client ${client.id}, skipping...`);
       }
     }
 

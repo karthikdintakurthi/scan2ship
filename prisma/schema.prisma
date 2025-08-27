@@ -143,11 +143,11 @@ model clients {
 
 model courier_services {
   id        String  @id
+  isActive  Boolean @default(true)
+  clientId  String
+  isDefault Boolean @default(false)
   code      String
   name      String
-  isActive  Boolean @default(true)
-  isDefault Boolean @default(false)
-  clientId  String
   clients   clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([code, clientId])

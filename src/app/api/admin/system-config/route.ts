@@ -125,6 +125,65 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  try {
+    // Authenticate admin user
+    const auth = await getAuthenticatedAdmin(request);
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const createData = await request.json();
+    const { configs } = createData;
+
+    console.log('📝 [API_ADMIN_SYSTEM_CONFIG_POST] Creating/updating system configuration in database');
+
+    // Create or update each configuration
+    const upsertPromises = configs.map(async (config: any) => {
+      const configId = `config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      return prisma.system_config.upsert({
+        where: { key: config.key },
+        update: {
+          value: config.value,
+          category: config.category,
+          type: config.type,
+          description: config.description,
+          isEncrypted: false,
+          updatedAt: new Date()
+        },
+        create: {
+          id: configId,
+          key: config.key,
+          value: config.value,
+          category: config.category,
+          type: config.type,
+          description: config.description,
+          isEncrypted: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+    });
+
+    await Promise.all(upsertPromises);
+
+    console.log('✅ [API_ADMIN_SYSTEM_CONFIG_POST] System configuration created/updated in database');
+
+    return NextResponse.json({
+      message: 'System configuration saved successfully',
+      savedCount: configs.length
+    });
+
+  } catch (error) {
+    console.error('❌ [API_ADMIN_SYSTEM_CONFIG_POST] Error saving system config:', error);
+    return NextResponse.json(
+      { error: 'Failed to save system configuration' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(request: NextRequest) {
   try {
     // Authenticate admin user

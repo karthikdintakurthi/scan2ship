@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
         // Include courier services
         courier_services: {
           orderBy: {
-            label: 'asc'
+            name: 'asc'
           }
         },
         // Include order configuration
@@ -134,9 +134,10 @@ export async function GET(request: NextRequest) {
         // Include courier services
         courierServices: client.courier_services.map((service: any) => ({
           id: service.id,
-          value: service.value,
-          label: service.label,
-          isActive: service.isActive
+          code: service.code,
+          name: service.name,
+          isActive: service.isActive,
+          isDefault: service.isDefault
         })),
         // Include order configuration
         clientOrderConfig: client.client_order_configs ? {

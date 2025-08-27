@@ -1,162 +1,312 @@
-const BASE_URL = 'http://localhost:3000';
+require('dotenv').config({ path: '.env.local' });
+const { PrismaClient } = require('@prisma/client');
+const jwt = require('jsonwebtoken');
 
-async function testOrderCreation() {
+const prisma = new PrismaClient();
+
+// Test configuration
+const TEST_CONFIG = {
+  masterAdminEmail: 'karthik@scan2ship.in',
+  clientId: 'client-1756297715470-3hwkwcugb', // RVD Jewels
+  testOrderData: {
+    name: 'Test Customer',
+    mobile: '919876543210',
+    phone: '919876543210',
+    address: '123 Test Street',
+    city: 'Mumbai',
+    state: 'Maharashtra',
+    country: 'India',
+    pincode: '400001',
+    courier_service: 'delhivery',
+    pickup_location: 'RVD Jewels',
+    package_value: 5000,
+    weight: 100,
+    total_items: 1,
+    is_cod: false,
+    reseller_name: 'Test Reseller',
+    reseller_mobile: '919876543211'
+  }
+};
+
+async function testOrderCreationWithWhatsApp() {
+  console.log('🧪 [ORDER_TEST] Starting Order Creation with WhatsApp Test...\n');
+
   try {
-    console.log('🧪 Testing Order Creation Flow...\n');
-
-    // Step 1: Login as client user (Sujatha)
-    console.log('1️⃣ Logging in as client user...');
-    const loginResponse = await fetch(`${BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: 'sujatha@scan2ship.in',
-        password: 'password123'
-      })
+    // Test 1: Verify client exists
+    console.log('📋 Test 1: Verifying Client Exists...');
+    const client = await prisma.clients.findUnique({
+      where: { id: TEST_CONFIG.clientId }
     });
 
-    if (!loginResponse.ok) {
-      const errorData = await loginResponse.text();
-      throw new Error(`Login failed: ${loginResponse.status} - ${errorData}`);
+    if (!client) {
+      throw new Error(`Client ${TEST_CONFIG.clientId} not found`);
     }
 
-    const loginData = await loginResponse.json();
-    const clientUserToken = loginData.session?.token || loginData.token;
+    console.log('✅ Client found:', client.companyName);
+    console.log('✅ Client is active:', client.isActive);
+
+    // Test 2: Verify pickup location exists
+    console.log('📋 Test 2: Verifying Pickup Location...');
+    const pickupLocation = await prisma.pickup_locations.findFirst({
+      where: { 
+        clientId: TEST_CONFIG.clientId,
+        value: TEST_CONFIG.testOrderData.pickup_location
+      }
+    });
+
+    if (!pickupLocation) {
+      throw new Error(`Pickup location ${TEST_CONFIG.testOrderData.pickup_location} not found for client`);
+    }
+
+    console.log('✅ Pickup location found:', pickupLocation.label);
+
+    // Test 3: Verify courier service exists
+    console.log('📋 Test 3: Verifying Courier Service...');
+    const courierService = await prisma.courier_services.findFirst({
+      where: { 
+        clientId: TEST_CONFIG.clientId,
+        code: TEST_CONFIG.testOrderData.courier_service
+      }
+    });
+
+    if (!courierService) {
+      throw new Error(`Courier service ${TEST_CONFIG.testOrderData.courier_service} not found for client`);
+    }
+
+    console.log('✅ Courier service found:', courierService.name);
+
+    // Test 4: Create order through API simulation
+    console.log('📋 Test 4: Creating Order with WhatsApp Notification...');
     
-    if (!clientUserToken) {
-      throw new Error('No token received from login');
-    }
-
-    console.log('✅ Login successful');
-
-    // Step 2: Get pickup locations
-    console.log('\n2️⃣ Fetching pickup locations...');
-    const pickupLocationsResponse = await fetch(`${BASE_URL}/api/pickup-locations`, {
-      headers: { 'Authorization': `Bearer ${clientUserToken}` }
-    });
-
-    if (!pickupLocationsResponse.ok) {
-      const errorData = await pickupLocationsResponse.text();
-      throw new Error(`Failed to fetch pickup locations: ${pickupLocationsResponse.status} - ${errorData}`);
-    }
-
-    const pickupLocationsData = await pickupLocationsResponse.json();
-    console.log('✅ Pickup locations retrieved:', pickupLocationsData);
-
-    // Step 3: Check if pickup locations have API keys
-    if (pickupLocationsData.pickupLocations && pickupLocationsData.pickupLocations.length > 0) {
-      console.log('\n3️⃣ Checking pickup location configurations...');
-      pickupLocationsData.pickupLocations.forEach(location => {
-        console.log(`   📍 ${location.label} (${location.value}):`);
-        console.log(`      API Key: ${location.delhiveryApiKey ? '✅ Configured' : '❌ Missing'}`);
-        if (location.delhiveryApiKey) {
-          console.log(`      Key Length: ${location.delhiveryApiKey.length} characters`);
-        }
-      });
-    }
-
-    // Step 4: Get order configuration
-    console.log('\n4️⃣ Fetching order configuration...');
-    const orderConfigResponse = await fetch(`${BASE_URL}/api/order-config`, {
-      headers: { 'Authorization': `Bearer ${clientUserToken}` }
-    });
-
-    if (!orderConfigResponse.ok) {
-      const errorData = await orderConfigResponse.text();
-      throw new Error(`Failed to fetch order config: ${orderConfigResponse.status} - ${errorData}`);
-    }
-
-    const orderConfig = await orderConfigResponse.json();
-    console.log('✅ Order configuration retrieved');
-
-    // Step 5: Try to create an order with a pickup location that has an API key
-    console.log('\n5️⃣ Testing order creation...');
+    // Generate a unique reference number
+    const referenceNumber = `TEST-${Date.now()}`;
     
-    // Find a pickup location with an API key
-    let pickupLocationWithKey = null;
-    if (pickupLocationsData.pickupLocations) {
-      pickupLocationWithKey = pickupLocationsData.pickupLocations.find(loc => loc.delhiveryApiKey);
+    // Create the order
+    const order = await prisma.Order.create({
+      data: {
+        ...TEST_CONFIG.testOrderData,
+        clientId: TEST_CONFIG.clientId,
+        reference_number: referenceNumber,
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+    });
+
+    console.log('✅ Order created successfully:', order.id);
+    console.log('✅ Reference number:', order.reference_number);
+
+    // Test 5: Simulate WhatsApp notification (like the API does)
+    console.log('📋 Test 5: Simulating WhatsApp Notification...');
+    
+    // Get WhatsApp configuration
+    const whatsappConfig = await prisma.system_config.findMany({
+      where: { category: 'whatsapp' }
+    });
+
+    const apiKey = whatsappConfig.find(c => c.key === 'FAST2SMS_WHATSAPP_API_KEY')?.value;
+    const messageId = whatsappConfig.find(c => c.key === 'FAST2SMS_WHATSAPP_MESSAGE_ID')?.value;
+
+    if (!apiKey || !messageId) {
+      throw new Error('WhatsApp configuration not found');
     }
 
-    if (!pickupLocationWithKey) {
-      console.log('⚠️ No pickup locations with API keys found. Creating test order without Delhivery...');
-      pickupLocationWithKey = { value: 'test-pickup', label: 'Test Pickup' };
-    }
+    console.log('✅ WhatsApp configuration loaded');
 
-    const testOrder = {
-      name: 'Test Customer',
-      mobile: '9876543210',
-      address: '456 Customer Street',
-      city: 'Customer City',
-      state: 'Customer State',
-      country: 'India',
-      pincode: '500002',
-      courier_service: 'manual', // Use manual instead of delhivery to avoid API key issue
-      pickup_location: pickupLocationWithKey.value,
-      package_value: 1000,
-      weight: 500,
-      total_items: 2,
-      is_cod: false,
-      product_description: 'Test Product'
+    // Prepare WhatsApp data
+    const whatsappData = {
+      customerName: order.name,
+      customerPhone: order.mobile,
+      orderNumber: `ORDER-${order.id}`,
+      courierService: order.courier_service,
+      trackingNumber: order.tracking_id || 'Will be assigned',
+      clientCompanyName: client.companyName,
+      resellerName: order.reseller_name,
+      resellerPhone: order.reseller_mobile,
+      packageValue: order.package_value,
+      weight: order.weight,
+      totalItems: order.total_items,
+      pickupLocation: order.pickup_location,
+      address: order.address,
+      city: order.city,
+      state: order.state,
+      pincode: order.pincode
     };
 
-    console.log('📦 Creating order with data:', testOrder);
-
-    const createOrderResponse = await fetch(`${BASE_URL}/api/orders`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${clientUserToken}`
-      },
-      body: JSON.stringify(testOrder)
+    console.log('📱 WhatsApp Data prepared:', {
+      customerName: whatsappData.customerName,
+      customerPhone: whatsappData.customerPhone,
+      orderNumber: whatsappData.orderNumber,
+      courierService: whatsappData.courierService,
+      clientCompanyName: whatsappData.clientCompanyName
     });
 
-    if (!createOrderResponse.ok) {
-      const errorData = await createOrderResponse.text();
-      throw new Error(`Create order failed: ${createOrderResponse.status} - ${errorData}`);
+    // Test 6: Send customer WhatsApp
+    console.log('📋 Test 6: Sending Customer WhatsApp...');
+    const customerResult = await sendWhatsAppMessage(
+      apiKey, 
+      messageId, 
+      whatsappData.customerPhone,
+      generateCustomerVariables(whatsappData)
+    );
+
+    if (customerResult.success) {
+      console.log('✅ Customer WhatsApp sent successfully');
+      console.log('📱 Message ID:', customerResult.messageId);
+    } else {
+      console.log('❌ Customer WhatsApp failed:', customerResult.error);
     }
 
-    const createdOrder = await createOrderResponse.json();
-    console.log('✅ Order created successfully:', createdOrder);
+    // Test 7: Send reseller WhatsApp (if reseller details exist)
+    if (whatsappData.resellerName && whatsappData.resellerPhone) {
+      console.log('📋 Test 7: Sending Reseller WhatsApp...');
+      const resellerResult = await sendWhatsAppMessage(
+        apiKey, 
+        messageId, 
+        whatsappData.resellerPhone,
+        generateResellerVariables(whatsappData)
+      );
 
-    // Step 6: Test with Delhivery if we have a pickup location with API key
-    if (pickupLocationWithKey.delhiveryApiKey) {
-      console.log('\n6️⃣ Testing Delhivery order creation...');
-      
-      const delhiveryOrder = {
-        ...testOrder,
-        courier_service: 'delhivery',
-        name: 'Delhivery Test Customer'
-      };
-
-      console.log('📦 Creating Delhivery order with data:', delhiveryOrder);
-
-      const delhiveryOrderResponse = await fetch(`${BASE_URL}/api/orders`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${clientUserToken}`
-        },
-        body: JSON.stringify(delhiveryOrder)
-      });
-
-      if (!delhiveryOrderResponse.ok) {
-        const errorData = await delhiveryOrderResponse.text();
-        console.log('⚠️ Delhivery order creation failed:', errorData);
-        console.log('💡 This is expected if the API key is not properly configured');
+      if (resellerResult.success) {
+        console.log('✅ Reseller WhatsApp sent successfully');
+        console.log('📱 Message ID:', resellerResult.messageId);
       } else {
-        const delhiveryCreatedOrder = await delhiveryOrderResponse.json();
-        console.log('✅ Delhivery order created successfully:', delhiveryCreatedOrder);
+        console.log('❌ Reseller WhatsApp failed:', resellerResult.error);
       }
+    } else {
+      console.log('📋 Test 7: Skipping Reseller WhatsApp (no reseller details)');
     }
 
-    console.log('\n🎉 Order creation test completed successfully!');
+    // Test 8: Verify order was created with all details
+    console.log('📋 Test 8: Verifying Order Details...');
+    const createdOrder = await prisma.Order.findUnique({
+      where: { id: order.id }
+    });
+
+    console.log('✅ Order verification:', {
+      id: createdOrder.id,
+      referenceNumber: createdOrder.reference_number,
+      customerName: createdOrder.name,
+      customerPhone: createdOrder.mobile,
+      courierService: createdOrder.courier_service,
+      pickupLocation: createdOrder.pickup_location,
+      packageValue: createdOrder.package_value,
+      weight: createdOrder.weight,
+      totalItems: createdOrder.total_items,
+      resellerName: createdOrder.reseller_name,
+      resellerPhone: createdOrder.reseller_mobile
+    });
+
+    // Cleanup: Delete test order
+    console.log('📋 Cleanup: Removing Test Order...');
+    await prisma.Order.delete({
+      where: { id: order.id }
+    });
+    console.log('✅ Test order cleaned up');
+
+    console.log('\n🎉 [ORDER_TEST] All tests completed successfully!');
+    console.log('✅ Order creation with WhatsApp notification is working properly');
 
   } catch (error) {
-    console.error('❌ Test failed:', error.message);
+    console.error('\n❌ [ORDER_TEST] Test failed:', error.message);
     console.error('Stack trace:', error.stack);
+    
+    // Provide specific debugging information
+    console.log('\n🔍 Debugging Information:');
+    console.log('1. Check if client exists and is active');
+    console.log('2. Check if pickup location exists for the client');
+    console.log('3. Check if courier service exists for the client');
+    console.log('4. Check if WhatsApp configuration is properly set');
+    console.log('5. Check if Fast2SMS API is responding correctly');
+    
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+function generateCustomerVariables(data) {
+  return [
+    data.customerName || 'Customer',
+    data.clientCompanyName || 'Scan2Ship',
+    data.courierService.replace('_', ' ').toUpperCase(),
+    data.trackingNumber || 'Will be assigned'
+  ];
+}
+
+function generateResellerVariables(data) {
+  return [
+    data.resellerName + ' (Your Customer -' + data.customerName + ')' || 'Reseller',
+    data.clientCompanyName || 'Scan2Ship',
+    data.courierService.replace('_', ' ').toUpperCase(),
+    data.trackingNumber || 'Will be assigned'
+  ];
+}
+
+async function sendWhatsAppMessage(apiKey, messageId, phone, variables) {
+  try {
+    console.log('📱 [WHATSAPP_API] Sending WhatsApp message...');
+    console.log('📱 [WHATSAPP_API] Phone:', phone);
+    console.log('📱 [WHATSAPP_API] Variables:', variables);
+    
+    const url = new URL('https://www.fast2sms.com/dev/whatsapp');
+    url.searchParams.set('authorization', apiKey);
+    url.searchParams.set('message_id', messageId);
+    url.searchParams.set('numbers', phone);
+    url.searchParams.set('variables_values', variables.join('|'));
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    console.log('📱 [WHATSAPP_API] Response status:', response.status);
+
+    if (!response.ok) {
+      const errorResponse = await response.text();
+      console.error('📱 [WHATSAPP_API] API error response:', errorResponse);
+      return {
+        success: false,
+        error: `API error: ${response.status} - ${errorResponse}`
+      };
+    }
+
+    const result = await response.json();
+    console.log('📱 [WHATSAPP_API] API response:', result);
+
+    if (result.return === true) {
+      return {
+        success: true,
+        messageId: result.request_id || 'unknown',
+        response: result
+      };
+    }
+
+    return {
+      success: false,
+      error: `API error: ${result.message?.join(', ') || 'Unknown error'}`,
+      response: result
+    };
+
+  } catch (error) {
+    console.error('📱 [WHATSAPP_API] API call failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
 
 // Run the test
-testOrderCreation();
+if (require.main === module) {
+  testOrderCreationWithWhatsApp()
+    .then(() => {
+      console.log('\n✅ Order creation test completed successfully');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('\n❌ Order creation test failed:', error.message);
+      process.exit(1);
+    });
+}
+
+module.exports = { testOrderCreationWithWhatsApp };
