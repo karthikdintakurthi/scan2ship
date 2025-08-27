@@ -160,7 +160,12 @@ export async function getDelhiveryApiKey(pickupLocation: string): Promise<string
       
       try {
         const pickupLocationRecord = await prisma.pickup_locations.findFirst({
-          where: { value: pickupLocation },
+          where: { 
+            value: {
+              equals: pickupLocation,
+              mode: 'insensitive'
+            }
+          },
           select: { delhiveryApiKey: true }
         });
         
