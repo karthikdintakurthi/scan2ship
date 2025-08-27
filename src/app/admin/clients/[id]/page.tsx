@@ -70,6 +70,8 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
   // Fetch client details
   useEffect(() => {
     if ((currentUser?.role === 'admin' || currentUser?.role === 'master_admin') && clientId) {
+      console.log('🔍 [CLIENT_PAGE] Fetching client details for:', clientId);
+      console.log('🔍 [CLIENT_PAGE] Current user role:', currentUser.role);
       fetchClientDetails();
     }
   }, [currentUser, clientId]);
@@ -77,17 +79,22 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
   const fetchClientDetails = async () => {
     try {
       setIsLoading(true);
+      console.log('🔍 [CLIENT_PAGE] Starting fetchClientDetails');
       
       const response = await authenticatedGet(`/api/admin/clients/${clientId}`);
+      console.log('🔍 [CLIENT_PAGE] Response status:', response.status);
 
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 [CLIENT_PAGE] Client data received:', data);
         setClient(data.client);
       } else {
+        const errorText = await response.text();
+        console.error('🔍 [CLIENT_PAGE] Response not ok:', errorText);
         setError('Failed to fetch client details');
       }
     } catch (error) {
-      console.error('Error fetching client details:', error);
+      console.error('🔍 [CLIENT_PAGE] Error fetching client details:', error);
       setError('Error fetching client details');
       // Handle authentication errors
       if (error instanceof Error && error.message.includes('Authentication failed')) {
@@ -134,8 +141,9 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
     );
   }
 
-  // Redirect if not admin
-  if (currentUser.role !== 'admin') {
+  // Redirect if not admin or master admin
+  if (currentUser.role !== 'admin' && currentUser.role !== 'master_admin') {
+    router.push('/');
     return null;
   }
 
