@@ -217,10 +217,10 @@ export async function GET(
         })),
         courierServices: client.courier_services.map(service => ({
           id: service.id,
-          name: service.label,
-          code: service.value,
+          name: service.name,
+          code: service.code,
           isActive: service.isActive,
-          isDefault: false
+          isDefault: service.isDefault
         })),
         clientOrderConfig: client.client_order_configs ? {
           // Default values
@@ -409,9 +409,10 @@ export async function PUT(
           data: updateData.courierServices.map((service: any) => ({
             id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             clientId,
-            value: service.code,
-            label: service.name,
-            isActive: service.isActive
+            code: service.code,
+            name: service.name,
+            isActive: service.isActive,
+            isDefault: service.isDefault
           }))
         });
       }

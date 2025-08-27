@@ -262,7 +262,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
     });
   };
 
-  const handleAddCourierService = () => {
+  const handleAddCourierService = async () => {
     if (!config || !newCourierService.name || !newCourierService.code) return;
 
     const newService: CourierService = {
@@ -270,13 +270,48 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
       name: newCourierService.name,
       code: newCourierService.code,
       isActive: newCourierService.isActive,
-      isDefault: false
+      isDefault: newCourierService.isDefault
     };
 
-    setConfig({
+    // If setting this as default, uncheck all existing services
+    let updatedCourierServices;
+    if (newCourierService.isDefault) {
+      updatedCourierServices = config.courierServices.map(s => ({ ...s, isDefault: false }));
+    } else {
+      updatedCourierServices = config.courierServices;
+    }
+
+    const updatedConfig = {
       ...config,
-      courierServices: [...config.courierServices, newService]
-    });
+      courierServices: [...updatedCourierServices, newService]
+    };
+
+    setConfig(updatedConfig);
+
+    // Auto-save the configuration
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/admin/settings/clients/${clientId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updatedConfig)
+      });
+
+      if (response.ok) {
+        setSuccess('Courier service added successfully!');
+        setTimeout(() => setSuccess(''), 3000);
+        // Refresh data to get the actual IDs from the database
+        fetchClientConfig();
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to save courier service');
+      }
+    } catch (error) {
+      setError('Error saving courier service');
+    }
 
     setNewCourierService({ name: '', code: '', isActive: true, isDefault: false });
   };

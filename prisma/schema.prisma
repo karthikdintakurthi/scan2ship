@@ -142,14 +142,15 @@ model clients {
 }
 
 model courier_services {
-  id       String  @id
-  value    String
-  label    String
-  isActive Boolean @default(true)
-  clientId String
-  clients  clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id        String  @id
+  code      String
+  name      String
+  isActive  Boolean @default(true)
+  isDefault Boolean @default(false)
+  clientId  String
+  clients   clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  @@unique([value, clientId])
+  @@unique([code, clientId])
 }
 
 model order_analytics {

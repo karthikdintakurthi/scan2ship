@@ -78,30 +78,47 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ [REGISTER_CLIENT] Created client user: ${clientUser.email} with role: ${clientUser.role}`);
 
-    // Create pickup locations
-    if (pickupLocations && pickupLocations.length > 0) {
+    // Create default pickup locations for the client
+    const defaultPickupLocations = [
+      { value: 'main-warehouse', label: 'Main Warehouse', delhiveryApiKey: null },
+      { value: 'branch-office', label: 'Branch Office', delhiveryApiKey: null }
+    ];
+
+    try {
       await prisma.pickup_locations.createMany({
-        data: pickupLocations.map((location: any) => ({
+        data: defaultPickupLocations.map((location: any) => ({
           id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           clientId: client.id,
           value: location.value,
           label: location.label,
-          delhiveryApiKey: location.delhiveryApiKey || null
+          delhiveryApiKey: location.delhiveryApiKey
         }))
       });
+      console.log(`✅ [REGISTER_CLIENT] Created ${defaultPickupLocations.length} default pickup locations for client ${client.id}`);
+    } catch (error) {
+      console.log(`⚠️ [REGISTER_CLIENT] Failed to create default pickup locations:`, error.message);
     }
 
-    // Create courier services
-    if (courierServices && courierServices.length > 0) {
+    // Create default courier services for the client
+    const defaultCourierServices = [
+      { code: 'delhivery', name: 'Delhivery', isActive: true, isDefault: true },
+      { code: 'india_post', name: 'India Post', isActive: true, isDefault: false }
+    ];
+
+    try {
       await prisma.courier_services.createMany({
-        data: courierServices.map((service: any) => ({
+        data: defaultCourierServices.map((service: any) => ({
           id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           clientId: client.id,
-          value: service.value,
-          label: service.label,
-          isActive: true
+          code: service.code,
+          name: service.name,
+          isActive: service.isActive,
+          isDefault: service.isDefault
         }))
       });
+      console.log(`✅ [REGISTER_CLIENT] Created ${defaultCourierServices.length} default courier services for client ${client.id}`);
+    } catch (error) {
+      console.log(`⚠️ [REGISTER_CLIENT] Failed to create default courier services:`, error.message);
     }
 
     return NextResponse.json({
