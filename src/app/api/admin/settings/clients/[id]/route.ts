@@ -373,6 +373,7 @@ export async function PUT(
       if (updateData.pickupLocations.length > 0) {
         await prisma.pickup_locations.createMany({
           data: updateData.pickupLocations.map((location: any) => ({
+            id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             clientId,
             value: location.value,
             label: location.name,
@@ -406,6 +407,7 @@ export async function PUT(
       if (updateData.courierServices.length > 0) {
         await prisma.courier_services.createMany({
           data: updateData.courierServices.map((service: any) => ({
+            id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             clientId,
             value: service.code,
             label: service.name,

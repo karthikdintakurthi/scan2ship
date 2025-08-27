@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
 
     // Convert string values to appropriate data types and map fields
     const processedOrderData = {
+      id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ...orderData,
       package_value: parseFloat(orderData.package_value) || 0,
       weight: parseFloat(orderData.weight) || 0,
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
     console.log('🔍 [API_ORDERS_POST] Processed order data:', processedOrderData);
 
     // Create order with client ID
-    const order = await prisma.order.create({
+    const order = await prisma.orders.create({
       data: processedOrderData
     });
 
@@ -145,7 +146,7 @@ export async function POST(request: NextRequest) {
         
         if (delhiveryResponse.success) {
           // Update order with Delhivery data
-          await prisma.order.update({
+          await prisma.orders.update({
             where: { id: order.id },
             data: {
               delhivery_waybill_number: delhiveryResponse.waybill_number,
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
           console.log('✅ [API_ORDERS_POST] Delhivery order created successfully');
         } else {
           // Update order with error status
-          await prisma.order.update({
+          await prisma.orders.update({
             where: { id: order.id },
             data: {
               delhivery_api_status: 'failed',
@@ -174,7 +175,7 @@ export async function POST(request: NextRequest) {
         console.error('❌ [API_ORDERS_POST] Delhivery API error:', error);
         
         // Update order with error status
-        await prisma.order.update({
+        await prisma.orders.update({
           where: { id: order.id },
           data: {
             delhivery_api_status: 'failed',
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch updated order data to get latest tracking number
-    const updatedOrder = await prisma.order.findUnique({
+    const updatedOrder = await prisma.orders.findUnique({
       where: { id: order.id }
     });
 

@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
     // Create client
     const client = await prisma.clients.create({
       data: {
+        id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name,
         companyName,
         email,
@@ -56,19 +57,22 @@ export async function POST(request: NextRequest) {
         pincode,
         subscriptionPlan: 'basic',
         subscriptionStatus: 'active',
-        isActive: true
+        isActive: true,
+        updatedAt: new Date()
       }
     });
 
     // Create user for the client (not admin)
     const clientUser = await prisma.users.create({
       data: {
+        id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         email,
         name,
         password: hashedPassword,
         role: 'user',
         isActive: true,
-        clientId: client.id
+        clientId: client.id,
+        updatedAt: new Date()
       }
     });
 
