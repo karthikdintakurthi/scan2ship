@@ -18,7 +18,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
     
     // Get user and client data from database
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
         client: true
@@ -54,7 +54,7 @@ export async function GET(
     console.log('📊 [API_ADMIN_CLIENT_GET] Fetching client details for ID:', clientId);
 
     // Get client with users and orders
-    const client = await prisma.client.findUnique({
+    const client = await prisma.clients.findUnique({
       where: { id: clientId },
       include: {
         users: {
@@ -147,7 +147,7 @@ export async function PUT(
     console.log('📝 [API_ADMIN_CLIENT_PUT] Updating client details for ID:', clientId);
 
     // Update client
-    const updatedClient = await prisma.client.update({
+    const updatedClient = await prisma.clients.update({
       where: { id: clientId },
       data: {
         name: updateData.name,
@@ -199,7 +199,7 @@ export async function DELETE(
     console.log('🗑️ [API_ADMIN_CLIENT_DELETE] Deleting client with ID:', clientId);
 
     // Check if client exists
-    const client = await prisma.client.findUnique({
+    const client = await prisma.clients.findUnique({
       where: { id: clientId },
       include: {
         _count: {
@@ -218,7 +218,7 @@ export async function DELETE(
     console.log(`🗑️ [API_ADMIN_CLIENT_DELETE] Found client: ${client.companyName} with ${client._count.users} users and ${client._count.orders} orders`);
 
     // Delete client (this will cascade delete users, orders, and related data due to foreign key constraints)
-    await prisma.client.delete({
+    await prisma.clients.delete({
       where: { id: clientId }
     });
 

@@ -25,7 +25,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
     }
 
     // Get user from database
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
         client: true
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     console.log('📊 [API_ADMIN_CLIENT_CONFIGS_GET] Fetching all clients with configurations for admin:', auth.user.email);
 
     // Get all clients with their complete configurations
-    const clients = await prisma.client.findMany({
+    const clients = await prisma.clients.findMany({
       include: {
         _count: {
           select: {

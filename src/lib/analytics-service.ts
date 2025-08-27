@@ -164,7 +164,7 @@ export class AnalyticsService {
    */
   static async getClientsAnalyticsSummary() {
     try {
-      const clients = await prisma.client.findMany({
+      const clients = await prisma.clients.findMany({
         where: { isActive: true },
         select: {
           id: true,

@@ -45,7 +45,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
     console.log('🔍 [ADMIN_AUTH] JWT decoded successfully, userId:', decoded.userId);
     
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: decoded.userId }
     });
 
@@ -101,7 +101,7 @@ export async function GET(
     // Get client with all related data
     let client;
     try {
-      client = await prisma.client.findUnique({
+      client = await prisma.clients.findUnique({
         where: { id: clientId },
         include: {
           pickupLocations: true,
@@ -305,7 +305,7 @@ export async function PUT(
 
     // Update client basic information
     if (updateData.client) {
-      await prisma.client.update({
+      await prisma.clients.update({
         where: { id: clientId },
         data: {
           name: updateData.client.name,
@@ -333,7 +333,7 @@ export async function PUT(
         //   valueToStore = encrypt(config.value);
         // }
         
-        return prisma.clientConfig.upsert({
+        return prisma.client_config.upsert({
           where: {
             clientId_key: {
               clientId,
@@ -428,7 +428,7 @@ export async function PUT(
     if (updateData.clientOrderConfig) {
       console.log('📝 [API_ADMIN_CLIENT_CONFIG_PUT] Updating client order configuration');
       
-      await prisma.clientOrderConfig.upsert({
+      await prisma.client_order_configs.upsert({
         where: { clientId },
         update: {
           // Default values

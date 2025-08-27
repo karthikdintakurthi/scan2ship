@@ -18,10 +18,10 @@ async function getAuthenticatedAdmin(request: NextRequest) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
     
     // Get user and client data from database
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
-        client: true
+        clients: true
       }
     });
 
@@ -31,7 +31,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
 
     return {
       user: user,
-      client: user.client
+      client: user.clients
     };
   } catch (error) {
     return null;
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     console.log('📊 [API_ADMIN_CLIENTS_GET] Fetching all clients for admin:', auth.user.email);
 
     // Get all clients with their statistics
-    const clients = await prisma.client.findMany({
+    const clients = await prisma.clients.findMany({
       include: {
         _count: {
           select: {

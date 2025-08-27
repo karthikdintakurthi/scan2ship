@@ -20,7 +20,7 @@ async function getAuthenticatedUser(request: NextRequest) {
     console.log('🔐 [AUTH] JWT decoded successfully, userId:', decoded.userId);
     
     // Get user and client data from database
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
         client: true
