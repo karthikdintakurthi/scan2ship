@@ -21,7 +21,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
-        client: true
+        clients: true
       }
     });
 
@@ -31,7 +31,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
 
     return {
       user: user,
-      client: user.client
+      client: user.clients
     };
   } catch (error) {
     return null;

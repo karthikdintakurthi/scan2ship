@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { authenticatedGet, authenticatedDelete } from '@/lib/api-client';
 
 interface Client {
   id: string;
@@ -76,13 +77,8 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
   const fetchClientDetails = async () => {
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('authToken');
       
-      const response = await fetch(`/api/admin/clients/${clientId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await authenticatedGet(`/api/admin/clients/${clientId}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -91,9 +87,38 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
         setError('Failed to fetch client details');
       }
     } catch (error) {
+      console.error('Error fetching client details:', error);
       setError('Error fetching client details');
+      // Handle authentication errors
+      if (error instanceof Error && error.message.includes('Authentication failed')) {
+        router.push('/login');
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteClient = async () => {
+    if (!confirm('Are you sure you want to delete this client? This action cannot be undone and will delete all associated users and orders.')) {
+      return;
+    }
+
+    try {
+      const response = await authenticatedDelete(`/api/admin/clients/${clientId}`);
+
+      if (response.ok) {
+        router.push('/admin/clients');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to delete client');
+      }
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      setError('Error deleting client');
+      // Handle authentication errors
+      if (error instanceof Error && error.message.includes('Authentication failed')) {
+        router.push('/login');
+      }
     }
   };
 
@@ -179,6 +204,12 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
             >
               Edit Client
             </Link>
+            <button
+              onClick={handleDeleteClient}
+              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
+            >
+              Delete Client
+            </button>
             <Link
               href="/admin/clients"
               className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
