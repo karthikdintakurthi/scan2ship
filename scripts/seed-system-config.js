@@ -153,7 +153,7 @@ async function seedSystemConfig() {
     console.log('🌱 Seeding system configuration...');
 
     for (const config of systemConfigs) {
-      await prisma.systemConfig.upsert({
+      await prisma.system_config.upsert({
         where: { key: config.key },
         update: {
           value: config.value,
@@ -163,7 +163,11 @@ async function seedSystemConfig() {
           isEncrypted: config.isEncrypted,
           updatedAt: new Date()
         },
-        create: config
+        create: {
+          ...config,
+          id: `config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          updatedAt: new Date()
+        }
       });
     }
 
