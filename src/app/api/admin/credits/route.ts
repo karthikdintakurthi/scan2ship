@@ -5,26 +5,52 @@ import jwt from 'jsonwebtoken';
 
 // Helper function to get authenticated admin user
 async function getAuthenticatedAdminUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: { clients: true }
-    });
+    const authHeader = request.headers.get('authorization');
+    console.log('🔐 [AUTH_DEBUG] Auth header:', authHeader ? 'Present' : 'Missing');
     
-    // Check if user is admin or master admin
-    if (user && (user.role === 'admin' || user.role === 'master_admin')) {
-      return user;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ [AUTH_DEBUG] Invalid or missing Authorization header');
+      return null;
     }
+
+    const token = authHeader.substring(7);
+    console.log('🔐 [AUTH_DEBUG] Token length:', token.length);
     
-    return null;
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ [AUTH_DEBUG] JWT_SECRET environment variable is not set');
+      return null;
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
+      console.log('🔐 [AUTH_DEBUG] JWT decoded successfully, userId:', decoded.userId);
+      
+      const user = await prisma.users.findUnique({
+        where: { id: decoded.userId },
+        include: { clients: true }
+      });
+      
+      console.log('🔐 [AUTH_DEBUG] User found:', user ? 'Yes' : 'No');
+      if (user) {
+        console.log('🔐 [AUTH_DEBUG] User role:', user.role);
+        console.log('🔐 [AUTH_DEBUG] User email:', user.email);
+      }
+      
+      // Check if user is admin or master admin
+      if (user && (user.role === 'admin' || user.role === 'master_admin')) {
+        console.log('✅ [AUTH_DEBUG] User authenticated as admin/master_admin');
+        return user;
+      } else {
+        console.log('❌ [AUTH_DEBUG] User role not authorized:', user?.role);
+        return null;
+      }
+    } catch (jwtError) {
+      console.error('❌ [AUTH_DEBUG] JWT verification failed:', jwtError);
+      return null;
+    }
   } catch (error) {
+    console.error('❌ [AUTH_DEBUG] Authentication function error:', error);
     return null;
   }
 }
@@ -32,9 +58,16 @@ async function getAuthenticatedAdminUser(request: NextRequest) {
 // GET /api/admin/credits - Get all clients with their credit balances
 export async function GET(request: NextRequest) {
   try {
+    console.log('📊 [API_ADMIN_CREDITS_GET] Request received');
+    console.log('📊 [API_ADMIN_CREDITS_GET] Request headers:', Object.fromEntries(request.headers.entries()));
+    
     const user = await getAuthenticatedAdminUser(request);
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.log('❌ [API_ADMIN_CREDITS_GET] Authentication failed');
+      return NextResponse.json({ 
+        error: 'Unauthorized - Authentication failed',
+        details: 'Please check your login credentials and try again'
+      }, { status: 401 });
     }
 
     console.log('📊 [API_ADMIN_CREDITS_GET] Fetching all clients with credits for admin:', user.email);
@@ -113,7 +146,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('❌ [API_ADMIN_CREDITS_GET] Error fetching clients with credits:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch clients with credits' },
+      { 
+        error: 'Failed to fetch clients with credits',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
