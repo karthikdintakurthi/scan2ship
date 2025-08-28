@@ -86,9 +86,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function useAuth() {
   const context = useContext(AuthContext);
+  
+  // Handle SSR case - return safe defaults if context is not available
   if (context === undefined) {
+    // Check if we're on the server side
+    if (typeof window === 'undefined') {
+      // Return safe defaults for SSR
+      return {
+        isAuthenticated: false,
+        isLoading: true,
+        currentUser: null,
+        currentClient: null,
+        currentSession: null,
+        creditBalance: null,
+        login: async () => ({ success: false, error: 'SSR not supported' }),
+        logout: () => {},
+        registerClient: async () => ({ success: false, error: 'SSR not supported' }),
+        registerUser: async () => ({ success: false, error: 'SSR not supported' }),
+        checkAuth: async () => false,
+        refreshSession: async () => false,
+        refreshCredits: async () => {},
+        updateCredits: () => {},
+      };
+    }
+    
+    // On client side, throw error if context is not available
     throw new Error('useAuth must be used within an AuthProvider');
   }
+  
   return context;
 }
 

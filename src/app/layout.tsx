@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import AuthWrapper from '@/components/AuthWrapper';
 import AuthErrorBoundary from '@/components/AuthErrorBoundary';
 import PWAScript from '@/components/PWAScript';
+import DynamicPWAHead from '@/components/DynamicPWAHead';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -84,15 +85,37 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Static PWA Meta Tags - will be updated by DynamicPWAHead */}
+        <link rel="icon" href="/images/scan2ship.png" />
+        <link rel="apple-touch-icon" href="/images/scan2ship.png" />
+        <link rel="manifest" href="/api/pwa/manifest?client=default" />
+        <meta name="theme-color" content="#2563eb" />
+        
+        {/* PWA Meta Tags */}
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Scan2Ship" />
+        
+        {/* iOS PWA Meta Tags */}
+        <meta name="apple-touch-fullscreen" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        
+        {/* Android PWA Meta Tags */}
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="application-name" content="Scan2Ship" />
+      </head>
       <body className={inter.className}>
         <AuthErrorBoundary>
           <AuthProvider>
+            <DynamicPWAHead />
             <AuthWrapper>
               {children}
             </AuthWrapper>
+            <PWAScript />
           </AuthProvider>
         </AuthErrorBoundary>
-        <PWAScript />
       </body>
     </html>
   );

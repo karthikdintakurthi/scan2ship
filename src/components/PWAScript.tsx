@@ -1,9 +1,15 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function PWAScript() {
+  const { currentClient } = useAuth();
+
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+
     // Check if service workers are supported
     if ('serviceWorker' in navigator) {
       // Register service worker
@@ -42,6 +48,32 @@ export default function PWAScript() {
       deferredPrompt = null;
     });
   }, []);
+
+  // Update PWA branding when client changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    if (currentClient) {
+      // Update the manifest link to trigger a refresh
+      const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+      if (manifestLink) {
+        const manifestUrl = `/api/pwa/manifest?client=${currentClient.id}`;
+        manifestLink.href = manifestUrl;
+        
+        // Force manifest refresh by removing and re-adding the link
+        const newManifestLink = document.createElement('link');
+        newManifestLink.rel = 'manifest';
+        newManifestLink.href = manifestUrl;
+        document.head.removeChild(manifestLink);
+        document.head.appendChild(newManifestLink);
+      }
+
+      // Update PWA head elements based on client branding
+      import('@/lib/pwa-config').then(({ updatePWAHead }) => {
+        updatePWAHead(currentClient);
+      }).catch(console.error);
+    }
+  }, [currentClient]);
 
   return null; // This component doesn't render anything
 }

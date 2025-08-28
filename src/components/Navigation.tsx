@@ -6,11 +6,15 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Image from 'next/image';
 import CreditWallet from './CreditWallet';
+import { getClientBranding } from '@/lib/pwa-config';
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pathname = usePathname();
   const { currentUser, currentClient, logout } = useAuth();
+
+  // Get dynamic branding based on current client
+  const branding = getClientBranding(currentClient);
 
   // Determine navigation based on context
   console.log('🔍 [NAVIGATION] Current user:', currentUser);
@@ -60,14 +64,14 @@ export default function Navigation() {
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center">
               <Image
-                            src="/images/scan2ship.png"
-            alt="Scan2Ship"
+                src={branding.logo}
+                alt={branding.shortName}
                 width={40}
                 height={40}
                 className="rounded-lg"
               />
               <div className="ml-3">
-                <h1 className="text-xl font-bold text-gray-900">Scan2Ship</h1>
+                <h1 className="text-xl font-bold text-gray-900">{branding.shortName}</h1>
                 {currentClient && (
                   <p className="text-xs text-gray-600">{currentClient.companyName}</p>
                 )}

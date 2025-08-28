@@ -1,7 +1,7 @@
 {
-  "name": "Scan2Ship - Accelerate Your Logistics",
+  "name": "Scan2Ship - SaaS Logistics Management Platform",
   "short_name": "Scan2Ship",
-  "description": "A software product that brings extra speed to your regular logistics operations",
+  "description": "A comprehensive SaaS platform for logistics management, order processing, and courier integration.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -37,5 +37,6 @@
       "type": "image/png",
       "form_factor": "narrow"
     }
-  ]
+  ],
+  "note": "This is a fallback manifest. The dynamic manifest is served from /api/pwa/manifest"
 }

@@ -173,6 +173,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies AppPageConfig<"/test-page">
 }
 
+// Validate ../../src/app/test-pwa/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/test-pwa/page.js")
+  handler satisfies AppPageConfig<"/test-pwa">
+}
+
 // Validate ../../src/app/test-ssr/page.tsx
 {
   const handler = {} as typeof import("../../src/app/test-ssr/page.js")
@@ -381,6 +387,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   const handler = {} as typeof import("../../src/app/api/process-text/route.js")
   handler satisfies RouteHandlerConfig<"/api/process-text">
+}
+
+// Validate ../../src/app/api/pwa/manifest/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/pwa/manifest/route.js")
+  handler satisfies RouteHandlerConfig<"/api/pwa/manifest">
 }
 
 // Validate ../../src/app/api/test-admin/route.ts
