@@ -167,8 +167,9 @@ async function main() {
   ]
 
   // First, create a default client
-  const defaultClient = await prisma.client.create({
+  const defaultClient = await prisma.clients.create({
     data: {
+      id: 'default-client-001',
       name: 'Default Client',
       companyName: 'Default Company',
       email: 'default@scan2ship.com',
@@ -177,7 +178,8 @@ async function main() {
       city: 'Default City',
       state: 'Default State',
       country: 'India',
-      pincode: '123456'
+      pincode: '123456',
+      updatedAt: new Date()
     }
   })
   console.log(`✅ Created default client: ${defaultClient.name}`)

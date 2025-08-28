@@ -8,11 +8,12 @@ async function seedSaaS() {
     console.log('🌱 Starting SaaS seed...');
 
     // Create a test client
-    const client = await prisma.client.create({
+    const client = await prisma.clients.create({
       data: {
+        id: `test-client-${Date.now()}`,
         name: 'Test Contact',
         companyName: 'Test Company',
-        email: 'test@company.com',
+        email: `test-${Date.now()}@company.com`,
         phone: '9876543210',
         address: '123 Test Street',
         city: 'Test City',
@@ -21,7 +22,8 @@ async function seedSaaS() {
         pincode: '123456',
         subscriptionPlan: 'basic',
         subscriptionStatus: 'active',
-        isActive: true
+        isActive: true,
+        updatedAt: new Date()
       }
     });
 
@@ -31,14 +33,16 @@ async function seedSaaS() {
     const hashedPassword = await bcrypt.hash('admin123', 12);
 
     // Create admin user for the client
-    const adminUser = await prisma.user.create({
+    const adminUser = await prisma.users.create({
       data: {
+        id: `test-user-${Date.now()}`,
         email: 'admin@company.com',
         name: 'Admin User',
         password: hashedPassword,
         role: 'admin',
         isActive: true,
-        clientId: client.id
+        clientId: client.id,
+        updatedAt: new Date()
       }
     });
 
@@ -51,8 +55,9 @@ async function seedSaaS() {
     ];
 
     for (const location of defaultPickupLocations) {
-      await prisma.pickupLocation.create({
+      await prisma.pickup_locations.create({
         data: {
+          id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           ...location,
           clientId: client.id
         }
@@ -63,15 +68,16 @@ async function seedSaaS() {
 
     // Create default courier services for the client
     const defaultCourierServices = [
-      { value: 'delhivery', label: 'Delhivery', isActive: true },
-      { value: 'dtdc', label: 'DTDC', isActive: true },
-      { value: 'india_post', label: 'India Post', isActive: true },
-      { value: 'manual', label: 'Manual', isActive: true }
+      { code: 'DEL', name: 'Delhivery', isActive: true },
+      { code: 'DTDC', name: 'DTDC', isActive: true },
+      { code: 'INP', name: 'India Post', isActive: true },
+      { code: 'MAN', name: 'Manual', isActive: true }
     ];
 
     for (const service of defaultCourierServices) {
-      await prisma.courierService.create({
+      await prisma.courier_services.create({
         data: {
+          id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           ...service,
           clientId: client.id
         }
