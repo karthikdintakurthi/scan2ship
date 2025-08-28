@@ -454,7 +454,7 @@ export default function ClientSettingsPage() {
                       <p className="text-sm text-gray-500">{location.value}</p>
                       {location.delhiveryApiKey && (
                         <p className="text-xs text-gray-400 mt-1">
-                          API Key: {maskValue(location.delhiveryApiKey, true)}
+                          API Key: {location.delhiveryApiKey}
                         </p>
                       )}
                     </div>

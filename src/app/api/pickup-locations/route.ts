@@ -1,23 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-
-// Encryption key for sensitive data
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'vanitha-logistics-encryption-key-2024';
-
-// Helper function to decrypt sensitive data
-function decrypt(encryptedText: string): string {
-  try {
-    const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch (error) {
-    console.error('❌ Error decrypting value:', error);
-    return encryptedText; // Return original if decryption fails
-  }
-}
 
 // Helper function to get authenticated user
 async function getAuthenticatedUser(request: NextRequest) {
@@ -71,34 +54,16 @@ export async function GET(request: NextRequest) {
 
     // Transform pickup locations to match the expected format
     const formattedLocations = pickupLocations.map(location => {
-      // Decrypt the Delhivery API key if it exists
-      let decryptedApiKey = '';
-      if (location.delhiveryApiKey) {
-        // Check if the API key is encrypted (96 characters) or plain text (40 characters for Delhivery)
-        if (location.delhiveryApiKey.length === 96) {
-          // Likely encrypted - try to decrypt
-          try {
-            decryptedApiKey = decrypt(location.delhiveryApiKey);
-            console.log(`🔓 [PICKUP_LOCATIONS] Decrypted API key for ${location.label}: ${decryptedApiKey.substring(0, 8)}...`);
-          } catch (error) {
-            console.error(`❌ [PICKUP_LOCATIONS] Failed to decrypt API key for ${location.label}:`, error);
-            decryptedApiKey = location.delhiveryApiKey; // Fallback to encrypted value
-          }
-        } else if (location.delhiveryApiKey.length === 40) {
-          // Likely plain text Delhivery API key
-          decryptedApiKey = location.delhiveryApiKey;
-          console.log(`🔑 [PICKUP_LOCATIONS] Found plain text API key for ${location.label}: ${decryptedApiKey.substring(0, 8)}...`);
-        } else {
-          // Unknown format - return as-is
-          decryptedApiKey = location.delhiveryApiKey;
-          console.warn(`⚠️ [PICKUP_LOCATIONS] Unknown API key format for ${location.label}: length ${location.delhiveryApiKey.length}`);
-        }
+      // Use API key as raw data - no encryption/decryption
+      const apiKey = location.delhiveryApiKey || '';
+      if (apiKey) {
+        console.log(`🔑 [PICKUP_LOCATIONS] Raw API key for ${location.label}: ${apiKey.substring(0, 8)}...`);
       }
 
       return {
         value: location.value,
         label: location.label,
-        delhiveryApiKey: decryptedApiKey,
+        delhiveryApiKey: apiKey,
         // Add default configuration for other required fields
         productDetails: {
           description: 'ARTIFICAL JEWELLERY',

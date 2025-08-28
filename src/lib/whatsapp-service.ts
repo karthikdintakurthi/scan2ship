@@ -206,23 +206,52 @@ class WhatsAppService {
    * Generate customer WhatsApp variables
    */
   private generateCustomerVariables(data: OrderWhatsAppData): string[] {
+    const courierService = data.courierService.toLowerCase();
+    let courierLink: string;
+
+    if(courierService === 'india_post'){
+      courierLink = 'https://www.indiapost.gov.in/';
+    }
+    else if(courierService === 'dtdc'){
+      courierLink = 'https://www.dtdc.in/trace.asp';
+    } else if(courierService === 'delhivery'){
+      courierLink = 'https://www.delhivery.com/';
+    } else {
+      courierLink = '';
+    }
+
     return [
-      data.customerName,
-      data.resellerName ? data.resellerName : data.clientCompanyName || 'Scan2Ship',
-      data.courierService.replace('_', ' ').toUpperCase(),
-      data.trackingNumber || 'Will be assigned'
+      data.resellerName || data.customerName || 'Customer',
+      data.clientCompanyName || 'Scan2Ship',
+      data.trackingNumber || 'Will be assigned',
+      courierLink,
     ];
   }
+
 
   /**
    * Generate reseller WhatsApp variables
    */
   private generateResellerVariables(data: OrderWhatsAppData): string[] {
+    const courierService = data.courierService.toLowerCase();
+    let courierLink: string;
+
+    if(courierService === 'india_post'){
+      courierLink = 'https://www.indiapost.gov.in/';
+    }
+    else if(courierService === 'dtdc'){
+      courierLink = 'https://www.dtdc.in/trace.asp';
+    } else if(courierService === 'delhivery'){
+      courierLink = 'https://www.delhivery.com/';
+    } else {
+      courierLink = '';
+    }
+
     return [
-      data.resellerName + ' (' + data.customerName + ')' || 'Reseller',
+      data.resellerName || data.customerName || 'Customer',
       data.clientCompanyName || 'Scan2Ship',
-      data.courierService.replace('_', ' ').toUpperCase(),
-      data.trackingNumber || 'Will be assigned'
+      data.trackingNumber || 'Will be assigned',
+      courierLink,
     ];
   }
 

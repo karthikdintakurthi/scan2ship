@@ -543,12 +543,18 @@ export default function OrderForm() {
         body: JSON.stringify(orderData),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create order')
-      }
-
       const result = await response.json()
+      
+      if (!response.ok) {
+        // Handle specific Delhivery API errors
+        if (result.error === 'Delhivery API failed') {
+          const errorMessage = result.details || result.delhiveryError || 'Delhivery API failed. Please check your pickup location configuration and try again.';
+          throw new Error(`Delhivery Error: ${errorMessage}`);
+        }
+        
+        // Handle other API errors
+        throw new Error(result.error || result.details || 'Failed to create order')
+      }
       
       if (result.success) {
         setCurrentStep('completed')

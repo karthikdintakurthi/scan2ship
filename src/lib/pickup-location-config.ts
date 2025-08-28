@@ -32,8 +32,8 @@ export interface PickupLocationConfig {
 
 // Default fallback configuration
 const defaultPickupLocationConfig: PickupLocationConfig = {
-  value: 'RVD JEWELS',
-  label: 'RVD JEWELS',
+  value: 'Scan2Ship',
+  label: 'Scan2Ship',
   delhiveryApiKey: '2bce24815f3e4da2513ab4aafb7ecb251469c4a9',
   productDetails: {
     description: 'ARTIFICAL JEWELLERY',
@@ -53,7 +53,7 @@ const defaultPickupLocationConfig: PickupLocationConfig = {
     cst_no: '',
     tin: ''
   },
-  vendorPickupLocation: 'RVD JEWELS',
+  vendorPickupLocation: 'Scan2Ship',
   shipmentDimensions: {
     length: 10,
     breadth: 10,
@@ -72,50 +72,52 @@ async function fetchPickupLocationsFromAPI(): Promise<PickupLocationConfig[]> {
   try {
     // For server-side execution, return default config
     if (typeof window === 'undefined') {
+      console.log('🔄 [SERVER] Using default pickup location config for server-side execution');
       return [defaultPickupLocationConfig];
     }
 
     const token = localStorage.getItem('authToken');
     if (!token) {
-      console.warn('No auth token found, using default pickup locations');
+      console.warn('⚠️ [CLIENT] No auth token found, using default pickup locations');
       return [defaultPickupLocationConfig];
     }
 
+    console.log('🔄 [CLIENT] Fetching pickup locations from API in real-time...');
     const response = await fetch('/api/pickup-locations', {
       headers: {
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'Cache-Control': 'no-cache', // Ensure fresh data
+        'Pragma': 'no-cache'
       }
     });
 
     if (response.ok) {
       const data = await response.json();
-      return data.pickupLocations || [defaultPickupLocationConfig];
+      const locations = data.pickupLocations || [defaultPickupLocationConfig];
+      console.log(`✅ [CLIENT] Successfully fetched ${locations.length} pickup locations in real-time`);
+      return locations;
     } else {
-      console.warn('Failed to fetch pickup locations from API, using default');
+      console.warn(`⚠️ [CLIENT] Failed to fetch pickup locations from API (${response.status}), using default`);
       return [defaultPickupLocationConfig];
     }
   } catch (error) {
-    console.error('Error fetching pickup locations:', error);
+    console.error('❌ [CLIENT] Error fetching pickup locations:', error);
     return [defaultPickupLocationConfig];
   }
 }
 
-// Function to get pickup locations (with caching)
+// Function to get pickup locations (always fetch in real-time)
 export async function getPickupLocations(): Promise<PickupLocationConfig[]> {
-  const now = Date.now();
+  // Always fetch fresh data in real-time
+  console.log('🔄 [REALTIME] Fetching pickup locations in real-time...');
   
-  // Return cached data if still valid
-  if (pickupLocationCache && (now - cacheTimestamp) < CACHE_DURATION) {
-    return pickupLocationCache;
-  }
-
-  // Fetch fresh data
   const locations = await fetchPickupLocationsFromAPI();
   
-  // Update cache
+  // Update cache for potential future use
   pickupLocationCache = locations;
-  cacheTimestamp = now;
+  cacheTimestamp = Date.now();
   
+  console.log(`✅ [REALTIME] Fetched ${locations.length} pickup locations in real-time`);
   return locations;
 }
 
@@ -149,9 +151,14 @@ export async function getPickupLocationLabels(): Promise<string[]> {
 // Helper function to get Delhivery API key for a specific pickup location
 export async function getDelhiveryApiKey(pickupLocation: string): Promise<string> {
   try {
+    console.log(`🔑 [REALTIME] Fetching Delhivery API key for pickup location: ${pickupLocation}`);
+    
+    // Always fetch in real-time from the API endpoint
+    // This ensures we get the latest configuration from the database
+    
     // Check if we're on the server side
     if (typeof window === 'undefined') {
-      // Server-side: fetch directly from database
+      // Server-side: fetch directly from database for immediate access
       console.log(`🔑 [SERVER] Fetching Delhivery API key for pickup location: ${pickupLocation}`);
       
       // Import Prisma client for server-side database access
@@ -183,41 +190,9 @@ export async function getDelhiveryApiKey(pickupLocation: string): Promise<string
             }
           }
           
-          // Check if the API key is encrypted (96 characters) or plain text (40 characters for Delhivery)
-          if (apiKey.length === 96) {
-            // Likely encrypted - try to decrypt
-            try {
-              const crypto = await import('crypto');
-              const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'vanitha-logistics-encryption-key-2024';
-              
-              const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-              let decrypted = decipher.update(apiKey, 'hex', 'utf8');
-              decrypted += decipher.final('utf8');
-              
-              console.log(`🔓 [SERVER] Successfully decrypted API key for pickup location: ${pickupLocation}`);
-              return decrypted;
-            } catch (decryptError) {
-              console.error(`❌ [SERVER] Failed to decrypt API key for pickup location ${pickupLocation}:`, decryptError);
-              // Return empty string if decryption fails
-              return '';
-            }
-          } else if (apiKey.length === 40) {
-            // Likely plain text Delhivery API key
-            console.log(`🔑 [SERVER] Found plain text API key for pickup location: ${pickupLocation}`);
-            return apiKey;
-          } else {
-            // Unknown format - validate for valid characters
-            console.warn(`⚠️ [SERVER] Unknown API key format for pickup location ${pickupLocation}: length ${apiKey.length}`);
-            
-            // Check if the API key contains only valid ASCII characters
-            const invalidChars = apiKey.match(/[^\x20-\x7E]/);
-            if (invalidChars) {
-              console.error(`❌ [SERVER] API key contains invalid characters at position ${invalidChars.index}: ${apiKey[invalidChars.index]}`);
-              return ''; // Return empty string for invalid API keys
-            }
-            
-            return apiKey; // Return as-is if it passes validation
-          }
+          // Use API key as raw data - no encryption/decryption
+          console.log(`🔑 [SERVER] Found raw API key for pickup location: ${pickupLocation}`);
+          return apiKey;
         } else {
           console.warn(`⚠️ [SERVER] No Delhivery API key found for pickup location: ${pickupLocation}`);
           return '';
@@ -226,28 +201,50 @@ export async function getDelhiveryApiKey(pickupLocation: string): Promise<string
         await prisma.$disconnect();
       }
     } else {
-      // Client-side: use existing logic
-      const config = await getPickupLocationConfig(pickupLocation);
-      if (config?.delhiveryApiKey) {
-        console.log(`🔑 [CLIENT] Found Delhivery API key for pickup location: ${pickupLocation}`);
-        
-        let apiKey = config.delhiveryApiKey;
-        
-        // Extract API key if it's wrapped in JavaScript code
-        if (apiKey.includes("'") && apiKey.includes('clientKeyD')) {
-          const match = apiKey.match(/'([^']+)'/);
-          if (match) {
-            apiKey = match[1];
-            console.log(`🔑 [CLIENT] Extracted clean API key from JavaScript code: ${apiKey}`);
-          }
-        }
-        
-        return apiKey;
-      }
+      // Client-side: fetch in real-time from API endpoint
+      console.log(`🔑 [CLIENT] Fetching Delhivery API key in real-time for pickup location: ${pickupLocation}`);
       
-      console.warn(`⚠️ [CLIENT] No Delhivery API key found for pickup location: ${pickupLocation}`);
-      console.warn(`💡 Please configure the Delhivery API key for this pickup location in the client settings`);
-      return '';
+      try {
+        // Get authentication token
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          console.warn('⚠️ [CLIENT] No auth token found for real-time API key fetch');
+          return '';
+        }
+
+        // Fetch pickup locations in real-time from API
+        const response = await fetch('/api/pickup-locations', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const pickupLocations = data.pickupLocations || [];
+          
+          // Find the specific pickup location
+          const location = pickupLocations.find((loc: any) => 
+            loc.value.toLowerCase() === pickupLocation.toLowerCase()
+          );
+          
+          if (location?.delhiveryApiKey) {
+            console.log(`🔑 [CLIENT] Found real-time Delhivery API key for pickup location: ${pickupLocation}`);
+            console.log(`🔑 [CLIENT] API key: ${location.delhiveryApiKey.substring(0, 8)}...`);
+            return location.delhiveryApiKey;
+          } else {
+            console.warn(`⚠️ [CLIENT] No Delhivery API key found in real-time data for pickup location: ${pickupLocation}`);
+            console.warn(`💡 Available pickup locations: ${pickupLocations.map((loc: any) => loc.value).join(', ')}`);
+            return '';
+          }
+        } else {
+          console.error(`❌ [CLIENT] Failed to fetch pickup locations in real-time: ${response.status}`);
+          return '';
+        }
+      } catch (error) {
+        console.error(`❌ [CLIENT] Error fetching pickup locations in real-time:`, error);
+        return '';
+      }
     }
   } catch (error) {
     console.error(`❌ Error getting Delhivery API key for pickup location ${pickupLocation}:`, error);

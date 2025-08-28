@@ -134,6 +134,167 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
     delhiveryApiKey: ''
   });
 
+  // Individual section save states
+  const [savingClientInfo, setSavingClientInfo] = useState(false);
+  const [savingCourierServices, setSavingCourierServices] = useState(false);
+  const [savingPickupLocations, setSavingPickupLocations] = useState(false);
+  const [savingOrderConfig, setSavingOrderConfig] = useState(false);
+
+  // Individual section success/error states
+  const [clientInfoSuccess, setClientInfoSuccess] = useState('');
+  const [clientInfoError, setClientInfoError] = useState('');
+  const [courierServicesSuccess, setCourierServicesSuccess] = useState('');
+  const [courierServicesError, setCourierServicesError] = useState('');
+  const [pickupLocationsSuccess, setPickupLocationsSuccess] = useState('');
+  const [pickupLocationsError, setPickupLocationsError] = useState('');
+  const [orderConfigSuccess, setOrderConfigSuccess] = useState('');
+  const [orderConfigError, setOrderConfigError] = useState('');
+
+  // Individual section save functions
+  const handleSaveClientInfo = async () => {
+    if (!config) return;
+
+    try {
+      setSavingClientInfo(true);
+      setClientInfoError('');
+      setClientInfoSuccess('');
+
+      const token = localStorage.getItem('authToken');
+      
+      const response = await fetch(`/api/admin/settings/clients/${clientId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          client: config.client
+        })
+      });
+
+      if (response.ok) {
+        setClientInfoSuccess('Client information updated successfully!');
+        setTimeout(() => setClientInfoSuccess(''), 3000);
+        fetchClientConfig(); // Refresh data
+      } else {
+        const data = await response.json();
+        setClientInfoError(data.error || 'Failed to update client information');
+      }
+    } catch (error) {
+      setClientInfoError('Error updating client information');
+    } finally {
+      setSavingClientInfo(false);
+    }
+  };
+
+  const handleSaveCourierServices = async () => {
+    if (!config) return;
+
+    try {
+      setSavingCourierServices(true);
+      setCourierServicesError('');
+      setCourierServicesSuccess('');
+
+      const token = localStorage.getItem('authToken');
+      
+      const response = await fetch(`/api/admin/settings/clients/${clientId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          courierServices: config.courierServices
+        })
+      });
+
+      if (response.ok) {
+        setCourierServicesSuccess('Courier services updated successfully!');
+        setTimeout(() => setCourierServicesSuccess(''), 3000);
+        fetchClientConfig(); // Refresh data
+      } else {
+        const data = await response.json();
+        setCourierServicesError(data.error || 'Failed to update courier services');
+      }
+    } catch (error) {
+      setCourierServicesError('Error updating courier services');
+    } finally {
+      setSavingCourierServices(false);
+    }
+  };
+
+  const handleSavePickupLocations = async () => {
+    if (!config) return;
+
+    try {
+      setSavingPickupLocations(true);
+      setPickupLocationsError('');
+      setPickupLocationsSuccess('');
+
+      const token = localStorage.getItem('authToken');
+      
+      const response = await fetch(`/api/admin/settings/clients/${clientId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          pickupLocations: config.pickupLocations
+        })
+      });
+
+      if (response.ok) {
+        setPickupLocationsSuccess('Pickup locations updated successfully!');
+        setTimeout(() => setPickupLocationsSuccess(''), 3000);
+        fetchClientConfig(); // Refresh data
+      } else {
+        const data = await response.json();
+        setPickupLocationsError(data.error || 'Failed to update pickup locations');
+      }
+    } catch (error) {
+      setPickupLocationsError('Error updating pickup locations');
+    } finally {
+      setSavingPickupLocations(false);
+    }
+  };
+
+  const handleSaveOrderConfig = async () => {
+    if (!config) return;
+
+    try {
+      setSavingOrderConfig(true);
+      setOrderConfigError('');
+      setOrderConfigSuccess('');
+
+      const token = localStorage.getItem('authToken');
+      
+      const response = await fetch(`/api/admin/settings/clients/${clientId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          clientOrderConfig: config.clientOrderConfig
+        })
+      });
+
+      if (response.ok) {
+        setOrderConfigSuccess('Order configuration updated successfully!');
+        setTimeout(() => setOrderConfigSuccess(''), 3000);
+        fetchClientConfig(); // Refresh data
+      } else {
+        const data = await response.json();
+        setOrderConfigError(data.error || 'Failed to update order configuration');
+      }
+    } catch (error) {
+      setOrderConfigError('Error updating order configuration');
+    } finally {
+      setSavingOrderConfig(false);
+    }
+  };
+
   // Check if user is admin or master admin
   useEffect(() => {
     if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'master_admin') {
@@ -191,48 +352,6 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
       setIsLoading(false);
     }
   };
-
-  const handleSaveConfig = async () => {
-    if (!config) return;
-
-    try {
-      setIsSaving(true);
-      setError('');
-      setSuccess('');
-
-      const token = localStorage.getItem('authToken');
-      
-      console.log('🔍 [ADMIN_CLIENT_SETTINGS] Saving config data:', {
-        hasClientOrderConfig: !!config.clientOrderConfig,
-        clientOrderConfig: config.clientOrderConfig,
-        configKeys: Object.keys(config)
-      });
-      
-      const response = await fetch(`/api/admin/settings/clients/${clientId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(config)
-      });
-
-      if (response.ok) {
-        setSuccess('Client configuration updated successfully!');
-        setTimeout(() => setSuccess(''), 3000);
-        fetchClientConfig(); // Refresh data
-      } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to update configuration');
-      }
-    } catch (error) {
-      setError('Error updating configuration');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-
 
   const handleAddPickupLocation = () => {
     if (!config || !newPickupLocation.name || !newPickupLocation.value) return;
@@ -428,13 +547,6 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
             <p className="text-gray-600 mt-2">{config.client.companyName} - Configuration Management</p>
           </div>
           <div className="flex space-x-3">
-            <button
-              onClick={handleSaveConfig}
-              disabled={isSaving}
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
             <Link
               href="/admin/settings"
               className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
@@ -462,7 +574,28 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
         {/* Client Information */}
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Client Information</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Client Information</h2>
+              <button
+                onClick={handleSaveClientInfo}
+                disabled={savingClientInfo}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {savingClientInfo ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+            
+            {/* Client Info Success/Error Messages */}
+            {clientInfoSuccess && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm text-green-800">{clientInfoSuccess}</p>
+              </div>
+            )}
+            {clientInfoError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-800">{clientInfoError}</p>
+              </div>
+            )}
             
             <div className="space-y-4">
               <div>
@@ -555,7 +688,26 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Courier Services</h2>
+              <button
+                onClick={handleSaveCourierServices}
+                disabled={savingCourierServices}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {savingCourierServices ? 'Saving...' : 'Save'}
+              </button>
             </div>
+            
+            {/* Courier Services Success/Error Messages */}
+            {courierServicesSuccess && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm text-green-800">{courierServicesSuccess}</p>
+              </div>
+            )}
+            {courierServicesError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-800">{courierServicesError}</p>
+              </div>
+            )}
             
             <div className="space-y-3">
               {config.courierServices.map((service) => (
@@ -765,7 +917,26 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Delhivery Pickup Locations</h2>
+              <button
+                onClick={handleSavePickupLocations}
+                disabled={savingPickupLocations}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {savingPickupLocations ? 'Saving...' : 'Save'}
+              </button>
             </div>
+            
+            {/* Pickup Locations Success/Error Messages */}
+            {pickupLocationsSuccess && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm text-green-800">{pickupLocationsSuccess}</p>
+              </div>
+            )}
+            {pickupLocationsError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-800">{pickupLocationsError}</p>
+              </div>
+            )}
             
             <div className="space-y-3">
               {config.pickupLocations.map((location) => (
@@ -926,7 +1097,26 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Order Configuration</h2>
+              <button
+                onClick={handleSaveOrderConfig}
+                disabled={savingOrderConfig}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {savingOrderConfig ? 'Saving...' : 'Save'}
+              </button>
             </div>
+            
+            {/* Order Config Success/Error Messages */}
+            {orderConfigSuccess && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm text-green-800">{orderConfigSuccess}</p>
+              </div>
+            )}
+            {orderConfigError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-800">{orderConfigError}</p>
+              </div>
+            )}
             
             {config.clientOrderConfig ? (
               <div className="space-y-6">

@@ -1,31 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-
-// Encryption key for sensitive data
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'vanitha-logistics-encryption-key-2024';
-
-// Helper function to encrypt sensitive data
-function encrypt(text: string): string {
-  const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return encrypted;
-}
-
-// Helper function to decrypt sensitive data
-function decrypt(encryptedText: string): string {
-  try {
-    const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch (error) {
-    console.error('❌ Error decrypting value:', error);
-    return encryptedText;
-  }
-}
 
 // Helper function to get authenticated admin user
 async function getAuthenticatedAdmin(request: NextRequest) {
@@ -212,7 +187,7 @@ export async function GET(
           id: location.id,
           name: location.label,
           value: location.value,
-          delhiveryApiKey: location.delhiveryApiKey ? '••••••••••••••••' : null,
+          delhiveryApiKey: location.delhiveryApiKey || null, // Return actual API key, not masked
           isActive: true
         })),
         courierServices: client.courier_services.map(service => ({

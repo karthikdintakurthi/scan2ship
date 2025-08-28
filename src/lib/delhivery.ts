@@ -200,7 +200,7 @@ export class DelhiveryService {
       const jsonData = {
         shipments: [shipmentData],
         pickup_location: {
-          name: orderData.pickup_location || 'VIJAYA8 FRANCHISE'
+          name: orderData.pickup_location || 'VIJAYA8 FRANCHISE' // Use actual pickup location value
         }
       };
 
