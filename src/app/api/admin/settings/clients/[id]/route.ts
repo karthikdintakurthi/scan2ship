@@ -344,39 +344,28 @@ export async function PUT(
         where: { clientId }
       });
 
-      // Then create new ones, filtering out duplicates
+      // Then create new ones
       if (updateData.pickupLocations.length > 0) {
-        // Filter out duplicate values for the same client
-        const uniqueLocations = updateData.pickupLocations.filter((location: any, index: number, self: any[]) => 
-          index === self.findIndex((l: any) => l.value === location.value)
-        );
-
         console.log(`📝 [API_ADMIN_CLIENT_CONFIG_PUT] Processing pickup locations:`, {
-          originalCount: updateData.pickupLocations.length,
-          uniqueCount: uniqueLocations.length,
-          duplicates: updateData.pickupLocations.length - uniqueLocations.length
+          count: updateData.pickupLocations.length
         });
 
-        if (uniqueLocations.length > 0) {
-          try {
-            await prisma.pickup_locations.createMany({
-              data: uniqueLocations.map((location: any) => ({
-                id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                clientId,
-                value: location.value,
-                label: location.name,
-                delhiveryApiKey: location.delhiveryApiKey && !location.delhiveryApiKey.startsWith('••••••••••••••••') 
-                  ? location.delhiveryApiKey  // Don't encrypt - store as plain text
-                  : location.delhiveryApiKey
-              }))
-            });
-            console.log(`✅ [API_ADMIN_CLIENT_CONFIG_PUT] Successfully created ${uniqueLocations.length} pickup locations`);
-          } catch (createError) {
-            console.error('❌ [API_ADMIN_CLIENT_CONFIG_PUT] Error creating pickup locations:', createError);
-            throw new Error(`Failed to create pickup locations: ${createError}`);
-          }
-        } else {
-          console.log('⚠️ [API_ADMIN_CLIENT_CONFIG_PUT] No unique pickup locations to create after filtering duplicates');
+        try {
+          await prisma.pickup_locations.createMany({
+            data: updateData.pickupLocations.map((location: any) => ({
+              id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              clientId,
+              value: location.value,
+              label: location.name,
+              delhiveryApiKey: location.delhiveryApiKey && !location.delhiveryApiKey.startsWith('••••••••••••••••') 
+                ? location.delhiveryApiKey  // Don't encrypt - store as plain text
+                : location.delhiveryApiKey
+            }))
+          });
+          console.log(`✅ [API_ADMIN_CLIENT_CONFIG_PUT] Successfully created ${updateData.pickupLocations.length} pickup locations`);
+        } catch (createError) {
+          console.error('❌ [API_ADMIN_CLIENT_CONFIG_PUT] Error creating pickup locations:', createError);
+          throw new Error(`Failed to create pickup locations: ${createError}`);
         }
       }
 
@@ -399,38 +388,27 @@ export async function PUT(
         where: { clientId }
       });
 
-      // Then create new ones, filtering out duplicates
+      // Then create new ones
       if (updateData.courierServices.length > 0) {
-        // Filter out duplicate codes for the same client
-        const uniqueServices = updateData.courierServices.filter((service: any, index: number, self: any[]) => 
-          index === self.findIndex((s: any) => s.code === service.code)
-        );
-
         console.log(`📝 [API_ADMIN_CLIENT_CONFIG_PUT] Processing courier services:`, {
-          originalCount: updateData.courierServices.length,
-          uniqueCount: uniqueServices.length,
-          duplicates: updateData.courierServices.length - uniqueServices.length
+          count: updateData.courierServices.length
         });
 
-        if (uniqueServices.length > 0) {
-          try {
-            await prisma.courier_services.createMany({
-              data: uniqueServices.map((service: any) => ({
-                id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                clientId,
-                code: service.code,
-                name: service.name,
-                isActive: service.isActive,
-                isDefault: service.isDefault
-              }))
-            });
-            console.log(`✅ [API_ADMIN_CLIENT_CONFIG_PUT] Successfully created ${uniqueServices.length} courier services`);
-          } catch (createError) {
-            console.error('❌ [API_ADMIN_CLIENT_CONFIG_PUT] Error creating courier services:', createError);
-            throw new Error(`Failed to create courier services: ${createError}`);
-          }
-        } else {
-          console.log('⚠️ [API_ADMIN_CLIENT_CONFIG_PUT] No unique courier services to create after filtering duplicates');
+        try {
+          await prisma.courier_services.createMany({
+            data: updateData.courierServices.map((service: any) => ({
+              id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              clientId,
+              code: service.code,
+              name: service.name,
+              isActive: service.isActive,
+              isDefault: service.isDefault
+            }))
+          });
+          console.log(`✅ [API_ADMIN_CLIENT_CONFIG_PUT] Successfully created ${updateData.courierServices.length} courier services`);
+        } catch (createError) {
+          console.error('❌ [API_ADMIN_CLIENT_CONFIG_PUT] Error creating courier services:', createError);
+          throw new Error(`Failed to create courier services: ${createError}`);
         }
       }
 
