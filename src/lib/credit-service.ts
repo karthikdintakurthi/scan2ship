@@ -70,7 +70,8 @@ export class CreditService {
     clientId: string,
     amount: number,
     description: string,
-    userId?: string
+    userId?: string,
+    clientName?: string
   ): Promise<ClientCredits> {
     try {
       const result = await prisma.$transaction(async (tx) => {
@@ -107,6 +108,7 @@ export class CreditService {
           data: {
             id: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             clientId,
+            clientName: clientName || 'Unknown Client',
             userId,
             type: 'ADD',
             amount,
@@ -136,7 +138,8 @@ export class CreditService {
     description: string,
     feature: keyof typeof CREDIT_COSTS,
     userId?: string,
-    orderId?: number
+    orderId?: number,
+    clientName?: string
   ): Promise<ClientCredits> {
     try {
       const result = await prisma.$transaction(async (tx) => {
@@ -168,6 +171,7 @@ export class CreditService {
           data: {
             id: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             clientId,
+            clientName: clientName || 'Unknown Client',
             userId,
             type: 'DEDUCT',
             amount,
@@ -218,7 +222,8 @@ export class CreditService {
     clientId: string,
     newBalance: number,
     description: string,
-    userId?: string
+    userId?: string,
+    clientName?: string
   ): Promise<ClientCredits> {
     try {
       const result = await prisma.$transaction(async (tx) => {
@@ -264,6 +269,7 @@ export class CreditService {
             balance: updatedCredits.balance,
             description,
             feature: 'MANUAL',
+            clientName: clientName || 'Unknown Client',
             createdAt: new Date()
           }
         });

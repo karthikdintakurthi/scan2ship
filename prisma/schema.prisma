@@ -7,64 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Order {
-  id                       Int              @id @default(autoincrement())
-  clientId                 String
-  name                     String
-  mobile                   String
-  phone                    String?
-  address                  String
-  city                     String
-  state                    String
-  country                  String
-  pincode                  String
-  courier_service          String
-  pickup_location          String
-  package_value            Float
-  weight                   Float
-  total_items              Int
-  tracking_id              String?
-  reference_number         String?
-  is_cod                   Boolean          @default(false)
-  cod_amount               Float?
-  reseller_name            String?
-  reseller_mobile          String?
-  created_at               DateTime         @default(now())
-  updated_at               DateTime         @updatedAt
-  delhivery_waybill_number String?
-  delhivery_order_id       String?
-  delhivery_api_status     String?
-  delhivery_api_error      String?
-  delhivery_retry_count    Int              @default(0)
-  last_delhivery_attempt   DateTime?
-  shipment_length          Float?
-  shipment_breadth         Float?
-  shipment_height          Float?
-  product_description      String?
-  return_address           String?
-  return_pincode           String?
-  fragile_shipment         Boolean          @default(false)
-  seller_name              String?
-  seller_address           String?
-  seller_gst               String?
-  invoice_number           String?
-  commodity_value          Float?
-  tax_value                Float?
-  category_of_goods        String?
-  vendor_pickup_location   String?
-  hsn_code                 String?
-  seller_cst_no            String?
-  seller_tin               String?
-  invoice_date             String?
-  return_reason            String?
-  ewbn                     String?
-  order_analytics          order_analytics?
-  credit_transactions      credit_transactions[]
-  clients                  clients          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@map("orders")
-}
-
 model analytics_events {
   id        String   @id
   eventType String
@@ -90,6 +32,30 @@ model client_config {
   clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([clientId, key])
+}
+
+model client_credit_costs {
+  id        String   @id
+  clientId  String
+  feature   String
+  cost      Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  clients   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, feature])
+}
+
+model client_credits {
+  id         String   @id
+  clientId   String   @unique
+  balance    Int      @default(0)
+  totalAdded Int      @default(0)
+  totalUsed  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  clients    clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 model client_order_configs {
@@ -133,16 +99,16 @@ model clients {
   updatedAt             DateTime
   analytics_events      analytics_events[]
   client_config         client_config[]
+  client_credit_costs   client_credit_costs[]
+  client_credits        client_credits?
   client_order_configs  client_order_configs?
   courier_services      courier_services[]
+  credit_transactions   credit_transactions[]
   order_analytics       order_analytics[]
-  orders                Order[]
+  orders                orders[]
   pickup_locations      pickup_locations[]
   sessions              sessions[]
   users                 users[]
-  client_credits        client_credits?
-  client_credit_costs   client_credit_costs[]
-  credit_transactions   credit_transactions[]
 }
 
 model courier_services {
@@ -157,6 +123,27 @@ model courier_services {
   @@unique([code, clientId])
 }
 
+model credit_transactions {
+  id                 String   @id
+  clientId           String
+  userId             String?
+  type               String
+  amount             Int
+  balance            Int
+  description        String
+  feature            String?
+  orderId            Int?
+  createdAt          DateTime @default(now())
+  clientName         String
+  utrNumber          String?
+  screenshotFileName String?
+  screenshotFileSize Int?
+  screenshotFileType String?
+  clients            clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orders             orders?  @relation(fields: [orderId], references: [id])
+  users              users?   @relation(fields: [userId], references: [id])
+}
+
 model order_analytics {
   id              String   @id
   orderId         Int      @unique
@@ -165,8 +152,64 @@ model order_analytics {
   userId          String?
   createdAt       DateTime @default(now())
   clients         clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  orders          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orders          orders   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   users           users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model orders {
+  id                       Int                   @id @default(autoincrement())
+  clientId                 String
+  name                     String
+  mobile                   String
+  phone                    String?
+  address                  String
+  city                     String
+  state                    String
+  country                  String
+  pincode                  String
+  courier_service          String
+  pickup_location          String
+  package_value            Float
+  weight                   Float
+  total_items              Int
+  tracking_id              String?
+  reference_number         String?
+  is_cod                   Boolean               @default(false)
+  cod_amount               Float?
+  reseller_name            String?
+  reseller_mobile          String?
+  created_at               DateTime              @default(now())
+  updated_at               DateTime
+  delhivery_waybill_number String?
+  delhivery_order_id       String?
+  delhivery_api_status     String?
+  delhivery_api_error      String?
+  delhivery_retry_count    Int                   @default(0)
+  last_delhivery_attempt   DateTime?
+  shipment_length          Float?
+  shipment_breadth         Float?
+  shipment_height          Float?
+  product_description      String?
+  return_address           String?
+  return_pincode           String?
+  fragile_shipment         Boolean               @default(false)
+  seller_name              String?
+  seller_address           String?
+  seller_gst               String?
+  invoice_number           String?
+  commodity_value          Float?
+  tax_value                Float?
+  category_of_goods        String?
+  vendor_pickup_location   String?
+  hsn_code                 String?
+  seller_cst_no            String?
+  seller_tin               String?
+  invoice_date             String?
+  return_reason            String?
+  ewbn                     String?
+  credit_transactions      credit_transactions[]
+  order_analytics          order_analytics?
+  clients                  clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 model pickup_locations {
@@ -177,7 +220,7 @@ model pickup_locations {
   clientId        String
   clients         clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  @@unique([value, clientId])
+  @@unique([label, clientId])
 }
 
 model sessions {
@@ -204,61 +247,20 @@ model system_config {
 }
 
 model users {
-  id                 String             @id
-  email              String
-  name               String
-  password           String?
-  role               String             @default("user")
-  isActive           Boolean            @default(true)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime
-  clientId           String
-  analytics_events   analytics_events[]
-  order_analytics    order_analytics[]
-  sessions           sessions[]
+  id                  String                @id
+  email               String
+  name                String
+  password            String?
+  role                String                @default("user")
+  isActive            Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  clientId            String
+  analytics_events    analytics_events[]
   credit_transactions credit_transactions[]
-  clients            clients            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  order_analytics     order_analytics[]
+  sessions            sessions[]
+  clients             clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([email, clientId])
-}
-
-// Credit System Models
-model client_credits {
-  id          String   @id
-  clientId    String   @unique
-  balance     Int      @default(0)
-  totalAdded  Int      @default(0)
-  totalUsed   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-}
-
-model client_credit_costs {
-  id          String   @id
-  clientId    String
-  feature     String   // "ORDER", "WHATSAPP", "IMAGE_PROCESSING", "TEXT_PROCESSING"
-  cost        Float    // Cost in credits (can be 0.5, 1.0, 1.5, etc.)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@unique([clientId, feature])
-}
-
-model credit_transactions {
-  id          String   @id
-  clientId    String
-  userId      String?
-  type        String   // "ADD", "DEDUCT", "RESET"
-  amount      Int
-  balance     Int      // Balance after transaction
-  description String
-  feature     String?  // "ORDER", "WHATSAPP", "IMAGE_PROCESSING", "TEXT_PROCESSING", "MANUAL"
-  orderId     Int?     // Reference to order if applicable
-  createdAt   DateTime @default(now())
-  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  users       users?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-  orders      Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
 }

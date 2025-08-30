@@ -115,7 +115,8 @@ export async function POST(
       clientId,
       amount,
       description,
-      user.id
+      user.id,
+      client.companyName
     );
     
     return NextResponse.json({
@@ -174,7 +175,8 @@ export async function PUT(
       clientId,
       newBalance,
       description,
-      user.id
+      user.id,
+      client.companyName
     );
     
     return NextResponse.json({

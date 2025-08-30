@@ -1,13 +1,8 @@
 {
   "/api/auth/verify/route": "app/api/auth/verify/route.js",
-  "/api/order-config/route": "app/api/order-config/route.js",
-  "/api/orders/route": "app/api/orders/route.js",
   "/api/credits/route": "app/api/credits/route.js",
-  "/api/pickup-locations/route": "app/api/pickup-locations/route.js",
-  "/api/courier-services/route": "app/api/courier-services/route.js",
-  "/view-orders/page": "app/view-orders/page.js",
-  "/orders/page": "app/orders/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/admin/settings/page": "app/admin/settings/page.js",
-  "/admin/settings/clients/[id]/page": "app/admin/settings/clients/[id]/page.js"
+  "/api/credits/transactions/route": "app/api/credits/transactions/route.js",
+  "/credits/page": "app/credits/page.js",
+  "/admin/credits/page": "app/admin/credits/page.js",
+  "/admin/page": "app/admin/page.js"
 }

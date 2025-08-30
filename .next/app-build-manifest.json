@@ -6,15 +6,10 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/page": [
+    "/credits/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
-    ],
-    "/api/pwa/manifest/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/pwa/manifest/route.js"
+      "static/chunks/app/credits/page.js"
     ],
     "/api/auth/verify/route": [
       "static/chunks/webpack.js",
@@ -26,50 +21,30 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/credits/route.js"
     ],
-    "/orders/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/orders/page.js"
-    ],
-    "/api/order-config/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/order-config/route.js"
-    ],
-    "/api/pickup-locations/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/pickup-locations/route.js"
-    ],
-    "/api/courier-services/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/courier-services/route.js"
-    ],
-    "/api/orders/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/orders/route.js"
-    ],
-    "/credits/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/credits/page.js"
-    ],
     "/api/credits/transactions/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/credits/transactions/route.js"
     ],
-    "/view-orders/page": [
+    "/api/validate-payment-screenshot/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/view-orders/page.js"
+      "static/chunks/app/api/validate-payment-screenshot/route.js"
     ],
-    "/api/orders/[id]/retry-delhivery/route": [
+    "/api/credits/verify-payment/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/orders/[id]/retry-delhivery/route.js"
+      "static/chunks/app/api/credits/verify-payment/route.js"
+    ],
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
+    ],
+    "/api/pwa/manifest/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/pwa/manifest/route.js"
     ],
     "/api/auth/login/route": [
       "static/chunks/webpack.js",
@@ -86,30 +61,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/admin/page.js"
     ],
-    "/admin/settings/page": [
+    "/admin/credits/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/settings/page.js"
+      "static/chunks/app/admin/credits/page.js"
     ],
-    "/api/admin/clients/route": [
+    "/api/admin/credits/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/clients/route.js"
+      "static/chunks/app/api/admin/credits/route.js"
     ],
-    "/api/admin/system-config/route": [
+    "/api/admin/credits/[clientId]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/system-config/route.js"
-    ],
-    "/admin/settings/clients/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/admin/settings/clients/[id]/page.js"
-    ],
-    "/api/admin/settings/clients/[id]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/settings/clients/[id]/route.js"
+      "static/chunks/app/api/admin/credits/[clientId]/route.js"
     ]
   }
 }

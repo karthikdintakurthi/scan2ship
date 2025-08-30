@@ -414,7 +414,7 @@ export default function AdminCreditsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Total Credits</dt>
-                      <dd className="text-lg font-medium text-gray-900">{summary.totalCredits.toLocaleString()}</dd>
+                      <dd className="text-lg font-medium text-gray-900">₹{summary.totalCredits.toLocaleString()}</dd>
                     </dl>
                   </div>
                 </div>
@@ -434,7 +434,7 @@ export default function AdminCreditsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Total Added</dt>
-                      <dd className="text-lg font-medium text-gray-900">{summary.totalAdded.toLocaleString()}</dd>
+                      <dd className="text-lg font-medium text-gray-900">₹{summary.totalAdded.toLocaleString()}</dd>
                     </dl>
                   </div>
                 </div>
