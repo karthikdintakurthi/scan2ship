@@ -11,21 +11,6 @@
       "static/chunks/main-app.js",
       "static/chunks/app/page.js"
     ],
-    "/orders/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/orders/page.js"
-    ],
-    "/view-orders/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/view-orders/page.js"
-    ],
-    "/credits/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/credits/page.js"
-    ],
     "/api/pwa/manifest/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -36,30 +21,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/verify/route.js"
     ],
-    "/admin/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/admin/layout.js"
-    ],
-    "/admin/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/admin/page.js"
-    ],
-    "/api/auth/login/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/login/route.js"
-    ],
     "/api/credits/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/credits/route.js"
     ],
-    "/api/orders/route": [
+    "/orders/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/orders/route.js"
+      "static/chunks/app/orders/page.js"
+    ],
+    "/api/order-config/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/order-config/route.js"
     ],
     "/api/pickup-locations/route": [
       "static/chunks/webpack.js",
@@ -71,35 +46,45 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/courier-services/route.js"
     ],
+    "/api/orders/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/orders/route.js"
+    ],
+    "/credits/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/credits/page.js"
+    ],
     "/api/credits/transactions/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/credits/transactions/route.js"
     ],
-    "/api/order-config/route": [
+    "/view-orders/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/order-config/route.js"
+      "static/chunks/app/view-orders/page.js"
     ],
-    "/api/analytics/track/route": [
+    "/api/orders/[id]/retry-delhivery/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/analytics/track/route.js"
+      "static/chunks/app/api/orders/[id]/retry-delhivery/route.js"
     ],
-    "/api/format-address-image/route": [
+    "/api/auth/login/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/format-address-image/route.js"
+      "static/chunks/app/api/auth/login/route.js"
     ],
-    "/admin/client-configurations/page": [
+    "/admin/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/client-configurations/page.js"
+      "static/chunks/app/admin/layout.js"
     ],
-    "/api/admin/client-configurations/route": [
+    "/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/client-configurations/route.js"
+      "static/chunks/app/admin/page.js"
     ],
     "/admin/settings/page": [
       "static/chunks/webpack.js",

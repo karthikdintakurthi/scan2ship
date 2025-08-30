@@ -1,31 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-
-// Encryption key for sensitive data
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'vanitha-logistics-encryption-key-2024';
-
-// Helper function to encrypt sensitive data
-function encrypt(text: string): string {
-  const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return encrypted;
-}
-
-// Helper function to decrypt sensitive data
-function decrypt(encryptedText: string): string {
-  try {
-    const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch (error) {
-    console.error('❌ Error decrypting value:', error);
-    return encryptedText;
-  }
-}
 
 // Helper function to get authenticated admin user
 async function getAuthenticatedAdmin(request: NextRequest) {
@@ -212,7 +187,7 @@ export async function GET(
           id: location.id,
           name: location.label,
           value: location.value,
-          delhiveryApiKey: location.delhiveryApiKey ? '••••••••••••••••' : null,
+          delhiveryApiKey: location.delhiveryApiKey || null, // Return actual API key, not masked
           isActive: true
         })),
         courierServices: client.courier_services.map(service => ({
@@ -371,17 +346,27 @@ export async function PUT(
 
       // Then create new ones
       if (updateData.pickupLocations.length > 0) {
-        await prisma.pickup_locations.createMany({
-          data: updateData.pickupLocations.map((location: any) => ({
-            id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            clientId,
-            value: location.value,
-            label: location.name,
-            delhiveryApiKey: location.delhiveryApiKey && !location.delhiveryApiKey.startsWith('••••••••••••••••') 
-              ? location.delhiveryApiKey  // Don't encrypt - store as plain text
-              : location.delhiveryApiKey
-          }))
+        console.log(`📝 [API_ADMIN_CLIENT_CONFIG_PUT] Processing pickup locations:`, {
+          count: updateData.pickupLocations.length
         });
+
+        try {
+          await prisma.pickup_locations.createMany({
+            data: updateData.pickupLocations.map((location: any) => ({
+              id: `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              clientId,
+              value: location.value,
+              label: location.name,
+              delhiveryApiKey: location.delhiveryApiKey && !location.delhiveryApiKey.startsWith('••••••••••••••••') 
+                ? location.delhiveryApiKey  // Don't encrypt - store as plain text
+                : location.delhiveryApiKey
+            }))
+          });
+          console.log(`✅ [API_ADMIN_CLIENT_CONFIG_PUT] Successfully created ${updateData.pickupLocations.length} pickup locations`);
+        } catch (createError) {
+          console.error('❌ [API_ADMIN_CLIENT_CONFIG_PUT] Error creating pickup locations:', createError);
+          throw new Error(`Failed to create pickup locations: ${createError}`);
+        }
       }
 
       // Clear pickup location cache for all clients since we can't target specific client cache
@@ -405,16 +390,26 @@ export async function PUT(
 
       // Then create new ones
       if (updateData.courierServices.length > 0) {
-        await prisma.courier_services.createMany({
-          data: updateData.courierServices.map((service: any) => ({
-            id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            clientId,
-            code: service.code,
-            name: service.name,
-            isActive: service.isActive,
-            isDefault: service.isDefault
-          }))
+        console.log(`📝 [API_ADMIN_CLIENT_CONFIG_PUT] Processing courier services:`, {
+          count: updateData.courierServices.length
         });
+
+        try {
+          await prisma.courier_services.createMany({
+            data: updateData.courierServices.map((service: any) => ({
+              id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              clientId,
+              code: service.code,
+              name: service.name,
+              isActive: service.isActive,
+              isDefault: service.isDefault
+            }))
+          });
+          console.log(`✅ [API_ADMIN_CLIENT_CONFIG_PUT] Successfully created ${updateData.courierServices.length} courier services`);
+        } catch (createError) {
+          console.error('❌ [API_ADMIN_CLIENT_CONFIG_PUT] Error creating courier services:', createError);
+          throw new Error(`Failed to create courier services: ${createError}`);
+        }
       }
 
       // Clear courier service cache for all clients since we can't target specific client cache

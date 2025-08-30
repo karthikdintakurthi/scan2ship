@@ -121,12 +121,74 @@ export async function POST(request: NextRequest) {
     // Log the processed data for debugging
     console.log('🔍 [API_ORDERS_POST] Processed order data:', processedOrderData);
 
-    // Create order with client ID
+    // Handle Delhivery API call first if courier service is Delhivery (case-insensitive)
+    let delhiveryResponse = null;
+    if (orderData.courier_service.toLowerCase() === 'delhivery') {
+      try {
+        console.log('🚚 [API_ORDERS_POST] Calling Delhivery API before creating order');
+        console.log('🚚 [API_ORDERS_POST] Order data being sent to Delhivery:', JSON.stringify(processedOrderData, null, 2));
+        console.log('🚚 [API_ORDERS_POST] Pickup location:', processedOrderData.pickup_location);
+        
+        // Create a temporary order object for Delhivery API call
+        const tempOrder = {
+          ...processedOrderData,
+          id: 0 // Temporary ID for API call
+        };
+        
+        delhiveryResponse = await delhiveryService.createOrder(tempOrder);
+        
+        console.log('🚚 [API_ORDERS_POST] Delhivery API response received:', JSON.stringify(delhiveryResponse, null, 2));
+        
+        if (!delhiveryResponse.success) {
+          console.log('❌ [API_ORDERS_POST] Delhivery API failed, not creating order');
+          return NextResponse.json({
+            success: false,
+            error: 'Delhivery API failed',
+            details: delhiveryResponse.error || 'Failed to create order with Delhivery',
+            delhiveryError: delhiveryResponse.error
+          }, { status: 400 });
+        }
+        
+        console.log('✅ [API_ORDERS_POST] Delhivery API succeeded, proceeding with order creation');
+      } catch (error) {
+        console.error('❌ [API_ORDERS_POST] Delhivery API error:', error);
+        console.error('❌ [API_ORDERS_POST] Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
+        
+        return NextResponse.json({
+          success: false,
+          error: 'Delhivery API failed',
+          details: error instanceof Error ? error.message : 'Unknown error occurred while creating order with Delhivery'
+        }, { status: 400 });
+      }
+    } else {
+      console.log('📝 [API_ORDERS_POST] Skipping Delhivery API for courier service:', orderData.courier_service);
+    }
+
+    // Create order with client ID (only if Delhivery succeeded or not required)
     const order = await prisma.Order.create({
       data: processedOrderData
     });
 
     console.log('✅ [API_ORDERS_POST] Order created successfully:', order.id);
+
+    // Update order with Delhivery data if available
+    if (delhiveryResponse && delhiveryResponse.success) {
+      await prisma.Order.update({
+        where: { id: order.id },
+        data: {
+          delhivery_waybill_number: delhiveryResponse.waybill_number,
+          delhivery_order_id: delhiveryResponse.order_id,
+          delhivery_api_status: 'success',
+          tracking_id: delhiveryResponse.waybill_number,
+          last_delhivery_attempt: new Date()
+        }
+      });
+      
+      console.log('✅ [API_ORDERS_POST] Delhivery data updated in order');
+    }
 
     // Deduct credits for order creation
     try {
@@ -156,66 +218,6 @@ export async function POST(request: NextRequest) {
       });
     } catch (analyticsError) {
       console.warn('⚠️ [API_ORDERS_POST] Failed to track order analytics:', analyticsError);
-    }
-
-    // Handle Delhivery API call if courier service is Delhivery (case-insensitive)
-    if (orderData.courier_service.toLowerCase() === 'delhivery') {
-      try {
-        console.log('🚚 [API_ORDERS_POST] Calling Delhivery API for order:', order.id);
-        console.log('🚚 [API_ORDERS_POST] Order data being sent to Delhivery:', JSON.stringify(order, null, 2));
-        console.log('🚚 [API_ORDERS_POST] Pickup location:', order.pickup_location);
-        
-        const delhiveryResponse = await delhiveryService.createOrder(order);
-        
-        console.log('🚚 [API_ORDERS_POST] Delhivery API response received:', JSON.stringify(delhiveryResponse, null, 2));
-        
-        if (delhiveryResponse.success) {
-          // Update order with Delhivery data
-          await prisma.Order.update({
-            where: { id: order.id },
-            data: {
-              delhivery_waybill_number: delhiveryResponse.waybill_number,
-              delhivery_order_id: delhiveryResponse.order_id,
-              delhivery_api_status: 'success',
-              tracking_id: delhiveryResponse.waybill_number,
-              last_delhivery_attempt: new Date()
-            }
-          });
-          
-          console.log('✅ [API_ORDERS_POST] Delhivery order created successfully');
-        } else {
-          // Update order with error status
-          await prisma.Order.update({
-            where: { id: order.id },
-            data: {
-              delhivery_api_status: 'failed',
-              delhivery_api_error: delhiveryResponse.error,
-              last_delhivery_attempt: new Date()
-            }
-          });
-          
-          console.log('❌ [API_ORDERS_POST] Delhivery order failed:', delhiveryResponse.error);
-        }
-      } catch (error) {
-        console.error('❌ [API_ORDERS_POST] Delhivery API error:', error);
-        console.error('❌ [API_ORDERS_POST] Error details:', {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          stack: error instanceof Error ? error.stack : undefined,
-          orderId: order.id
-        });
-        
-        // Update order with error status
-        await prisma.Order.update({
-          where: { id: order.id },
-          data: {
-            delhivery_api_status: 'failed',
-            delhivery_api_error: error instanceof Error ? error.message : 'Unknown error',
-            last_delhivery_attempt: new Date()
-          }
-        });
-      }
-    } else {
-      console.log('📝 [API_ORDERS_POST] Skipping Delhivery API for courier service:', orderData.courier_service);
     }
 
     // Fetch updated order data to get latest tracking number
