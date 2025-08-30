@@ -237,13 +237,8 @@ Focus on accuracy and only extract information that is clearly visible and prope
           upiId: validationResult.upiId
         });
 
-        // Deduct credits for successful image processing
-        try {
-          await CreditService.deductImageProcessingCredits(client.id, user.id);
-          console.log('💳 [API_VALIDATE_PAYMENT_SCREENSHOT] Credits deducted for image processing: 2 credits');
-        } catch (creditError) {
-          console.error('❌ [API_VALIDATE_PAYMENT_SCREENSHOT] Failed to deduct credits for image processing:', creditError);
-        }
+        // Note: No credits deducted for payment validation - this is part of the recharge flow
+        console.log('💳 [API_VALIDATE_PAYMENT_SCREENSHOT] No credits deducted - payment validation is free for recharge flow');
 
         return NextResponse.json({
           success: true,

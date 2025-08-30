@@ -160,7 +160,7 @@ export async function GET(
     const orderId = parseInt(id)
     
     // Get order details
-    const order = await prisma.Order.findUnique({
+    const order = await prisma.orders.findUnique({
       where: { id: orderId }
     })
 

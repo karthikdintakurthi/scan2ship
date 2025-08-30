@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id } = await params
     const orderId = parseInt(id)
-    const order = await prisma.Order.findUnique({
+    const order = await prisma.orders.findUnique({
       where: { id: orderId }
     })
 
@@ -38,7 +38,7 @@ export async function PUT(
     const orderId = parseInt(id)
     const body = await request.json()
     
-    const order = await prisma.Order.update({
+    const order = await prisma.orders.update({
       where: { id: orderId },
       data: body
     })
@@ -60,7 +60,7 @@ export async function DELETE(
   try {
     const { id } = await params
     const orderId = parseInt(id)
-    await prisma.Order.delete({
+    await prisma.orders.delete({
       where: { id: orderId }
     })
 

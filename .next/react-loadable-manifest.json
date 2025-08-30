@@ -1,6 +1,18 @@
 {
+  "components/OrderForm.tsx -> @/lib/courier-service-config": {
+    "id": "components/OrderForm.tsx -> @/lib/courier-service-config",
+    "files": []
+  },
+  "components/OrderList.tsx -> @/lib/order-form-config": {
+    "id": "components/OrderList.tsx -> @/lib/order-form-config",
+    "files": []
+  },
   "components/PWAScript.tsx -> @/lib/pwa-config": {
     "id": "components/PWAScript.tsx -> @/lib/pwa-config",
+    "files": []
+  },
+  "hooks/usePickupLocation.ts -> @/lib/order-form-config": {
+    "id": "hooks/usePickupLocation.ts -> @/lib/order-form-config",
     "files": []
   }
 }

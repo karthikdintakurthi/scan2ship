@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create order with client ID (only if Delhivery succeeded or not required)
-    const order = await prisma.Order.create({
+    const order = await prisma.orders.create({
       data: processedOrderData
     });
 
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
 
     // Update order with Delhivery data if available
     if (delhiveryResponse && delhiveryResponse.success) {
-      await prisma.Order.update({
+      await prisma.orders.update({
         where: { id: order.id },
         data: {
           delhivery_waybill_number: delhiveryResponse.waybill_number,
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch updated order data to get latest tracking number
-    const updatedOrder = await prisma.Order.findUnique({
+    const updatedOrder = await prisma.orders.findUnique({
       where: { id: order.id }
     });
 
@@ -373,13 +373,13 @@ export async function GET(request: NextRequest) {
     
     // Get orders with pagination
     const [orders, totalCount] = await Promise.all([
-      prisma.Order.findMany({
+      prisma.orders.findMany({
         where: whereClause,
         orderBy: { created_at: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.Order.count({ where: whereClause })
+      prisma.orders.count({ where: whereClause })
     ]);
     
     const totalPages = Math.ceil(totalCount / limit);
@@ -455,7 +455,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if all orders belong to the authenticated client (security check)
-    const existingOrders = await prisma.Order.findMany({
+    const existingOrders = await prisma.orders.findMany({
       where: {
         id: { in: validOrderIds },
         clientId: client.id // Ensure client isolation
@@ -475,7 +475,7 @@ export async function DELETE(request: NextRequest) {
       const deletedOrders = [];
       
       for (const orderId of validOrderIds) {
-        const deletedOrder = await tx.Order.delete({
+        const deletedOrder = await tx.orders.delete({
           where: { id: parseInt(orderId) }
         });
         deletedOrders.push(deletedOrder);

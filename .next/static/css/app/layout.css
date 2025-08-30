@@ -670,9 +670,6 @@ video {
 .z-50 {
   z-index: 50;
 }
-.col-span-full {
-  grid-column: 1 / -1;
-}
 .mx-2 {
   margin-left: 0.5rem;
   margin-right: 0.5rem;
