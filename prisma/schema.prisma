@@ -60,9 +60,24 @@ model Order {
   ewbn                     String?
   order_analytics          order_analytics?
   credit_transactions      credit_transactions[]
+  product_images           OrderProductImage[]
   clients                  clients          @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("orders")
+}
+
+model OrderProductImage {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  imageUrl    String
+  imageName   String
+  quantity    Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_product_images")
 }
 
 model analytics_events {

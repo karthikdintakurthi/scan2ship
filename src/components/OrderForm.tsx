@@ -31,6 +31,13 @@ interface AddressFormData {
   product_description: string
 }
 
+interface ProductImage {
+  id: string
+  file: File
+  preview: string
+  quantity: number
+}
+
 export default function OrderForm() {
   const { refreshCredits } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false)
@@ -45,6 +52,104 @@ export default function OrderForm() {
   
   // Use the persistent pickup location hook
   const { selectedPickupLocation, updatePickupLocation, pickupLocations, isLoaded } = usePickupLocation()
+  
+  // Product images state
+  const [productImages, setProductImages] = useState<ProductImage[]>([])
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState('')
+
+  // Product image handlers
+  const handleProductImageUpload = (files: FileList | File[]) => {
+    const fileArray = Array.from(files)
+    if (fileArray.length === 0) return
+
+    // Filter and validate files
+    const validFiles = fileArray.filter(file => {
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        console.warn(`Skipping non-image file: ${file.name}`)
+        return false
+      }
+      
+      // Check file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        console.warn(`Skipping large file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
+        return false
+      }
+      
+      return true
+    })
+
+    if (validFiles.length === 0) {
+      alert('Please select valid image files (JPG, PNG, GIF) under 5MB each.')
+      return
+    }
+
+    const newImages: ProductImage[] = validFiles.map((file) => ({
+      id: Math.random().toString(36).substr(2, 9),
+      file,
+      preview: URL.createObjectURL(file),
+      quantity: 1
+    }))
+
+    setProductImages(prev => [...prev, ...newImages])
+    
+    // Show success message
+    setUploadMessage(`${validFiles.length} image${validFiles.length > 1 ? 's' : ''} uploaded successfully!`)
+    setTimeout(() => setUploadMessage(''), 3000)
+  }
+
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+
+    handleProductImageUpload(files)
+    
+    // Reset the input
+    event.target.value = ''
+  }
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDragOver(false)
+    
+    const files = event.dataTransfer.files
+    if (files && files.length > 0) {
+      handleProductImageUpload(files)
+    }
+  }
+
+  const handleQuantityChange = (imageId: string, quantity: number) => {
+    setProductImages(prev => 
+      prev.map(img => 
+        img.id === imageId ? { ...img, quantity: Math.max(1, quantity) } : img
+      )
+    )
+  }
+
+  const handleRemoveProductImage = (imageId: string) => {
+    setProductImages(prev => {
+      const imageToRemove = prev.find(img => img.id === imageId)
+      if (imageToRemove) {
+        URL.revokeObjectURL(imageToRemove.preview)
+      }
+      return prev.filter(img => img.id !== imageId)
+    })
+  }
   
   const [formData, setFormData] = useState<AddressFormData>({
     customer_name: '',
@@ -118,6 +223,13 @@ export default function OrderForm() {
 
     loadConfiguration();
   }, []);
+
+  // Cleanup product images on unmount
+  useEffect(() => {
+    return () => {
+      productImages.forEach(img => URL.revokeObjectURL(img.preview))
+    }
+  }, [productImages])
 
   // Update form data when pickup location changes from the hook
   useEffect(() => {
@@ -483,6 +595,38 @@ export default function OrderForm() {
     setCurrentStep('creating')
 
     try {
+      // Upload product images if any
+      let uploadedImageUrls: string[] = []
+      if (productImages.length > 0) {
+        setIsUploadingImage(true)
+        try {
+          const uploadFormData = new FormData()
+          productImages.forEach(img => {
+            uploadFormData.append('files', img.file)
+          })
+
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: uploadFormData
+          })
+
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload product images')
+          }
+
+          const uploadResult = await uploadResponse.json()
+          uploadedImageUrls = uploadResult.files.map((file: any) => file.url)
+        } catch (uploadError) {
+          console.error('Image upload error:', uploadError)
+          setError('Failed to upload product images. Please try again.')
+          setIsProcessing(false)
+          setCurrentStep('idle')
+          return
+        } finally {
+          setIsUploadingImage(false)
+        }
+      }
+
       // Determine order creation pattern
       let creationPattern = 'manual';
       
@@ -517,7 +661,12 @@ export default function OrderForm() {
         product_description: formData.product_description,
         waybill: formData.tracking_number,
         reference_number: formData.reference_number,
-        creationPattern // Add creation pattern to order data
+        creationPattern, // Add creation pattern to order data
+        product_images: productImages.map((img, index) => ({
+          imageName: img.file.name,
+          imageUrl: uploadedImageUrls[index] || '',
+          quantity: img.quantity
+        }))
       }
 
       // Debug logging to see what values are being sent
@@ -590,6 +739,10 @@ export default function OrderForm() {
         setAddressDetail('')
         setSelectedImage(null)
         setImagePreview(null)
+        
+        // Clear product images
+        productImages.forEach(img => URL.revokeObjectURL(img.preview))
+        setProductImages([])
         setImageProcessingError('')
         setAddressProcessingError('')
         
@@ -633,6 +786,11 @@ export default function OrderForm() {
     setImagePreview(null)
     setImageProcessingError('')
     setAddressProcessingError('')
+    
+    // Clear product images
+    productImages.forEach(img => URL.revokeObjectURL(img.preview))
+    setProductImages([])
+    
     setError('')
     setSuccess('')
     setCurrentStep('idle')
@@ -1056,6 +1214,176 @@ export default function OrderForm() {
             </div>
           </div>
 
+          {/* Product Details */}
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-4 mb-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">🛍️ Product Details</h3>
+            
+            {/* Image Upload */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Upload Product Images
+              </label>
+              
+              {/* Success Message */}
+              {uploadMessage && (
+                <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                  <div className="flex items-center">
+                    <div className="text-green-600 mr-2">✅</div>
+                    <div className="text-green-800 text-sm">{uploadMessage}</div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Drag and Drop Zone */}
+              <div
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200 cursor-pointer ${
+                  isDragOver 
+                    ? 'border-blue-500 bg-blue-50 scale-105' 
+                    : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('product-image-upload')?.click()}
+                onTouchStart={() => {}} // Enable touch events
+              >
+                <input
+                  type="file"
+                  id="product-image-upload"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                />
+                
+                {/* Mobile-specific input for camera access */}
+                <input
+                  type="file"
+                  id="product-image-camera"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                />
+                
+                <div className="space-y-2">
+                  <div className="text-4xl mb-2">
+                    {isDragOver ? '📤' : '📷'}
+                  </div>
+                  <p className={`font-medium ${isDragOver ? 'text-blue-700' : 'text-blue-600'}`}>
+                    {isDragOver ? 'Drop images here' : 'Click to upload images'}
+                  </p>
+                  {!isDragOver && (
+                    <>
+                      <p className="text-blue-700 font-medium">or drag and drop</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Supports: JPG, PNG, GIF (Max: 5MB each)
+                      </p>
+                      
+                      {/* Mobile-specific buttons */}
+                      <div className="flex flex-col sm:flex-row gap-2 mt-3 sm:hidden">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            document.getElementById('product-image-upload')?.click()
+                          }}
+                          className="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                        >
+                          📁 Select from Gallery
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            document.getElementById('product-image-camera')?.click()
+                          }}
+                          className="px-3 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors"
+                        >
+                          📸 Take Photo
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Product Images Table */}
+            {productImages.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Product Image
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Quantity
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {productImages.map((image, index) => (
+                      <tr key={image.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center space-x-3">
+                            <img
+                              src={image.preview}
+                              alt={`Product ${index + 1}`}
+                              className="w-16 h-16 object-cover rounded-md border border-gray-200"
+                            />
+                            <span className="text-sm text-gray-900">{image.file.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            min="1"
+                            value={image.quantity}
+                            onChange={(e) => handleQuantityChange(image.id, parseInt(e.target.value) || 1)}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleRemoveProductImage(image.id)}
+                            className="text-red-600 hover:text-red-800 transition-colors"
+                            title="Remove image"
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* No Images Message */}
+            {productImages.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-2">📸</div>
+                <p>No product images uploaded yet</p>
+                <p className="text-sm">Upload images to see them in the table above</p>
+              </div>
+            )}
+
+            {/* Upload Progress */}
+            {isUploadingImage && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                  <span className="text-blue-800 text-sm">Uploading images to server...</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Order Details */}
           <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
             <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -1179,7 +1507,7 @@ export default function OrderForm() {
                   <input
                     type="number"
                     id="cod_amount"
-                    value={formData.cod_amount}
+                    value={formData.package_value}
                     onChange={(e) => handleInputChange('cod_amount', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
@@ -1221,7 +1549,7 @@ export default function OrderForm() {
               {isProcessing ? (
                 <>
                   <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
-                  Creating Order...
+                  {isUploadingImage ? 'Uploading Images...' : 'Creating Order...'}
                 </>
               ) : (
                 'Create Order'

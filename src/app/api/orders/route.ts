@@ -118,6 +118,10 @@ export async function POST(request: NextRequest) {
     delete processedOrderData.waybill;
     delete processedOrderData.creationPattern;
     
+    // Extract product images data for later processing
+    const productImagesData = orderData.product_images || [];
+    delete processedOrderData.product_images;
+    
     // Log the processed data for debugging
     console.log('🔍 [API_ORDERS_POST] Processed order data:', processedOrderData);
 
@@ -173,6 +177,13 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('✅ [API_ORDERS_POST] Order created successfully:', order.id);
+
+    // TODO: Store product images data once database migration is complete
+    // For now, log the product images data
+    if (productImagesData.length > 0) {
+      console.log('📸 [API_ORDERS_POST] Product images data received:', productImagesData);
+      // This will be stored in OrderProductImage table after migration
+    }
 
     // Update order with Delhivery data if available
     if (delhiveryResponse && delhiveryResponse.success) {
