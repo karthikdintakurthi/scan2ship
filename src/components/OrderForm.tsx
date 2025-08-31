@@ -577,18 +577,30 @@ export default function OrderForm() {
         creationPattern = 'image_ai';
       }
 
-      // Use company name and phone if reseller fields are empty
-      const resellerName = formData.reseller_name.trim() || currentClient?.companyName || '';
-      const resellerMobile = formData.reseller_mobile.trim() || currentClient?.phone || '';
+      // Use company name and phone if reseller fields are empty (only if enabled in client settings)
+      let resellerName = formData.reseller_name.trim();
+      let resellerMobile = formData.reseller_mobile.trim();
       
-      // Debug logging for reseller field fallback
-      console.log('🔍 [ORDER_FORM] Reseller field fallback logic:');
-      console.log('  - formData.reseller_name:', formData.reseller_name);
-      console.log('  - formData.reseller_mobile:', formData.reseller_mobile);
-      console.log('  - currentClient?.companyName:', currentClient?.companyName);
-      console.log('  - currentClient?.phone:', currentClient?.phone);
-      console.log('  - Final reseller_name:', resellerName);
-      console.log('  - Final reseller_mobile:', resellerMobile);
+      // Check if reseller fallback is enabled in client configuration
+      if (clientOrderConfig?.enableResellerFallback) {
+        resellerName = resellerName || currentClient?.companyName || '';
+        resellerMobile = resellerMobile || currentClient?.phone || '';
+        
+        // Debug logging for reseller field fallback
+        console.log('🔍 [ORDER_FORM] Reseller field fallback ENABLED:');
+        console.log('  - formData.reseller_name:', formData.reseller_name);
+        console.log('  - formData.reseller_mobile:', formData.reseller_mobile);
+        console.log('  - currentClient?.companyName:', currentClient?.companyName);
+        console.log('  - currentClient?.phone:', currentClient?.phone);
+        console.log('  - Final reseller_name:', resellerName);
+        console.log('  - Final reseller_mobile:', resellerMobile);
+      } else {
+        // Debug logging for reseller field fallback disabled
+        console.log('🔍 [ORDER_FORM] Reseller field fallback DISABLED:');
+        console.log('  - Using only form values without fallback');
+        console.log('  - Final reseller_name:', resellerName);
+        console.log('  - Final reseller_mobile:', resellerMobile);
+      }
 
       const orderData = {
         name: formData.customer_name,
@@ -1122,7 +1134,10 @@ export default function OrderForm() {
           <div className="bg-white border border-gray-200 rounded-md p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">🏪 Reseller Information</h3>
             <p className="text-sm text-gray-600 mb-4">
-              💡 <strong>Note:</strong> If Reseller Name or Mobile are left empty, the system will automatically use your Company Name and Company Phone number respectively.
+              💡 <strong>Note:</strong> {clientOrderConfig?.enableResellerFallback ? 
+                'If Reseller Name or Mobile are left empty, the system will automatically use your Company Name and Company Phone number respectively.' :
+                'Reseller fallback is disabled. You must fill in both Reseller Name and Mobile fields.'
+              }
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1136,7 +1151,7 @@ export default function OrderForm() {
                   onChange={(e) => handleInputChange('reseller_name', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
-                {!formData.reseller_name.trim() && currentClient?.companyName && (
+                {clientOrderConfig?.enableResellerFallback && !formData.reseller_name.trim() && currentClient?.companyName && (
                   <p className="text-xs text-blue-600 mt-1">
                     💡 Will use Company Name: {currentClient.companyName}
                   </p>
@@ -1154,7 +1169,7 @@ export default function OrderForm() {
                   onChange={(e) => handleInputChange('reseller_mobile', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
-                {!formData.reseller_mobile.trim() && currentClient?.phone && (
+                {clientOrderConfig?.enableResellerFallback && !formData.reseller_mobile.trim() && currentClient?.phone && (
                   <p className="text-xs text-blue-600 mt-1">
                     💡 Will use Company Phone: {currentClient.phone}
                   </p>

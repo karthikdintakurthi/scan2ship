@@ -22,6 +22,9 @@ export interface OrderConfig {
   requirePackageValue: boolean;
   requireWeight: boolean;
   requireTotalItems: boolean;
+  
+  // Reseller settings
+  enableResellerFallback: boolean;
 }
 
 // Default fallback configuration
@@ -48,7 +51,10 @@ const defaultOrderConfig: OrderConfig = {
   requireProductDescription: true,
   requirePackageValue: true,
   requireWeight: true,
-  requireTotalItems: true
+  requireTotalItems: true,
+  
+  // Reseller settings
+  enableResellerFallback: true
 };
 
 // Cache for order configuration

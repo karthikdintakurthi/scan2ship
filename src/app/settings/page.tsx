@@ -74,6 +74,9 @@ interface ClientConfigData {
     requirePackageValue: boolean;
     requireWeight: boolean;
     requireTotalItems: boolean;
+    
+    // Reseller settings
+    enableResellerFallback: boolean;
   };
   configs: ClientConfig[];
   configByCategory: Record<string, ClientConfig[]>;
@@ -134,27 +137,62 @@ export default function ClientSettingsPage() {
     }
   }, [currentUser, currentClient]);
 
+
+
   const fetchClientConfig = async () => {
     try {
       setIsLoading(true);
       setError('');
       const token = localStorage.getItem('authToken');
       
-      console.log('🔍 [CLIENT_SETTINGS] Fetching client config for client ID:', currentClient?.id);
-      console.log('🔍 [CLIENT_SETTINGS] Auth token:', token ? `${token.substring(0, 20)}...` : 'null');
-      
-      const response = await fetch(`/api/admin/settings/clients/${currentClient?.id}`, {
+      // For regular users, use the order-config endpoint instead of admin endpoint
+      const response = await fetch('/api/order-config', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      console.log('🔍 [CLIENT_SETTINGS] Response status:', response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('🔍 [CLIENT_SETTINGS] Response data:', data);
-        setConfig(data.config);
+        
+        // Fetch pickup locations and courier services
+        const [pickupResponse, courierResponse] = await Promise.all([
+          fetch('/api/pickup-locations', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }),
+          fetch('/api/courier-services', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+        ]);
+
+        const pickupData = pickupResponse.ok ? await pickupResponse.json() : { pickupLocations: [] };
+        const courierData = courierResponse.ok ? await courierResponse.json() : { courierServices: [] };
+
+        // Transform the data to match the expected format
+        const transformedConfig = {
+          client: {
+            id: currentClient?.id || '',
+            name: currentClient?.name || '',
+            companyName: currentClient?.companyName || '',
+            email: currentClient?.email || '',
+            phone: currentClient?.phone || '',
+            address: currentClient?.address || '',
+            city: currentClient?.city || '',
+            state: currentClient?.state || '',
+            country: currentClient?.country || '',
+            pincode: currentClient?.pincode || '',
+            subscriptionPlan: 'basic',
+            subscriptionStatus: 'active',
+            isActive: true
+          },
+          pickupLocations: pickupData.pickupLocations || [],
+          courierServices: courierData.courierServices || [],
+          clientOrderConfig: data.orderConfig,
+          configs: [],
+          configByCategory: {}
+        };
+        
+        setConfig(transformedConfig);
       } else {
         const errorText = await response.text();
         console.error('❌ [CLIENT_SETTINGS] API error:', errorText);
@@ -649,6 +687,28 @@ export default function ClientSettingsPage() {
                       <div>
                         <dt className="text-xs text-gray-500">Total Items Range</dt>
                         <dd className="text-sm text-gray-900">{config.clientOrderConfig.minTotalItems} - {config.clientOrderConfig.maxTotalItems}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">Reseller Settings</h3>
+                    <dl className="space-y-2">
+                      <div>
+                        <dt className="text-xs text-gray-500">Auto-fallback for Reseller</dt>
+                        <dd className="text-sm text-gray-900">
+                          {config.clientOrderConfig.enableResellerFallback ? (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                              Enabled
+                            </span>
+                          ) : (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                              Disabled
+                            </span>
+                          )}
+                        </dd>
+                        <dd className="text-xs text-gray-500 mt-1">
+                          When enabled, empty reseller fields automatically use company name/phone
+                        </dd>
                       </div>
                     </dl>
                   </div>

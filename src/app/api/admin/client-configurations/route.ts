@@ -155,7 +155,8 @@ export async function GET(request: NextRequest) {
           requireProductDescription: client.client_order_configs.requireProductDescription,
           requirePackageValue: client.client_order_configs.requirePackageValue,
           requireWeight: client.client_order_configs.requireWeight,
-          requireTotalItems: client.client_order_configs.requireTotalItems
+          requireTotalItems: client.client_order_configs.requireTotalItems,
+          enableResellerFallback: client.client_order_configs.enableResellerFallback
         } : null
       }))
     });

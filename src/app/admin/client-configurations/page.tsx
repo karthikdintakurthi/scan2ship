@@ -48,6 +48,7 @@ interface ClientOrderConfig {
   requirePackageValue: boolean;
   requireWeight: boolean;
   requireTotalItems: boolean;
+  enableResellerFallback: boolean;
 }
 
 interface Client {
@@ -395,6 +396,12 @@ export default function ClientConfigurationsPage() {
                             <p className="text-gray-600">Package Value Range:</p>
                             <p className="font-medium">
                               ₹{client.clientOrderConfig.minPackageValue} - ₹{client.clientOrderConfig.maxPackageValue}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Reseller Fallback:</p>
+                            <p className="font-medium">
+                              {client.clientOrderConfig.enableResellerFallback ? 'Enabled' : 'Disabled'}
                             </p>
                           </div>
                         </div>

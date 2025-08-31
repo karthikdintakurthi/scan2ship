@@ -85,7 +85,10 @@ export async function GET(request: NextRequest) {
           requireProductDescription: true,
           requirePackageValue: true,
           requireWeight: true,
-          requireTotalItems: true
+          requireTotalItems: true,
+          
+          // Reseller settings
+          enableResellerFallback: true
         }
       });
     }
@@ -122,7 +125,10 @@ export async function GET(request: NextRequest) {
         requireProductDescription: orderConfig.requireProductDescription,
         requirePackageValue: orderConfig.requirePackageValue,
         requireWeight: orderConfig.requireWeight,
-        requireTotalItems: orderConfig.requireTotalItems
+        requireTotalItems: orderConfig.requireTotalItems,
+        
+        // Reseller settings
+        enableResellerFallback: orderConfig.enableResellerFallback
       },
       clientId: client.id,
       clientName: client.companyName

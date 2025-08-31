@@ -108,6 +108,8 @@ export async function GET(
       clientConfigs: client.client_config.length,
       hasOrderConfig: !!client.client_order_configs
     });
+    
+
 
     // Process client configurations and decrypt sensitive data
     let processedConfigs: Array<{
@@ -163,6 +165,8 @@ export async function GET(
       configByCategory = {};
     }
 
+
+    
     // Build response object
     let responseData;
     try {
@@ -198,6 +202,8 @@ export async function GET(
           isDefault: service.isDefault
         })),
         clientOrderConfig: client.client_order_configs ? {
+          id: client.client_order_configs.id,
+          
           // Default values
           defaultProductDescription: client.client_order_configs.defaultProductDescription,
           defaultPackageValue: client.client_order_configs.defaultPackageValue,
@@ -220,7 +226,10 @@ export async function GET(
           requireProductDescription: client.client_order_configs.requireProductDescription,
           requirePackageValue: client.client_order_configs.requirePackageValue,
           requireWeight: client.client_order_configs.requireWeight,
-          requireTotalItems: client.client_order_configs.requireTotalItems
+          requireTotalItems: client.client_order_configs.requireTotalItems,
+          
+          // Reseller settings
+          enableResellerFallback: client.client_order_configs.enableResellerFallback
         } : null,
 
         orderConfig: {
@@ -453,7 +462,10 @@ export async function PUT(
           requireProductDescription: updateData.clientOrderConfig.requireProductDescription,
           requirePackageValue: updateData.clientOrderConfig.requirePackageValue,
           requireWeight: updateData.clientOrderConfig.requireWeight,
-          requireTotalItems: updateData.clientOrderConfig.requireTotalItems
+          requireTotalItems: updateData.clientOrderConfig.requireTotalItems,
+          
+          // Reseller settings
+          enableResellerFallback: updateData.clientOrderConfig.enableResellerFallback
         },
         create: {
           id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -480,7 +492,10 @@ export async function PUT(
           requireProductDescription: updateData.clientOrderConfig.requireProductDescription,
           requirePackageValue: updateData.clientOrderConfig.requirePackageValue,
           requireWeight: updateData.clientOrderConfig.requireWeight,
-          requireTotalItems: updateData.clientOrderConfig.requireTotalItems
+          requireTotalItems: updateData.clientOrderConfig.requireTotalItems,
+          
+          // Reseller settings
+          enableResellerFallback: updateData.clientOrderConfig.enableResellerFallback
         }
       });
 
