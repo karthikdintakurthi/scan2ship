@@ -1,16 +1,15 @@
 {
-  "/api/pwa/manifest/route": "app/api/pwa/manifest/route.js",
-  "/api/auth/verify/route": "app/api/auth/verify/route.js",
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/api/credits/route": "app/api/credits/route.js",
-  "/api/order-config/route": "app/api/order-config/route.js",
+  "/api/orders/route": "app/api/orders/route.js",
   "/api/pickup-locations/route": "app/api/pickup-locations/route.js",
+  "/api/auth/verify/route": "app/api/auth/verify/route.js",
+  "/api/credits/route": "app/api/credits/route.js",
   "/api/courier-services/route": "app/api/courier-services/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/api/order-config/route": "app/api/order-config/route.js",
   "/api/analytics/track/route": "app/api/analytics/track/route.js",
   "/api/format-address-image/route": "app/api/format-address-image/route.js",
-  "/api/orders/route": "app/api/orders/route.js",
   "/api/orders/[id]/shipping-label/route": "app/api/orders/[id]/shipping-label/route.js",
   "/page": "app/page.js",
-  "/orders/page": "app/orders/page.js",
-  "/view-orders/page": "app/view-orders/page.js"
+  "/view-orders/page": "app/view-orders/page.js",
+  "/orders/page": "app/orders/page.js"
 }
