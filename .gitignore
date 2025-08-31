@@ -8,3 +8,6 @@ next/
 /.next/**/*.js
 .next/static/chunks/app/layout.js
 .next/static/chunks/webpack.js
+.next
+/.next
+/.next/cache/webpack/client-development
