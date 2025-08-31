@@ -8,6 +8,8 @@ import { getPickupLocationConfig } from '@/lib/pickup-location-config'
 import { getCourierServiceByValue, validateCourierServiceRestrictions } from '@/lib/courier-service-config'
 import { getOrderConfig, validateOrderData } from '@/lib/order-config'
 
+
+
 interface AddressFormData {
   customer_name: string
   mobile_number: string
@@ -96,17 +98,25 @@ export default function OrderForm() {
         setOrderConfig(formConfig);
         setClientOrderConfig(clientConfig);
         
-        // Update form data with client-specific defaults
-        setFormData(prev => ({
-          ...prev,
-          courier_service: formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : 'Delhivery',
-          package_value: clientConfig.defaultPackageValue.toString(),
-          weight: clientConfig.defaultWeight.toString(),
-          total_items: clientConfig.defaultTotalItems.toString(),
-          is_cod: clientConfig.codEnabledByDefault,
-          cod_amount: clientConfig.defaultCodAmount?.toString() || '',
-          product_description: clientConfig.defaultProductDescription
-        }));
+        if (clientConfig) {
+          // Log the initial package value for debugging
+          console.log('🔍 [INITIAL_CONFIG] Client config defaultPackageValue:', clientConfig.defaultPackageValue);
+          console.log('🔍 [INITIAL_CONFIG] Setting package_value to client setting');
+          
+          // Update form data with client-specific defaults
+          setFormData(prev => ({
+            ...prev,
+            courier_service: formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : 'Delhivery',
+            package_value: clientConfig.defaultPackageValue.toString(),
+            weight: clientConfig.defaultWeight.toString(),
+            total_items: clientConfig.defaultTotalItems.toString(),
+            is_cod: clientConfig.codEnabledByDefault,
+            cod_amount: clientConfig.defaultCodAmount?.toString() || '',
+            product_description: clientConfig.defaultProductDescription
+          }));
+        } else {
+          console.warn('No client config available, using form config only');
+        }
         
         setConfigLoaded(true);
         console.log('✅ [ORDER_FORM] Configuration loaded:', { formConfig, clientConfig });
@@ -127,12 +137,37 @@ export default function OrderForm() {
           // Get the pickup location config to populate package value
           const pickupConfig = await getPickupLocationConfig(selectedPickupLocation);
           
-          setFormData(prev => ({
-            ...prev,
-            pickup_location: selectedPickupLocation,
-            package_value: pickupConfig?.productDetails.commodity_value?.toString() || prev.package_value,
-            product_description: pickupConfig?.productDetails.description || prev.product_description
-          }));
+          // Also refresh the order configuration to get latest client settings
+          const [formConfig, clientConfig] = await Promise.all([
+            getOrderFormConfig(),
+            getOrderConfig()
+          ]);
+          
+                    setOrderConfig(formConfig);
+          setClientOrderConfig(clientConfig);
+          
+          if (clientConfig) {
+            // Log the package value sources for debugging
+            console.log('🔍 [PACKAGE_VALUE] Client config defaultPackageValue:', clientConfig.defaultPackageValue);
+            console.log('🔍 [PACKAGE_VALUE] Pickup config commodity_value:', pickupConfig?.productDetails.commodity_value);
+            console.log('🔍 [PACKAGE_VALUE] Using client setting for package value');
+            
+            setFormData(prev => ({
+              ...prev,
+              pickup_location: selectedPickupLocation,
+              // Priority: Client settings first, then pickup location as fallback
+              package_value: clientConfig.defaultPackageValue.toString(),
+              // Update with latest client configuration
+              courier_service: formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : prev.courier_service,
+              weight: clientConfig.defaultWeight.toString(),
+              total_items: clientConfig.defaultTotalItems.toString(),
+              is_cod: clientConfig.codEnabledByDefault,
+              cod_amount: clientConfig.defaultCodAmount?.toString() || '',
+              product_description: clientConfig.defaultProductDescription
+            }));
+          } else {
+            console.warn('No client config available, cannot update form data');
+          }
         } catch (error) {
           console.error('❌ [ORDER_FORM] Error getting pickup location config:', error);
         }
@@ -140,7 +175,53 @@ export default function OrderForm() {
 
       updatePickupLocationData();
     }
-  }, [selectedPickupLocation, isLoaded, configLoaded])
+  }, [selectedPickupLocation, isLoaded, configLoaded]);
+
+  // Auto-refresh configuration every 5 minutes to ensure data is current
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (configLoaded) {
+        console.log('🔄 [ORDER_FORM] Auto-refreshing configuration...');
+                    // Reload configuration
+            const reloadConfig = async () => {
+              try {
+                const [formConfig, clientConfig] = await Promise.all([
+                  getOrderFormConfig(),
+                  getOrderConfig()
+                ]);
+            
+                          setOrderConfig(formConfig);
+              setClientOrderConfig(clientConfig);
+              
+              if (clientConfig) {
+                // Log the auto-refresh package value for debugging
+                console.log('🔍 [AUTO_REFRESH] Client config defaultPackageValue:', clientConfig.defaultPackageValue);
+                console.log('🔍 [AUTO_REFRESH] Updating package_value to client setting');
+                
+                // Update form data with latest client configuration
+                setFormData(prev => ({
+                  ...prev,
+                  courier_service: formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : prev.courier_service,
+                  package_value: clientConfig.defaultPackageValue.toString(),
+                  weight: clientConfig.defaultWeight.toString(),
+                  total_items: clientConfig.defaultTotalItems.toString(),
+                  is_cod: clientConfig.codEnabledByDefault,
+                  cod_amount: clientConfig.defaultCodAmount?.toString() || '',
+                  product_description: clientConfig.defaultProductDescription
+                }));
+              } else {
+                console.warn('No client config available during auto-refresh');
+              }
+          } catch (error) {
+            console.error('Error auto-refreshing config:', error);
+          }
+        };
+        reloadConfig();
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [configLoaded]);
 
   // Generate random 6-digit alphanumeric order number with mobile
   const generateOrderNumber = useCallback((mobileNumber: string) => {
@@ -1227,6 +1308,8 @@ export default function OrderForm() {
 
           {/* Form Actions */}
           <div className="flex justify-end space-x-4 mt-8">
+
+
             <button
               type="button"
               onClick={resetForm}

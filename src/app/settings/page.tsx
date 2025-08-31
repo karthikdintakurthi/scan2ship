@@ -88,6 +88,7 @@ export default function ClientSettingsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+
   // Editing states
   const [editingConfig, setEditingConfig] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -162,6 +163,48 @@ export default function ClientSettingsPage() {
     } catch (error) {
       console.error('❌ [CLIENT_SETTINGS] Fetch error:', error);
       setError('Error fetching client configuration');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to fetch order configuration for a specific client
+  const fetchOrderConfigForClient = async (clientId: string) => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const token = localStorage.getItem('authToken');
+      
+      console.log('🔍 [ORDER_CONFIG] Fetching order config for client ID:', clientId);
+      console.log('🔍 [ORDER_CONFIG] Auth token:', token ? `${token.substring(0, 20)}...` : 'null');
+      
+      const response = await fetch(`/api/admin/settings/clients/${clientId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      console.log('🔍 [ORDER_CONFIG] Response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🔍 [ORDER_CONFIG] Response data:', data);
+        
+        if (data.config && data.config.clientOrderConfig) {
+          setSuccess(`Order configuration fetched successfully for client: ${clientId}`);
+          return data.config.clientOrderConfig;
+        } else {
+          throw new Error('No order configuration found for this client');
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('❌ [ORDER_CONFIG] API error:', errorText);
+        throw new Error('Failed to fetch order configuration');
+      }
+    } catch (error) {
+      console.error('❌ [ORDER_CONFIG] Fetch error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch order configuration');
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -352,13 +395,70 @@ export default function ClientSettingsPage() {
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                     config.client.isActive 
                       ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
+                      : 'bg-red-800'
                   }`}>
                     {config.client.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </dd>
               </div>
             </dl>
+          </div>
+        </div>
+
+        {/* Fetch Order Configuration for Specific Client */}
+        <div className="bg-white shadow rounded-lg mb-8">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">Fetch Order Configuration</h2>
+          </div>
+          <div className="px-6 py-4">
+            <div className="flex items-center space-x-4">
+              <input
+                type="text"
+                placeholder="Enter Client ID (e.g., client-1756653250197-7ltxt67xn)"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                id="clientIdInput"
+                defaultValue="client-1756653250197-7ltxt67xn"
+              />
+              <button
+                onClick={async () => {
+                  const clientIdInput = document.getElementById('clientIdInput') as HTMLInputElement;
+                  const clientId = clientIdInput.value.trim();
+                  if (clientId) {
+                    try {
+                      const orderConfig = await fetchOrderConfigForClient(clientId);
+                      alert(`Order Configuration for ${clientId}:\n\n` + 
+                        `Default Product Description: ${orderConfig.defaultProductDescription}\n` +
+                        `Default Package Value: ₹${orderConfig.defaultPackageValue}\n` +
+                        `Default Weight: ${orderConfig.defaultWeight}g\n` +
+                        `Default Total Items: ${orderConfig.defaultTotalItems}\n` +
+                        `COD Enabled by Default: ${orderConfig.codEnabledByDefault ? 'Yes' : 'No'}\n` +
+                        `Default COD Amount: ${orderConfig.defaultCodAmount ? `₹${orderConfig.defaultCodAmount}` : 'Not set'}\n` +
+                        `Package Value Range: ₹${orderConfig.minPackageValue} - ₹${orderConfig.maxPackageValue}\n` +
+                        `Weight Range: ${orderConfig.minWeight}g - ${orderConfig.maxWeight}g\n` +
+                        `Total Items Range: ${orderConfig.minTotalItems} - ${orderConfig.maxTotalItems}\n` +
+                        `Require Product Description: ${orderConfig.requireProductDescription ? 'Yes' : 'No'}\n` +
+                        `Require Package Value: ${orderConfig.requirePackageValue ? 'Yes' : 'No'}\n` +
+                        `Require Weight: ${orderConfig.requireWeight ? 'Yes' : 'No'}\n` +
+                        `Require Total Items: ${orderConfig.requireTotalItems ? 'Yes' : 'No'}`
+                      );
+                    } catch (error) {
+                      alert(`Error: ${error instanceof Error ? error.message : 'Failed to fetch order configuration'}`);
+                    }
+                  } else {
+                    setError('Please enter a client ID');
+                  }
+                }}
+                disabled={isLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Fetching...' : 'Fetch Order Config'}
+              </button>
+              
+
+            </div>
+            
+
+
           </div>
         </div>
 
