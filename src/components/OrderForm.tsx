@@ -32,7 +32,7 @@ interface AddressFormData {
 }
 
 export default function OrderForm() {
-  const { refreshCredits } = useAuth();
+  const { refreshCredits, currentClient } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentStep, setCurrentStep] = useState<'idle' | 'creating' | 'completed'>('idle')
   const [error, setError] = useState('')
@@ -496,6 +496,19 @@ export default function OrderForm() {
         creationPattern = 'image_ai';
       }
 
+      // Use company name and phone if reseller fields are empty
+      const resellerName = formData.reseller_name.trim() || currentClient?.companyName || '';
+      const resellerMobile = formData.reseller_mobile.trim() || currentClient?.phone || '';
+      
+      // Debug logging for reseller field fallback
+      console.log('🔍 [ORDER_FORM] Reseller field fallback logic:');
+      console.log('  - formData.reseller_name:', formData.reseller_name);
+      console.log('  - formData.reseller_mobile:', formData.reseller_mobile);
+      console.log('  - currentClient?.companyName:', currentClient?.companyName);
+      console.log('  - currentClient?.phone:', currentClient?.phone);
+      console.log('  - Final reseller_name:', resellerName);
+      console.log('  - Final reseller_mobile:', resellerMobile);
+
       const orderData = {
         name: formData.customer_name,
         mobile: formData.mobile_number,
@@ -512,8 +525,8 @@ export default function OrderForm() {
         total_items: formData.total_items,
         is_cod: formData.is_cod,
         cod_amount: formData.cod_amount,
-        reseller_name: formData.reseller_name,
-        reseller_mobile: formData.reseller_mobile,
+        reseller_name: resellerName,
+        reseller_mobile: resellerMobile,
         product_description: formData.product_description,
         waybill: formData.tracking_number,
         reference_number: formData.reference_number,
@@ -1027,6 +1040,9 @@ export default function OrderForm() {
           {/* Reseller Information */}
           <div className="bg-white border border-gray-200 rounded-md p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">🏪 Reseller Information</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              💡 <strong>Note:</strong> If Reseller Name or Mobile are left empty, the system will automatically use your Company Name and Company Phone number respectively.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="reseller_name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -1039,6 +1055,11 @@ export default function OrderForm() {
                   onChange={(e) => handleInputChange('reseller_name', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+                {!formData.reseller_name.trim() && currentClient?.companyName && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    💡 Will use Company Name: {currentClient.companyName}
+                  </p>
+                )}
               </div>
               
               <div>
@@ -1052,6 +1073,11 @@ export default function OrderForm() {
                   onChange={(e) => handleInputChange('reseller_mobile', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+                {!formData.reseller_mobile.trim() && currentClient?.phone && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    💡 Will use Company Phone: {currentClient.phone}
+                  </p>
+                )}
               </div>
             </div>
           </div>

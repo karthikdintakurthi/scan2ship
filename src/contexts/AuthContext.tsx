@@ -22,6 +22,12 @@ interface Client {
   name: string;
   companyName: string;
   email: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
   subscriptionPlan: string;
   subscriptionStatus: string;
   isActive: boolean;
