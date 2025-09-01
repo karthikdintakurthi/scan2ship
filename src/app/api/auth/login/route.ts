@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
-import { enhancedJwtConfig } from '@/lib/jwt-config';
 import { 
   applySecurityMiddleware, 
   InputValidator 
 } from '@/lib/security-middleware';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,8 +52,11 @@ export async function POST(request: NextRequest) {
     };
 
     // Find user with client information
-    const user = await prisma.users.findUnique({
-      where: { email },
+    const user = await prisma.users.findFirst({
+      where: { 
+        email: email,
+        isActive: true
+      },
       include: {
         clients: true
       }
@@ -74,8 +77,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify password
+    // Verify password with bcrypt
+    if (!user.password) {
+      return NextResponse.json(
+        { error: 'Invalid email or password' },
+        { status: 401 }
+      );
+    }
+    
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    
     if (!isPasswordValid) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -83,52 +94,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate JWT tokens
-    const loginToken = enhancedJwtConfig.generateToken(
+    // Generate JWT token using basic jwt.sign
+    const loginToken = jwt.sign(
       {
         userId: user.id,
         clientId: user.clientId,
         email: user.email,
         role: user.role
       },
-      'login'
-    );
-
-    const refreshToken = enhancedJwtConfig.generateToken(
+      process.env.JWT_SECRET || 'fallback-secret',
       {
-        userId: user.id,
-        clientId: user.clientId,
-        email: user.email,
-        role: user.role
-      },
-      'refresh'
+        expiresIn: '8h',
+        issuer: 'vanitha-logistics',
+        audience: 'vanitha-logistics-users',
+        algorithm: 'HS256'
+      }
     );
 
     // Create or update session
     const session = await prisma.sessions.upsert({
       where: {
-        userId: user.id
+        token: loginToken
       },
       update: {
-        token: loginToken,
-        refreshToken: refreshToken,
         expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours
-        updatedAt: new Date()
       },
       create: {
         id: crypto.randomUUID(),
         userId: user.id,
         clientId: user.clientId,
         token: loginToken,
-        refreshToken: refreshToken,
         expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date()
       }
     });
-
-    // Get token info for debugging
-    const tokenInfo = enhancedJwtConfig.getTokenInfo(loginToken);
 
     // Return user data and session
     const response = NextResponse.json({
@@ -145,13 +144,8 @@ export async function POST(request: NextRequest) {
       },
       client: user.clients,
       session: {
-        id: session.id,
-        userId: session.userId,
-        clientId: session.clientId,
         token: loginToken,
-        refreshToken: refreshToken,
-        expiresAt: session.expiresAt,
-        tokenInfo
+        expiresAt: session.expiresAt
       }
     });
 

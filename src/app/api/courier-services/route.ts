@@ -1,55 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
-
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const decoded = jwt.verify(token, enhancedJwtConfig.getSecret()) as any;
-    
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: {
-          include: {
-            courier_services: true
-          }
-        }
-      }
-    });
-
-    if (!user || !user.isActive) {
-      return null;
-    }
-
-    return user;
-  } catch (error) {
-    return null;
-  }
-}
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate user
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      console.log('❌ [API_COURIER_SERVICES_GET] Authentication failed');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
 
-    console.log(`📊 [API_COURIER_SERVICES_GET] Fetching courier services for client: ${user.clients.companyName} (ID: ${user.clients.id})`);
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
+
+    console.log(`📊 [API_COURIER_SERVICES_GET] Fetching courier services for client: ${user.client.companyName || user.client.id} (ID: ${user.clientId})`);
 
     // Get courier services for the current client
     const courierServices = await prisma.courier_services.findMany({
-      where: { clientId: user.clients.id },
+      where: { clientId: user.clientId },
       orderBy: { name: 'asc' }
     });
 
@@ -62,20 +49,26 @@ export async function GET(request: NextRequest) {
       isActive: service.isActive
     }));
 
-    console.log(`✅ [API_COURIER_SERVICES_GET] Found ${formattedServices.length} courier services for client ${user.clients.companyName}`);
+    console.log(`✅ [API_COURIER_SERVICES_GET] Found ${formattedServices.length} courier services for client ${user.client.companyName || user.client.id}`);
     console.log(`📋 [API_COURIER_SERVICES_GET] Formatted services:`, formattedServices);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       courierServices: formattedServices,
-      clientId: user.clients.id,
-      clientName: user.clients.companyName
+      clientId: user.clientId,
+      clientName: user.client.companyName || user.client.id
     });
+
+    // Apply security headers
+    securityHeaders(response);
+    return response;
 
   } catch (error) {
     console.error('❌ [API_COURIER_SERVICES_GET] Error fetching courier services:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to fetch courier services' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }

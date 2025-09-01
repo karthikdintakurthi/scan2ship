@@ -76,8 +76,8 @@ model client_order_configs {
   requirePackageValue       Boolean @default(true)
   requireWeight             Boolean @default(true)
   requireTotalItems         Boolean @default(true)
-  enableResellerFallback    Boolean @default(true)
   clientId                  String  @unique
+  enableResellerFallback    Boolean @default(true)
   clients                   clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 

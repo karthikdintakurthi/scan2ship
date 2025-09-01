@@ -1,68 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
-
-const prisma = new PrismaClient();
-
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const decoded = jwt.verify(token, enhancedJwtConfig.getSecret()) as any;
-    
-    // Get user and client data from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    if (!user || !user.isActive || !user.clients.isActive) {
-      return null;
-    }
-
-    console.log(`📊 [API_ORDER_CONFIG_GET] Fetching order config for user: ${user.email} (${user.role})`);
-
-    return { user, client: user.clients };
-  } catch (error) {
-    return null;
-  }
-}
+import { prisma } from '@/lib/prisma';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate user
-    const auth = await getAuthenticatedUser(request);
-    if (!auth) {
-      console.log('❌ [API_ORDER_CONFIG_GET] Authentication failed');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
 
-    const { user, client } = auth;
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
 
-    console.log(`📊 [API_ORDER_CONFIG_GET] Fetching order config for client: ${client.companyName} (ID: ${client.id})`);
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
+
+    console.log(`📊 [API_ORDER_CONFIG_GET] Fetching order config for user: ${user.email} (${user.role})`);
+    console.log(`📊 [API_ORDER_CONFIG_GET] Fetching order config for client: ${user.client.companyName || user.client.id} (ID: ${user.clientId})`);
 
     // Get order configuration for the current client
     let orderConfig = await prisma.client_order_configs.findUnique({
-      where: { clientId: client.id }
+      where: { clientId: user.clientId }
     });
 
     // If no order config exists, create a default one
     if (!orderConfig) {
-      console.log(`📝 [API_ORDER_CONFIG_GET] No order config found, creating default for client ${client.companyName}`);
+      console.log(`📝 [API_ORDER_CONFIG_GET] No order config found, creating default for client ${user.client.companyName || user.client.id}`);
       
       orderConfig = await prisma.client_order_configs.create({
         data: {
           id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          clientId: client.id,
+          clientId: user.clientId,
           // Default values
           defaultProductDescription: 'ARTIFICAL JEWELLERY',
           defaultPackageValue: 5000,
@@ -93,7 +78,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    console.log(`✅ [API_ORDER_CONFIG_GET] Order config retrieved for client ${client.companyName}:`, {
+    console.log(`✅ [API_ORDER_CONFIG_GET] Order config retrieved for client ${user.client.companyName || user.client.id}:`, {
       defaultProductDescription: orderConfig.defaultProductDescription,
       defaultPackageValue: orderConfig.defaultPackageValue,
       defaultWeight: orderConfig.defaultWeight,
@@ -101,7 +86,7 @@ export async function GET(request: NextRequest) {
       codEnabledByDefault: orderConfig.codEnabledByDefault
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       orderConfig: {
         // Default values
         defaultProductDescription: orderConfig.defaultProductDescription,
@@ -130,15 +115,21 @@ export async function GET(request: NextRequest) {
         // Reseller settings
         enableResellerFallback: orderConfig.enableResellerFallback
       },
-      clientId: client.id,
-      clientName: client.companyName
+      clientId: user.clientId,
+      clientName: user.client.companyName || user.client.id
     });
+
+    // Apply security headers
+    securityHeaders(response);
+    return response;
 
   } catch (error) {
     console.error('❌ [API_ORDER_CONFIG_GET] Error fetching order config:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to fetch order configuration' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }

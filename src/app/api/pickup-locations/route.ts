@@ -1,54 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
-
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const decoded = jwt.verify(token, enhancedJwtConfig.getSecret()) as any;
-    
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: {
-          include: {
-            pickup_locations: true
-          }
-        }
-      }
-    });
-
-    if (!user || !user.isActive) {
-      return null;
-    }
-
-    return user;
-  } catch (error) {
-    return null;
-  }
-}
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate user
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
 
-    console.log(`📊 [API_PICKUP_LOCATIONS_GET] Fetching pickup locations for client: ${user.clients.companyName}`);
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
+
+    console.log(`📊 [API_PICKUP_LOCATIONS_GET] Fetching pickup locations for client: ${user.client.companyName || user.client.id}`);
 
     // Get pickup locations for the current client
     const pickupLocations = await prisma.pickup_locations.findMany({
-      where: { clientId: user.clients.id },
+      where: { clientId: user.clientId },
       orderBy: { label: 'asc' }
     });
 
@@ -93,19 +81,25 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log(`✅ [API_PICKUP_LOCATIONS_GET] Found ${formattedLocations.length} pickup locations for client ${user.clients.companyName}`);
+    console.log(`✅ [API_PICKUP_LOCATIONS_GET] Found ${formattedLocations.length} pickup locations for client ${user.client.companyName || user.client.id}`);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       pickupLocations: formattedLocations,
-      clientId: user.clients.id,
-      clientName: user.clients.companyName
+      clientId: user.clientId,
+      clientName: user.client.companyName || user.client.id
     });
+
+    // Apply security headers
+    securityHeaders(response);
+    return response;
 
   } catch (error) {
     console.error('❌ [API_PICKUP_LOCATIONS_GET] Error fetching pickup locations:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to fetch pickup locations' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }

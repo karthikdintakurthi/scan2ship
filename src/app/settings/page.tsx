@@ -585,8 +585,8 @@ export default function ClientSettingsPage() {
             </div>
             <div className="px-6 py-4">
               <div className="space-y-4">
-                {config.pickupLocations.map((location) => (
-                  <div key={location.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                {config.pickupLocations.map((location, index) => (
+                  <div key={location.id || location.value || `pickup-${index}`} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                     <div className="flex-1">
                       <h3 className="text-sm font-medium text-gray-900">{location.name}</h3>
                       <p className="text-sm text-gray-500">{location.value}</p>

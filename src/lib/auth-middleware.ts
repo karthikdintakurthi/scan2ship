@@ -1,262 +1,330 @@
 /**
- * JWT Authentication Middleware
- * Provides secure JWT verification with role-based access control
+ * Comprehensive Authentication & Authorization Middleware
+ * Provides consistent role-based access control and session management
  */
 
-import { NextRequest } from 'next/server';
-import jwt from 'jsonwebtoken';
-import { jwtConfig } from './jwt-config';
-import { prisma } from './prisma';
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
+// User roles and permissions
+export enum UserRole {
+  USER = 'user',
+  ADMIN = 'admin',
+  SUPER_ADMIN = 'super_admin'
+}
+
+// Permission levels
+export enum PermissionLevel {
+  READ = 'read',
+  WRITE = 'write',
+  DELETE = 'delete',
+  ADMIN = 'admin'
+}
+
+// Role permissions mapping
+export const ROLE_PERMISSIONS = {
+  [UserRole.USER]: [
+    PermissionLevel.READ,
+    PermissionLevel.WRITE
+  ],
+  [UserRole.ADMIN]: [
+    PermissionLevel.READ,
+    PermissionLevel.WRITE,
+    PermissionLevel.DELETE,
+    PermissionLevel.ADMIN
+  ],
+  [UserRole.SUPER_ADMIN]: [
+    PermissionLevel.READ,
+    PermissionLevel.WRITE,
+    PermissionLevel.DELETE,
+    PermissionLevel.ADMIN
+  ]
+};
+
+// Interface for authenticated user
 export interface AuthenticatedUser {
-  userId: string;
-  clientId: string;
+  id: string;
   email: string;
-  role: string;
-  iat: number;
-  exp: number;
+  role: UserRole;
+  clientId: string;
+  isActive: boolean;
+  client: {
+    id: string;
+    isActive: boolean;
+    subscriptionStatus: string;
+    subscriptionExpiresAt: Date | null;
+  };
+  permissions: PermissionLevel[];
 }
 
-export interface AuthResult {
-  success: boolean;
-  user?: AuthenticatedUser;
-  error?: string;
-  statusCode?: number;
-}
-
-/**
- * Verify JWT token with enhanced security
- */
-export function verifyJWT(token: string): AuthResult {
-  try {
-    // Basic token format validation
-    if (!token || typeof token !== 'string') {
-      return {
-        success: false,
-        error: 'Invalid token format',
-        statusCode: 401
-      };
-    }
-
-    // Verify JWT with secure configuration
-    const decoded = jwt.verify(token, jwtConfig.secret, {
-      issuer: jwtConfig.options.issuer,
-      audience: jwtConfig.options.audience,
-      algorithms: [jwtConfig.options.algorithm]
-    }) as AuthenticatedUser;
-
-    // Validate required fields
-    if (!decoded.userId || !decoded.clientId || !decoded.email || !decoded.role) {
-      return {
-        success: false,
-        error: 'Invalid token payload',
-        statusCode: 401
-      };
-    }
-
-    // Check token expiration
-    const now = Math.floor(Date.now() / 1000);
-    if (decoded.exp && decoded.exp < now) {
-      return {
-        success: false,
-        error: 'Token expired',
-        statusCode: 401
-      };
-    }
-
-    // Check if token is too old (refresh threshold)
-    const refreshThreshold = now - (8 * 60 * 60); // 8 hours ago
-    if (decoded.iat && decoded.iat < refreshThreshold) {
-      return {
-        success: false,
-        error: 'Token too old, please refresh',
-        statusCode: 401
-      };
-    }
-
-    return {
-      success: true,
-      user: decoded
-    };
-
-  } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      return {
-        success: false,
-        error: 'Token expired',
-        statusCode: 401
-      };
-    } else if (error instanceof jwt.JsonWebTokenError) {
-      return {
-        success: false,
-        error: 'Invalid token',
-        statusCode: 401
-      };
-    } else if (error instanceof jwt.NotBeforeError) {
-      return {
-        success: false,
-        error: 'Token not yet valid',
-        statusCode: 401
-      };
-    } else {
-      return {
-        success: false,
-        error: 'Token verification failed',
-        statusCode: 500
-      };
-    }
-  }
+// Interface for authorization options
+export interface AuthorizationOptions {
+  requiredRole?: UserRole;
+  requiredPermissions?: PermissionLevel[];
+  requireActiveUser?: boolean;
+  requireActiveClient?: boolean;
+  requireValidSubscription?: boolean;
 }
 
 /**
- * Authenticate user from request headers
+ * Get authenticated user from JWT token
  */
-export async function authenticateUser(request: NextRequest): Promise<AuthResult> {
+export async function getAuthenticatedUser(request: NextRequest): Promise<AuthenticatedUser | null> {
   try {
     const authHeader = request.headers.get('authorization');
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return {
-        success: false,
-        error: 'No authorization header or invalid format',
-        statusCode: 401
-      };
+      return null;
     }
 
     const token = authHeader.substring(7);
-    const authResult = verifyJWT(token);
     
-    if (!authResult.success || !authResult.user) {
-      return authResult;
+    // Use basic JWT verification to match the login endpoint
+    const jwt = require('jsonwebtoken');
+    let decoded;
+    
+    try {
+      // Verify JWT token with basic approach
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret', {
+        issuer: 'vanitha-logistics',
+        audience: 'vanitha-logistics-users',
+        algorithms: ['HS256']
+      });
+    } catch (error) {
+      console.error('JWT verification error:', error);
+      return null;
     }
-
-    // Verify user exists and is active in database
+    
+    if (!decoded || !decoded.userId) {
+      return null;
+    }
+    
+    // Get user and client data from database
     const user = await prisma.users.findUnique({
-      where: { id: authResult.user.userId },
+      where: { id: decoded.userId },
       include: {
-        clients: true
+        clients: {
+          select: {
+            id: true,
+            isActive: true,
+            subscriptionStatus: true,
+            subscriptionExpiresAt: true
+          }
+        }
       }
     });
 
     if (!user || !user.isActive) {
-      return {
-        success: false,
-        error: 'User not found or inactive',
-        statusCode: 401
-      };
+      return null;
     }
 
+    // Check if client is active
     if (!user.clients || !user.clients.isActive) {
-      return {
-        success: false,
-        error: 'Client account is inactive',
-        statusCode: 401
-      };
+      return null;
     }
 
-    // Update user data with latest from database
-    authResult.user.role = user.role;
-    authResult.user.email = user.email;
+    // Get user permissions based on role
+    const permissions = ROLE_PERMISSIONS[user.role as UserRole] || [];
 
-    return authResult;
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role as UserRole,
+      clientId: user.clientId,
+      isActive: user.isActive,
+      client: user.clients,
+      permissions
+    };
 
   } catch (error) {
-    return {
-      success: false,
-      error: 'Authentication failed',
-      statusCode: 500
-    };
+    console.error('Authentication error:', error);
+    return null;
   }
 }
 
 /**
- * Authenticate admin user (admin or master_admin role)
+ * Check if user has required role
  */
-export async function authenticateAdmin(request: NextRequest): Promise<AuthResult> {
-  const authResult = await authenticateUser(request);
-  
-  if (!authResult.success) {
-    return authResult;
-  }
+export function hasRequiredRole(user: AuthenticatedUser, requiredRole: UserRole): boolean {
+  const roleHierarchy = {
+    [UserRole.USER]: 1,
+    [UserRole.ADMIN]: 2,
+    [UserRole.SUPER_ADMIN]: 3
+  };
 
-  if (!authResult.user || (authResult.user.role !== 'admin' && authResult.user.role !== 'master_admin')) {
-    return {
-      success: false,
-      error: 'Insufficient privileges',
-      statusCode: 403
-    };
-  }
-
-  return authResult;
+  return roleHierarchy[user.role] >= roleHierarchy[requiredRole];
 }
 
 /**
- * Authenticate master admin user only
+ * Check if user has required permissions
  */
-export async function authenticateMasterAdmin(request: NextRequest): Promise<AuthResult> {
-  const authResult = await authenticateUser(request);
-  
-  if (!authResult.success) {
-    return authResult;
-  }
-
-  if (!authResult.user || authResult.user.role !== 'master_admin') {
-    return {
-      success: false,
-      error: 'Master admin privileges required',
-      statusCode: 403
-    };
-  }
-
-  return authResult;
+export function hasRequiredPermissions(user: AuthenticatedUser, requiredPermissions: PermissionLevel[]): boolean {
+  return requiredPermissions.every(permission => user.permissions.includes(permission));
 }
 
 /**
- * Generate JWT token with role-based expiry
+ * Check if user's subscription is valid
  */
-export function generateJWT(payload: {
-  userId: string;
-  clientId: string;
-  email: string;
-  role: string;
-}, operation: 'login' | 'refresh' | 'api' = 'login'): string {
+export function hasValidSubscription(user: AuthenticatedUser): boolean {
+  // If subscriptionExpiresAt is null, it means unlimited/never expires
+  if (!user.client.subscriptionExpiresAt) {
+    return true;
+  }
   
-  // Different expiry times based on operation
-  let expiresIn: string;
-  switch (operation) {
-    case 'login':
-      expiresIn = '8h'; // Standard login session
-      break;
-    case 'refresh':
-      expiresIn = '24h'; // Refresh token (longer expiry)
-      break;
-    case 'api':
-      expiresIn = '1h'; // API operations (shorter expiry)
-      break;
-    default:
-      expiresIn = '8h';
+  // Check if subscription has expired
+  return new Date() < user.client.subscriptionExpiresAt;
+}
+
+/**
+ * Authorization middleware
+ */
+export async function authorizeUser(
+  request: NextRequest,
+  options: AuthorizationOptions = {}
+): Promise<{ user: AuthenticatedUser; response?: NextResponse } | { user: null; response: NextResponse }> {
+  const {
+    requiredRole = UserRole.USER,
+    requiredPermissions = [],
+    requireActiveUser = true,
+    requireActiveClient = true,
+    requireValidSubscription = false
+  } = options;
+
+  // Get authenticated user
+  const user = await getAuthenticatedUser(request);
+  
+  if (!user) {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    };
   }
 
-  return jwt.sign(payload, jwtConfig.secret, {
-    ...jwtConfig.options,
-    expiresIn
+  // Check if user is active
+  if (requireActiveUser && !user.isActive) {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { error: 'User account is deactivated' },
+        { status: 403 }
+      )
+    };
+  }
+
+  // Check if client is active
+  if (requireActiveClient && !user.client.isActive) {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { error: 'Client account is deactivated' },
+        { status: 403 }
+      )
+    };
+  }
+
+  // Check if user has required role
+  if (!hasRequiredRole(user, requiredRole)) {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { error: `Insufficient permissions. Required role: ${requiredRole}` },
+        { status: 403 }
+      )
+    };
+  }
+
+  // Check if user has required permissions
+  if (requiredPermissions.length > 0 && !hasRequiredPermissions(user, requiredPermissions)) {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { error: `Insufficient permissions. Required: ${requiredPermissions.join(', ')}` },
+        { status: 403 }
+      )
+    };
+  }
+
+  // Check subscription validity
+  if (requireValidSubscription && !hasValidSubscription(user)) {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { error: 'Subscription has expired. Please renew to continue.' },
+        { status: 403 }
+      )
+    };
+  }
+
+  return { user };
+}
+
+/**
+ * Admin-only authorization
+ */
+export async function authorizeAdmin(request: NextRequest): Promise<{ user: AuthenticatedUser; response?: NextResponse } | { user: null; response: NextResponse }> {
+  return authorizeUser(request, {
+    requiredRole: UserRole.ADMIN,
+    requiredPermissions: [PermissionLevel.ADMIN],
+    requireActiveUser: true,
+    requireActiveClient: true
   });
 }
 
 /**
- * Refresh JWT token if it's close to expiry
+ * Super admin authorization
  */
-export function shouldRefreshToken(token: string): boolean {
-  try {
-    const decoded = jwt.decode(token) as any;
-    if (!decoded || !decoded.exp) return true;
-    
-    const now = Math.floor(Date.now() / 1000);
-    const timeUntilExpiry = decoded.exp - now;
-    const refreshThreshold = 15 * 60; // 15 minutes
-    
-    return timeUntilExpiry < refreshThreshold;
-  } catch {
+export async function authorizeSuperAdmin(request: NextRequest): Promise<{ user: AuthenticatedUser; response?: NextResponse } | { user: null; response: NextResponse }> {
+  return authorizeUser(request, {
+    requiredRole: UserRole.SUPER_ADMIN,
+    requiredPermissions: [PermissionLevel.ADMIN],
+    requireActiveUser: true,
+    requireActiveClient: true
+  });
+}
+
+/**
+ * User authorization with subscription check
+ */
+export async function authorizeUserWithSubscription(request: NextRequest): Promise<{ user: AuthenticatedUser; response?: NextResponse } | { user: null; response: NextResponse }> {
+  return authorizeUser(request, {
+    requiredRole: UserRole.USER,
+    requireActiveUser: true,
+    requireActiveClient: true,
+    requireValidSubscription: true
+  });
+}
+
+/**
+ * Check if user can access specific resource
+ */
+export async function canAccessResource(
+  userId: string,
+  resourceOwnerId: string,
+  userRole: UserRole
+): Promise<boolean> {
+  // Super admins can access everything
+  if (userRole === UserRole.SUPER_ADMIN) {
     return true;
   }
+
+  // Admins can access resources from their client
+  if (userRole === UserRole.ADMIN) {
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { clientId: true }
+    });
+
+    const resourceOwner = await prisma.users.findUnique({
+      where: { id: resourceOwnerId },
+      select: { clientId: true }
+    });
+
+    return user?.clientId === resourceOwner?.clientId;
+  }
+
+  // Regular users can only access their own resources
+  return userId === resourceOwnerId;
 }

@@ -1,37 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { CreditService } from '@/lib/credit-service';
-import { enhancedJwtConfig } from '@/lib/jwt-config';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
-
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  try {
-    // Use enhanced JWT configuration for verification
-    const decoded = enhancedJwtConfig.verifyToken(token);
-    
-    // Get user and client data from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: { clients: true }
-    });
-
-    if (!user || !user.isActive || !user.clients.isActive) {
-      return null;
-    }
-    return user;
-  } catch (error) {
-    console.error('JWT verification error:', error);
-    return null;
-  }
-}
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,15 +14,25 @@ export async function GET(request: NextRequest) {
     );
     
     if (securityResponse) {
+      securityHeaders(securityResponse);
       return securityResponse;
     }
 
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      const response = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      securityHeaders(response);
-      return response;
+    // Authorize user with subscription check
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true,
+      requireValidSubscription: false  // Temporarily disabled
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
+
+    const user = authResult.user!;
 
     try {
       const credits = await CreditService.getClientCredits(user.clientId);
