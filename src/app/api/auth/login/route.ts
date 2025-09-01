@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { jwtConfig } from '@/lib/jwt-config';
+import { enhancedJwtConfig } from '@/lib/jwt-config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,23 +55,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create session with secure JWT configuration
+    // Generate JWT token with operation-specific expiry
+    const tokenPayload = {
+      userId: user.id,
+      clientId: user.clientId,
+      email: user.email,
+      role: user.role
+    };
+
+    // Generate login token (8 hours) and refresh token (24 hours)
+    const loginToken = enhancedJwtConfig.generateToken(tokenPayload, 'login');
+    const refreshToken = enhancedJwtConfig.generateToken(tokenPayload, 'refresh');
+
+    // Create session with enhanced security
     const session = await prisma.sessions.create({
       data: {
-        id: crypto.randomUUID(), // Generate unique ID for session
+        id: crypto.randomUUID(),
         userId: user.id,
         clientId: user.clientId,
-        token: jwt.sign(
-          { 
-            userId: user.id, 
-            clientId: user.clientId,
-            email: user.email,
-            role: user.role 
-          },
-          jwtConfig.secret,
-          jwtConfig.options
-        ),
-        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) // 8 hours (matching JWT expiry)
+        token: loginToken,
+        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) // 8 hours
       }
     });
 
@@ -86,8 +88,10 @@ export async function POST(request: NextRequest) {
         id: session.id,
         userId: session.userId,
         clientId: session.clientId,
-        token: session.token,
-        expiresAt: session.expiresAt
+        token: loginToken,
+        refreshToken: refreshToken,
+        expiresAt: session.expiresAt,
+        tokenInfo: enhancedJwtConfig.getTokenInfo(loginToken)
       }
     });
 

@@ -16,7 +16,7 @@ async function getAuthenticatedUser(request: NextRequest) {
   console.log('🔐 [AUTH] Token extracted, length:', token.length);
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    const decoded = jwt.verify(token, enhancedJwtConfig.getSecret()) as any;
     console.log('🔐 [AUTH] JWT decoded successfully, userId:', decoded.userId);
     
     // Get user and client data from database

@@ -14,7 +14,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
   
   try {
     const jwt = await import('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    const decoded = jwt.verify(token, enhancedJwtConfig.getSecret()) as any;
     
     // Get user from database
     const user = await prisma.users.findUnique({

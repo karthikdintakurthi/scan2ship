@@ -17,7 +17,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
   console.log('🔍 [ADMIN_AUTH] Token length:', token.length);
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    const decoded = jwt.verify(token, enhancedJwtConfig.getSecret()) as any;
     console.log('🔍 [ADMIN_AUTH] JWT decoded successfully, userId:', decoded.userId);
     
     const user = await prisma.users.findUnique({

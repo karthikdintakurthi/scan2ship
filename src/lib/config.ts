@@ -1,10 +1,12 @@
-// Environment configuration with validation
+import { jwtConfig } from './jwt-config';
+
 export const config = {
   database: {
     url: process.env.DATABASE_URL,
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'fallback-secret',
+    secret: jwtConfig.secret,
+    options: jwtConfig.options,
   },
   app: {
     name: process.env.NEXT_PUBLIC_APP_NAME || 'Vanitha Logistics',
@@ -18,6 +20,32 @@ export const config = {
     apiKey: process.env.OPENAI_API_KEY,
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   },
+  whatsapp: {
+    apiKey: process.env.FAST2SMS_WHATSAPP_API_KEY,
+    messageId: process.env.FAST2SMS_WHATSAPP_MESSAGE_ID,
+  },
+  // Production environment checks
+  isProduction: process.env.NODE_ENV === 'production',
+  isDevelopment: process.env.NODE_ENV === 'development',
+  
+  // Additional security checks for production
+  validateProductionConfig() {
+    if (process.env.NODE_ENV === 'production' &&
+        !process.env.VERCEL_BUILD) {
+      
+      if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET is required in production');
+      }
+      
+      if (!process.env.ENCRYPTION_KEY) {
+        throw new Error('ENCRYPTION_KEY is required in production');
+      }
+      
+      if (process.env.DEBUG) {
+        console.warn('DEBUG is enabled in production - consider removing');
+      }
+    }
+  }
 };
 
 // Validate required environment variables only at runtime
