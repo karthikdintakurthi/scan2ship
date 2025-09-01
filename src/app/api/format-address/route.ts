@@ -111,7 +111,16 @@ Rules:
 19. TRACKING NUMBER EXTRACTION: Look for barcode numbers or tracking numbers in the text
 20. If barcode number is present, extract it
 21. If no tracking number found, set to null
-22. Return ONLY the JSON object, no additional text or explanation
+22. SPECIAL CHARACTER CLEANUP: Remove or replace problematic special characters from all fields:
+    - Remove semicolons (;) and replace with spaces
+    - Remove newlines (\\n) and replace with spaces
+    - Remove tabs (\\t) and replace with spaces
+    - Remove carriage returns (\\r) and replace with spaces
+    - Replace multiple consecutive spaces with single space
+    - Remove any other non-standard characters that could cause API issues
+    - Keep commas (,) as they are important for address formatting
+    - Keep periods (.) as they are important for names and addresses
+23. Return ONLY the JSON object, no additional text or explanation
 
 Examples of name extraction:
 - "G.subrahmanyam, plot no 92, flat no.202..." → customer_name: "G. Subrahmanyam"
@@ -139,7 +148,13 @@ Examples of reseller detection:
 Examples of tracking number extraction:
 - "Package with barcode 123456789012345" → tracking_number: "123456789012345"
 - "Tracking: ABC123456789" → tracking_number: "ABC123456789"
-- "No barcode mentioned" → tracking_number: null`
+- "No barcode mentioned" → tracking_number: null
+
+Examples of special character cleanup:
+- "John Doe; 123 Main St\nApt 4B\tCity" → address: "John Doe 123 Main St Apt 4B City"
+- "Building A; Floor 2; Room 205" → address: "Building A Floor 2 Room 205"
+- "G.subrahmanyam, plot no 92; flat no.202" → address: "G.subrahmanyam, plot no 92 flat no.202"
+- "Surabhi Building, 80 fert main Road NGEF layout stage 2Nagarabhavi, Land Mark; Manjunatha Interiors" → address: "Surabhi Building, 80 fert main Road NGEF layout stage 2Nagarabhavi, Land Mark Manjunatha Interiors"`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
