@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { jwtConfig } from '@/lib/jwt-config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create session
+    // Create session with secure JWT configuration
     const session = await prisma.sessions.create({
       data: {
         id: crypto.randomUUID(), // Generate unique ID for session
@@ -68,10 +69,10 @@ export async function POST(request: NextRequest) {
             email: user.email,
             role: user.role 
           },
-          process.env.JWT_SECRET || 'fallback-secret',
-          { expiresIn: '24h' }
+          jwtConfig.secret,
+          jwtConfig.options
         ),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) // 8 hours (matching JWT expiry)
       }
     });
 

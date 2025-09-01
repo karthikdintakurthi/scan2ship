@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { jwtConfig } from '@/lib/jwt-config';
 
 const prisma = new PrismaClient();
 
@@ -16,7 +17,11 @@ async function getAuthenticatedAdmin(request: NextRequest) {
   const token = authHeader.substring(7);
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    const decoded = jwt.verify(token, jwtConfig.secret, {
+      issuer: jwtConfig.options.issuer,
+      audience: jwtConfig.options.audience,
+      algorithms: [jwtConfig.options.algorithm]
+    }) as any;
     
     // Get user and client data from database
     const user = await prisma.users.findUnique({

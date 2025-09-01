@@ -3,8 +3,18 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-// Encryption key for sensitive data
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'vanitha-logistics-encryption-key-2024';
+// Encryption key for sensitive data - must be set in environment
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+
+// Validate encryption key is present
+if (!ENCRYPTION_KEY) {
+  throw new Error('ENCRYPTION_KEY environment variable is required for secure operation');
+}
+
+// Validate encryption key length (minimum 32 characters for AES-256)
+if (ENCRYPTION_KEY.length < 32) {
+  throw new Error('ENCRYPTION_KEY must be at least 32 characters long for AES-256 encryption');
+}
 
 // Cache for system configurations
 let configCache: Map<string, { value: string; timestamp: number }> = new Map();
@@ -12,6 +22,10 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Helper function to encrypt sensitive data
 function encrypt(text: string): string {
+  if (!ENCRYPTION_KEY) {
+    throw new Error('Encryption key not available');
+  }
+  
   const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
@@ -20,6 +34,10 @@ function encrypt(text: string): string {
 
 // Helper function to decrypt sensitive data
 function decrypt(encryptedText: string): string {
+  if (!ENCRYPTION_KEY) {
+    throw new Error('Encryption key not available');
+  }
+  
   try {
     const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
     let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
@@ -27,7 +45,7 @@ function decrypt(encryptedText: string): string {
     return decrypted;
   } catch (error) {
     console.error('❌ Error decrypting value:', error);
-    return encryptedText; // Return original if decryption fails
+    throw new Error('Failed to decrypt sensitive data - encryption key may be invalid');
   }
 }
 

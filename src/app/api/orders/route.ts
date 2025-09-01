@@ -6,6 +6,7 @@ import whatsappService, { initializeWhatsAppService } from '@/lib/whatsapp-servi
 import { generateReferenceNumber, formatReferenceNumber } from '@/lib/reference-number';
 import AnalyticsService from '@/lib/analytics-service';
 import { CreditService } from '@/lib/credit-service';
+import { jwtConfig } from '@/lib/jwt-config';
 
 const delhiveryService = new DelhiveryService();
 
@@ -22,7 +23,11 @@ async function getAuthenticatedUser(request: NextRequest) {
   console.log('🔐 [AUTH] Token extracted, length:', token.length);
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    const decoded = jwt.verify(token, jwtConfig.secret, {
+      issuer: jwtConfig.options.issuer,
+      audience: jwtConfig.options.audience,
+      algorithms: [jwtConfig.options.algorithm]
+    }) as any;
     console.log('🔐 [AUTH] JWT decoded successfully, userId:', decoded.userId);
     
     // Get user and client data from database

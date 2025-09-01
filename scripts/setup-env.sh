@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Vanitha Logistics Environment Setup Script
-echo "🚀 Setting up Vanitha Logistics Environment Variables..."
+# Environment Setup Script for Vanitha Logistics
+# This script helps set up your .env.local file with secure secrets
+
+echo "🔒 Setting up secure environment variables for Vanitha Logistics..."
+echo ""
 
 # Check if .env.local exists
 if [ -f ".env.local" ]; then
@@ -9,17 +12,31 @@ if [ -f ".env.local" ]; then
     cp .env.local .env.local.backup
 fi
 
-# Create new .env.local with current values
-cat > .env.local << 'EOF'
+# Generate strong secrets
+echo "🔐 Generating cryptographically secure secrets..."
+JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+
+echo "✅ JWT_SECRET generated: ${JWT_SECRET:0:16}..."
+echo "✅ ENCRYPTION_KEY generated: ${ENCRYPTION_KEY:0:16}..."
+echo ""
+
+# Create .env.local with secure values
+echo "📝 Creating .env.local with secure configuration..."
+
+cat > .env.local << EOF
 # ========================================
-# VANITHA LOGISTICS - ENVIRONMENT CONFIG
+# VANITHA LOGISTICS - ENVIRONMENT CONFIGURATION
 # ========================================
+# This file contains your actual environment variables
+# DO NOT commit this file to version control
 
 # Database Configuration
 DATABASE_URL="postgresql://karthiknaidudintakurthi@localhost:5432/vanitha-logistics"
 
 # Authentication & Security
-JWT_SECRET="vanitha-logistics-super-secret-jwt-key-2024"
+JWT_SECRET="${JWT_SECRET}"
+ENCRYPTION_KEY="${ENCRYPTION_KEY}"
 
 # Application Configuration
 NODE_ENV="development"
@@ -37,18 +54,14 @@ OPENAI_MODEL="gpt-4o-mini"
 
 # Fast2SMS WhatsApp API Configuration
 FAST2SMS_WHATSAPP_API_KEY="your_fast2sms_whatsapp_api_key_here"
-FAST2SMS_WHATSAPP_MESSAGE_ID="4697"
-
-# Note: Google Cloud configuration removed as it's no longer needed
-
-# Note: Email configuration removed as it's no longer needed
+FAST2SMS_WHATSAPP_MESSAGE_ID="your_message_id_here"
 
 # File Upload Configuration
-MAX_FILE_SIZE="5242880"
+MAX_FILE_SIZE="5242880"  # 5MB in bytes
 ALLOWED_FILE_TYPES="image/jpeg,image/png,image/gif"
 
 # Rate Limiting
-RATE_LIMIT_WINDOW="900000"
+RATE_LIMIT_WINDOW="900000"  # 15 minutes in milliseconds
 RATE_LIMIT_MAX_REQUESTS="100"
 
 # Logging Configuration
@@ -62,10 +75,11 @@ EOF
 
 echo "✅ .env.local created successfully!"
 echo ""
-echo "🔑 IMPORTANT: You need to update the following keys with your actual values:"
-echo "   - Note: DELHIVERY_API_KEY is now managed at client level through pickup locations"
-echo "   - OPENAI_API_KEY: Get from OpenAI platform"
-echo "   - SMTP_USER/SMTP_PASS: Your email credentials (if using email features)"
+echo "🔍 Next steps:"
+echo "1. Review the generated .env.local file"
+echo "2. Fill in any missing API keys (OpenAI, WhatsApp, etc.)"
+echo "3. Run: npm run validate-env"
+echo "4. Test the application: npm run build && npm start"
 echo ""
-echo "📝 Edit .env.local to add your actual API keys"
-echo "🚀 Restart your development server after updating the keys"
+echo "⚠️  IMPORTANT: Never commit .env.local to version control!"
+echo "   It contains sensitive secrets that should remain private."
