@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import jwt from 'jsonwebtoken'
-import JsBarcode from 'jsbarcode'
-import { createCanvas } from 'canvas'
 
 const prisma = new PrismaClient()
 
@@ -39,28 +37,21 @@ async function getAuthenticatedUser(request: NextRequest) {
   }
 }
 
-// Function to generate barcode for tracking number
+// Function to generate barcode for tracking number using external service
 async function generateBarcode(trackingNumber: string): Promise<string> {
   try {
-    // Create a canvas for the barcode
-    const canvas = createCanvas(300, 100);
-    const ctx = canvas.getContext('2d');
+    // Use a reliable barcode generation service
+    const barcodeUrl = `https://barcodeapi.org/api/Code128/${encodeURIComponent(trackingNumber)}`;
+    const response = await fetch(barcodeUrl);
     
-    // Generate barcode on the canvas
-    JsBarcode(canvas, trackingNumber, {
-      format: "CODE128",
-      width: 2,
-      height: 60,
-      displayValue: true,
-      fontSize: 16,
-      margin: 10,
-      background: "#ffffff",
-      lineColor: "#000000"
-    });
-    
-    // Convert canvas to data URL
-    const barcodeDataURL = canvas.toDataURL('image/png');
-    return barcodeDataURL;
+    if (response.ok) {
+      const arrayBuffer = await response.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      return `data:image/png;base64,${base64}`;
+    } else {
+      console.error('Barcode service returned error:', response.status);
+      return '';
+    }
   } catch (error) {
     console.error('Error generating barcode:', error);
     return '';
