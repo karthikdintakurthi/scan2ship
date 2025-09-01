@@ -26,6 +26,7 @@
     "@types/qrcode": "^1.5.5",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
+    "exceljs": "^4.4.0",
     "express-rate-limit": "^8.0.1",
     "jsonwebtoken": "^9.0.2",
     "limiter": "^3.0.0",
@@ -38,13 +39,13 @@
     "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "tesseract.js": "^6.0.1",
-    "xlsx": "^0.18.5"
+    "tesseract.js": "^6.0.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
+    "@types/exceljs": "^0.5.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/pdfkit": "^0.17.2",
