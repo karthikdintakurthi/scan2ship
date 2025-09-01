@@ -93,8 +93,10 @@ export default function OrderList() {
   const [configLoaded, setConfigLoaded] = useState(false)
   
   // Pagination helper variables
-  const hasNextPage = currentPage < totalPages
+  const hasNextPage = currentPage < (totalPages || 1)
   const hasPrevPage = currentPage > 1
+
+
 
   // Load dynamic configuration
   useEffect(() => {
@@ -123,8 +125,9 @@ export default function OrderList() {
     loadConfiguration();
   }, []);
 
+  // Initial load - only run once
   useEffect(() => {
-    fetchOrders(1, '', '', '', selectedPickupLocation, selectedCourierService)
+    fetchOrders(1, '', '', '', '', '')
   }, [])
 
   // Handle search with debouncing
@@ -243,10 +246,17 @@ export default function OrderList() {
       if (response.ok) {
         const data = await response.json()
         console.log('✅ [FETCH_ORDERS] Orders fetched successfully:', data)
-        setOrders(data.orders)
-        setCurrentPage(data.pagination.currentPage)
-        setTotalPages(data.pagination.totalPages)
-        setTotalOrders(data.pagination.totalOrders)
+        const ordersData = data.orders || []
+        const currentPageData = data.pagination?.currentPage || 1
+        const totalPagesData = data.pagination?.totalPages || 1
+        const totalOrdersData = data.pagination?.totalCount || data.pagination?.totalOrders || 0
+        
+
+        
+        setOrders(ordersData)
+        setCurrentPage(currentPageData)
+        setTotalPages(totalPagesData)
+        setTotalOrders(totalOrdersData)
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }))
         console.error('❌ [FETCH_ORDERS] Failed to fetch orders:', {
@@ -255,10 +265,20 @@ export default function OrderList() {
           error: errorData
         })
         setError(`Failed to fetch orders: ${errorData.error || 'Unknown error'}`)
+        // Reset pagination state on error
+        setOrders([])
+        setTotalOrders(0)
+        setTotalPages(1)
+        setCurrentPage(1)
       }
     } catch (error) {
       console.error('❌ [FETCH_ORDERS] Error fetching orders:', error)
       setError(`Error fetching orders: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      // Reset pagination state on error
+      setOrders([])
+      setTotalOrders(0)
+      setTotalPages(1)
+      setCurrentPage(1)
     } finally {
       setLoading(false)
     }
@@ -1055,8 +1075,8 @@ export default function OrderList() {
               )}
             </h3>
             <p className="text-sm text-gray-600">
-              Showing {orders.length} of {totalOrders} orders
-              {totalPages > 1 && ` (Page ${currentPage} of ${totalPages})`}
+              Showing {orders.length} of {totalOrders || 0} orders
+              {(totalPages || 1) > 1 && ` (Page ${currentPage} of ${totalPages || 1})`}
             </p>
           </div>
           {totalOrders > 0 && (
@@ -1240,11 +1260,17 @@ export default function OrderList() {
               <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm text-gray-700">
-                    Showing <span className="font-medium">{((currentPage - 1) * ordersPerPage) + 1}</span> to{' '}
-                    <span className="font-medium">
-                      {Math.min(currentPage * ordersPerPage, totalOrders)}
-                    </span>{' '}
-                    of <span className="font-medium">{totalOrders}</span> results
+                    {totalOrders > 0 ? (
+                      <>
+                        Showing <span className="font-medium">{((currentPage - 1) * ordersPerPage) + 1}</span> to{' '}
+                        <span className="font-medium">
+                          {Math.min(currentPage * ordersPerPage, totalOrders)}
+                        </span>{' '}
+                        of <span className="font-medium">{totalOrders}</span> results
+                      </>
+                    ) : (
+                      'No results found'
+                    )}
                   </p>
                 </div>
                 <div>
@@ -1261,14 +1287,14 @@ export default function OrderList() {
                     </button>
                     
                     {/* Page numbers */}
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    {Array.from({ length: Math.min(5, totalPages || 1) }, (_, i) => {
                       let pageNum
-                      if (totalPages <= 5) {
+                      if ((totalPages || 1) <= 5) {
                         pageNum = i + 1
                       } else if (currentPage <= 3) {
                         pageNum = i + 1
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i
+                      } else if (currentPage >= (totalPages || 1) - 2) {
+                        pageNum = (totalPages || 1) - 4 + i
                       } else {
                         pageNum = currentPage - 2 + i
                       }
