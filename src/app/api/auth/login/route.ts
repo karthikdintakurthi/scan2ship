@@ -3,86 +3,146 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { enhancedJwtConfig } from '@/lib/jwt-config';
+import { 
+  applySecurityMiddleware, 
+  InputValidator 
+} from '@/lib/security-middleware';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    // Apply security middleware (rate limiting for auth endpoints)
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'auth', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      return securityResponse;
+    }
 
-    if (!email || !password) {
+    // Parse and validate request body
+    const body = await request.json();
+    
+    // Input validation
+    const emailValidation = InputValidator.validateEmail(body.email);
+    if (!emailValidation.valid) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: emailValidation.error },
+        { status: 400 }
+      );
+    }
+    
+    const passwordValidation = InputValidator.validateString(body.password, {
+      required: true,
+      minLength: 6,
+      maxLength: 128
+    });
+    
+    if (!passwordValidation.valid) {
+      return NextResponse.json(
+        { error: passwordValidation.error },
         { status: 400 }
       );
     }
 
-    // Find user by email
-    const user = await prisma.users.findFirst({
+    const { email, password } = {
+      email: emailValidation.value!,
+      password: passwordValidation.value!
+    };
+
+    // Find user with client information
+    const user = await prisma.users.findUnique({
       where: { email },
       include: {
         clients: true
       }
     });
 
-    if (!user) {
+    if (!user || !user.isActive) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
-    // Check if user is active
-    if (!user.isActive) {
+    // Check if user's client is active
+    if (!user.clients || !user.clients.isActive) {
       return NextResponse.json(
-        { error: 'Account is deactivated' },
-        { status: 401 }
-      );
-    }
-
-    // Check if client is active
-    if (!user.clients.isActive) {
-      return NextResponse.json(
-        { error: 'Client account is deactivated' },
+        { error: 'Client account is inactive' },
         { status: 401 }
       );
     }
 
     // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password || '');
-    if (!isValidPassword) {
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
-    // Generate JWT token with operation-specific expiry
-    const tokenPayload = {
-      userId: user.id,
-      clientId: user.clientId,
-      email: user.email,
-      role: user.role
-    };
+    // Generate JWT tokens
+    const loginToken = enhancedJwtConfig.generateToken(
+      {
+        userId: user.id,
+        clientId: user.clientId,
+        email: user.email,
+        role: user.role
+      },
+      'login'
+    );
 
-    // Generate login token (8 hours) and refresh token (24 hours)
-    const loginToken = enhancedJwtConfig.generateToken(tokenPayload, 'login');
-    const refreshToken = enhancedJwtConfig.generateToken(tokenPayload, 'refresh');
+    const refreshToken = enhancedJwtConfig.generateToken(
+      {
+        userId: user.id,
+        clientId: user.clientId,
+        email: user.email,
+        role: user.role
+      },
+      'refresh'
+    );
 
-    // Create session with enhanced security
-    const session = await prisma.sessions.create({
-      data: {
+    // Create or update session
+    const session = await prisma.sessions.upsert({
+      where: {
+        userId: user.id
+      },
+      update: {
+        token: loginToken,
+        refreshToken: refreshToken,
+        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours
+        updatedAt: new Date()
+      },
+      create: {
         id: crypto.randomUUID(),
         userId: user.id,
         clientId: user.clientId,
         token: loginToken,
-        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) // 8 hours
+        refreshToken: refreshToken,
+        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     });
 
-    // Return user data (without password) and session
-    const { password: _, ...userWithoutPassword } = user;
-    
-    return NextResponse.json({
-      user: userWithoutPassword,
+    // Get token info for debugging
+    const tokenInfo = enhancedJwtConfig.getTokenInfo(loginToken);
+
+    // Return user data and session
+    const response = NextResponse.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        clientId: user.clientId,
+        clients: user.clients
+      },
       client: user.clients,
       session: {
         id: session.id,
@@ -91,9 +151,16 @@ export async function POST(request: NextRequest) {
         token: loginToken,
         refreshToken: refreshToken,
         expiresAt: session.expiresAt,
-        tokenInfo: enhancedJwtConfig.getTokenInfo(loginToken)
+        tokenInfo
       }
     });
+
+    // Apply security headers
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-XSS-Protection', '1; mode=block');
+
+    return response;
 
   } catch (error) {
     console.error('Login error:', error);
