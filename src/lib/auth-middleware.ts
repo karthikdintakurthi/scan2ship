@@ -84,8 +84,13 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
     let decoded;
     
     try {
-      // Verify JWT token with basic approach
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret', {
+      // Verify JWT token with secure configuration
+      if (!process.env.JWT_SECRET) {
+        console.error('🚨 CRITICAL SECURITY ERROR: JWT_SECRET environment variable is not set');
+        throw new Error('JWT_SECRET environment variable is required for secure authentication');
+      }
+      
+      decoded = jwt.verify(token, process.env.JWT_SECRET, {
         issuer: 'vanitha-logistics',
         audience: 'vanitha-logistics-users',
         algorithms: ['HS256']

@@ -94,7 +94,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate JWT token using basic jwt.sign
+    // Generate JWT token using secure configuration
+    if (!process.env.JWT_SECRET) {
+      console.error('🚨 CRITICAL SECURITY ERROR: JWT_SECRET environment variable is not set');
+      return NextResponse.json(
+        { error: 'Authentication service unavailable' },
+        { status: 500 }
+      );
+    }
+    
     const loginToken = jwt.sign(
       {
         userId: user.id,
@@ -102,7 +110,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         role: user.role
       },
-      process.env.JWT_SECRET || 'fallback-secret',
+      process.env.JWT_SECRET,
       {
         expiresIn: '8h',
         issuer: 'vanitha-logistics',
