@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import crypto from 'crypto';
 
 // Encryption key for sensitive data (in production, use a proper key management system)
@@ -22,46 +23,59 @@ function decrypt(encryptedText: string): string {
   return decrypted;
 }
 
-// Helper function to get authenticated admin user
-async function getAuthenticatedAdmin(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
+// Helper function to mask sensitive values
+function maskSensitiveValue(value: string, type: string, isEncrypted: boolean): string {
+  if (!value) return '';
   
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+  if (isEncrypted) {
+    return '••••••••••••••••';
   }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const decoded = jwt.verify(token, enhancedJwtConfig.getSecret()) as any;
-    
-    // Get user from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    if (!user || !user.isActive || (user.role !== 'admin' && user.role !== 'master_admin')) {
-      return null;
+  
+  // Mask sensitive keys based on their names
+  const sensitiveKeys = [
+    'API_KEY', 'SECRET', 'PASSWORD', 'TOKEN', 'KEY', 'CREDENTIAL'
+  ];
+  
+  const isSensitive = sensitiveKeys.some(key => 
+    value.toUpperCase().includes(key)
+  );
+  
+  if (isSensitive) {
+    if (type === 'password') {
+      return '••••••••••••••••';
+    } else {
+      return `${value.substring(0, 4)}••••••••••••••••${value.substring(value.length - 4)}`;
     }
-
-    return {
-      user: user,
-      client: user.client
-    };
-  } catch (error) {
-    return null;
   }
+  
+  return value;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     console.log('📊 [API_ADMIN_SYSTEM_CONFIG_GET] Fetching system configuration from database');
@@ -74,28 +88,24 @@ export async function GET(request: NextRequest) {
       ]
     });
 
-    // Process configurations and decrypt sensitive data
+    // Process configurations and mask sensitive data
     const processedConfigs = configs.map(config => {
-      let displayValue = config.value;
-      
-      // For encrypted fields, show masked value
-      if (config.isEncrypted && config.value) {
-        if (config.type === 'password') {
-          displayValue = '••••••••••••••••';
-        } else {
-          displayValue = '***ENCRYPTED***';
-        }
-      }
+      const displayValue = maskSensitiveValue(config.value, config.type, config.isEncrypted);
       
       return {
         id: config.id,
         key: config.key,
-        value: config.value, // Keep original value for editing
+        // NEVER expose actual values to the client
+        value: null, // Remove actual values for security
         displayValue: displayValue, // Masked value for display
         type: config.type,
         category: config.category,
         description: config.description,
-        isEncrypted: config.isEncrypted
+        isEncrypted: config.isEncrypted,
+        // Add security metadata
+        isSensitive: config.isEncrypted || config.key.toUpperCase().includes('API_KEY') || 
+                    config.key.toUpperCase().includes('SECRET') || 
+                    config.key.toUpperCase().includes('PASSWORD')
       };
     });
 
@@ -108,29 +118,46 @@ export async function GET(request: NextRequest) {
       return acc;
     }, {} as Record<string, any[]>);
 
-    console.log('✅ [API_ADMIN_SYSTEM_CONFIG_GET] System configuration retrieved from database');
+    console.log('✅ [API_ADMIN_SYSTEM_CONFIG_GET] System configuration retrieved from database (sensitive data masked)');
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       configs: processedConfigs,
       configByCategory,
-      total: configs.length
+      total: configs.length,
+      security: {
+        sensitiveDataMasked: true,
+        actualValuesNotExposed: true,
+        timestamp: new Date().toISOString()
+      }
     });
+    
+    securityHeaders(response);
+    return response;
 
   } catch (error) {
     console.error('❌ [API_ADMIN_SYSTEM_CONFIG_GET] Error fetching system config:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to fetch system configuration' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (auth.response) {
+      securityHeaders(auth.response);
+      return auth.response;
     }
 
     const createData = await request.json();
@@ -187,9 +214,16 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (auth.response) {
+      securityHeaders(auth.response);
+      return auth.response;
     }
 
     const updateData = await request.json();

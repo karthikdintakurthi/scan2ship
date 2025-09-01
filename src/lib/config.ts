@@ -1,6 +1,7 @@
 import { jwtConfig } from './jwt-config';
 
-export const config = {
+// Server-side only configuration (never exposed to client)
+const serverConfig = {
   database: {
     url: process.env.DATABASE_URL,
     // Database security configuration
@@ -22,10 +23,6 @@ export const config = {
     secret: jwtConfig.secret,
     options: jwtConfig.options,
   },
-  app: {
-    name: process.env.NEXT_PUBLIC_APP_NAME || 'Vanitha Logistics',
-    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-  },
   delhivery: {
     baseUrl: process.env.DELHIVERY_BASE_URL || 'https://track.delhivery.com',
     webhookSecret: process.env.DELHIVERY_WEBHOOK_SECRET,
@@ -37,6 +34,16 @@ export const config = {
   whatsapp: {
     apiKey: process.env.FAST2SMS_WHATSAPP_API_KEY,
     messageId: process.env.FAST2SMS_WHATSAPP_MESSAGE_ID,
+  },
+};
+
+// Client-safe configuration (only NEXT_PUBLIC_ variables)
+export const config = {
+  app: {
+    name: process.env.NEXT_PUBLIC_APP_NAME || 'Vanitha Logistics',
+    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
+    supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@vanithalogistics.com',
   },
   // Production environment checks
   isProduction: process.env.NODE_ENV === 'production',
@@ -55,12 +62,12 @@ export const config = {
         throw new Error('ENCRYPTION_KEY is required in production');
       }
       
-      if (process.env.DEBUG) {
+      if (process.env.DEBUG === 'true') {
         console.warn('DEBUG is enabled in production - consider removing');
       }
       
       // Database security checks for production
-      if (process.env.DB_ENABLE_QUERY_LOGGING === 'true') {
+      if (process.env.DB_LOG_SLOW_QUERIES === 'true') {
         console.warn('Database query logging is enabled in production - security risk');
       }
       
@@ -70,6 +77,15 @@ export const config = {
       }
     }
   }
+};
+
+// Server-side only configuration export
+export const getServerConfig = () => {
+  // Ensure this is only called on the server side
+  if (typeof window !== 'undefined') {
+    throw new Error('Server configuration cannot be accessed on the client side');
+  }
+  return serverConfig;
 };
 
 // Validate required environment variables only at runtime
@@ -83,7 +99,6 @@ export function validateConfig() {
     
     if (missing.length > 0) {
       console.error('Missing required environment variables:', missing);
-      console.error('Available environment variables:', Object.keys(process.env));
       throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
     }
     
