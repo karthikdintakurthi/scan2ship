@@ -383,6 +383,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/orders/[id]/shipping-label">
 }
 
+// Validate ../../src/app/api/orders/[id]/waybill/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/orders/[id]/waybill/route.js")
+  handler satisfies RouteHandlerConfig<"/api/orders/[id]/waybill">
+}
+
 // Validate ../../src/app/api/orders/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/orders/route.js")

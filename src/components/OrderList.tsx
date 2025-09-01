@@ -357,30 +357,67 @@ export default function OrderList() {
     }
   }
 
+  const downloadWaybill = async (orderId: number) => {
+    try {
+      // Get auth token from localStorage
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+
+      const response = await fetch(`/api/orders/${orderId}/waybill`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        // Get HTML content
+        const htmlContent = await response.text()
+        
+        // Create a new window/tab with the HTML content
+        const newWindow = window.open('', '_blank')
+        if (newWindow) {
+          newWindow.document.write(htmlContent)
+          newWindow.document.close()
+          
+          // Focus the new window
+          newWindow.focus()
+          
+          console.log('✅ Waybill opened in new tab. Use browser print function (Ctrl+P) to save as PDF.')
+        } else {
+          alert('Please allow popups to view the waybill')
+        }
+      } else {
+        const error = await response.json()
+        alert(`Failed to download waybill: ${error.error}`)
+      }
+    } catch (error) {
+      alert('Error downloading waybill')
+      console.error('Error downloading waybill:', error)
+    }
+  }
+
   const downloadBulkLabels = async () => {
     if (selectedOrders.size === 0) return
 
     try {
-      // Get all selected orders that have Delhivery waybill numbers
-      const selectedOrderObjects = orders.filter(order => 
-        selectedOrders.has(order.id) && 
-        order.courier_service.toLowerCase() === 'delhivery' && 
-        order.delhivery_waybill_number
-      )
+      // Get all selected orders
+      const selectedOrderObjects = orders.filter(order => selectedOrders.has(order.id))
 
       if (selectedOrderObjects.length === 0) {
-        alert('No Delhivery orders with waybill numbers found in selection')
+        alert('No orders found in selection')
         return
       }
 
-      console.log(`🚀 Starting bulk download for ${selectedOrderObjects.length} labels`)
+      console.log(`🚀 Starting bulk download for ${selectedOrderObjects.length} orders`)
 
-      // Fetch all labels and combine them into one PDF
+      // Fetch all labels/waybills and combine them
       const labelContents = []
       
       for (let i = 0; i < selectedOrderObjects.length; i++) {
         const order = selectedOrderObjects[i]
-        console.log(`📥 Fetching label ${i + 1}/${selectedOrderObjects.length} for order ${order.id}`)
+        console.log(`📥 Fetching ${i + 1}/${selectedOrderObjects.length} for order ${order.id} (${order.courier_service})`)
         
         try {
           // Get auth token from localStorage
@@ -389,7 +426,21 @@ export default function OrderList() {
             throw new Error('Authentication token not found. Please log in again.');
           }
 
-          const response = await fetch(`/api/orders/${order.id}/shipping-label`, {
+          let endpoint = ''
+          let waybillNumber = ''
+
+          // Determine endpoint based on courier service
+          if (order.courier_service.toLowerCase() === 'delhivery' && order.delhivery_waybill_number) {
+            // Use Delhivery shipping label for Delhivery orders with waybill numbers
+            endpoint = `/api/orders/${order.id}/shipping-label`
+            waybillNumber = order.delhivery_waybill_number
+          } else {
+            // Use universal waybill for all other couriers or Delhivery without waybill
+            endpoint = `/api/orders/${order.id}/waybill`
+            waybillNumber = order.tracking_id || order.reference_number || `ORDER-${order.id}`
+          }
+
+          const response = await fetch(endpoint, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -399,16 +450,17 @@ export default function OrderList() {
             const htmlContent = await response.text()
             labelContents.push({
               orderId: order.id,
-              waybill: order.delhivery_waybill_number || 'Unknown',
-              htmlContent: htmlContent
+              waybill: waybillNumber,
+              htmlContent: htmlContent,
+              courier: order.courier_service
             })
-            console.log(`✅ Label ${i + 1}/${selectedOrderObjects.length} fetched successfully`)
+            console.log(`✅ ${order.courier_service} ${i + 1}/${selectedOrderObjects.length} fetched successfully`)
           } else {
             const error = await response.json()
-            console.error(`❌ Failed to fetch label for order ${order.id}: ${error.error}`)
+            console.error(`❌ Failed to fetch ${order.courier_service} for order ${order.id}: ${error.error}`)
           }
         } catch (error) {
-          console.error(`❌ Error fetching label for order ${order.id}:`, error)
+          console.error(`❌ Error fetching ${order.courier_service} for order ${order.id}:`, error)
         }
       }
 
@@ -449,7 +501,7 @@ export default function OrderList() {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Bulk Labels - ${labelContents.length} Orders</title>
+    <title>Bulk Labels & Waybills - ${labelContents.length} Orders</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -1043,7 +1095,7 @@ export default function OrderList() {
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                                            Download {selectedOrders.size} Label{selectedOrders.size !== 1 ? 's' : ''}
+                                            Download {selectedOrders.size} Label{selectedOrders.size !== 1 ? 's' : ''} & Waybill{selectedOrders.size !== 1 ? 's' : ''}
               </button>
               <button
                 onClick={() => setSelectedOrders(new Set())}
@@ -1121,7 +1173,7 @@ export default function OrderList() {
                     Reference Number
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                    Shipping Label
+                    Labels & Waybills
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                     Actions
@@ -1206,7 +1258,15 @@ export default function OrderList() {
                             Generate Label
                           </button>
                         ) : (
-                          <span className="text-gray-400 text-sm">Not Available</span>
+                          <button
+                            onClick={() => downloadWaybill(order.id)}
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Generate Waybill
+                          </button>
                         )}
                       </div>
                     </td>
