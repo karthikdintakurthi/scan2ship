@@ -3,6 +3,20 @@ import { jwtConfig } from './jwt-config';
 export const config = {
   database: {
     url: process.env.DATABASE_URL,
+    // Database security configuration
+    security: {
+      maxQueryTimeout: parseInt(process.env.DB_MAX_QUERY_TIMEOUT || '30000'),
+      maxResults: parseInt(process.env.DB_MAX_RESULTS || '1000'),
+      enableQueryLogging: process.env.NODE_ENV === 'development',
+      enableSlowQueryLogging: process.env.DB_LOG_SLOW_QUERIES === 'true',
+      slowQueryThreshold: parseInt(process.env.DB_SLOW_QUERY_THRESHOLD || '1000'),
+      connectionPool: {
+        min: parseInt(process.env.DB_POOL_MIN || '2'),
+        max: parseInt(process.env.DB_POOL_MAX || '10'),
+        acquireTimeout: parseInt(process.env.DB_POOL_ACQUIRE_TIMEOUT || '30000'),
+        idleTimeout: parseInt(process.env.DB_POOL_IDLE_TIMEOUT || '30000'),
+      }
+    }
   },
   jwt: {
     secret: jwtConfig.secret,
@@ -43,6 +57,16 @@ export const config = {
       
       if (process.env.DEBUG) {
         console.warn('DEBUG is enabled in production - consider removing');
+      }
+      
+      // Database security checks for production
+      if (process.env.DB_ENABLE_QUERY_LOGGING === 'true') {
+        console.warn('Database query logging is enabled in production - security risk');
+      }
+      
+      if (process.env.DB_MAX_QUERY_TIMEOUT && 
+          parseInt(process.env.DB_MAX_QUERY_TIMEOUT) > 60000) {
+        console.warn('Database query timeout is very long in production');
       }
     }
   }

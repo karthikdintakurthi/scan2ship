@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
+import { enhancedJwtConfig } from '@/lib/jwt-config';
 import { CreditService } from '@/lib/credit-service';
 
 // Helper function to get authenticated user and client
@@ -14,7 +14,7 @@ async function getAuthenticatedUser(request: NextRequest) {
   const token = authHeader.substring(7);
 
   try {
-    const decoded = jwt.verify(token, enhancedJwtConfig.getSecret()) as any;
+    const decoded = enhancedJwtConfig.verifyToken(token);
     
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },

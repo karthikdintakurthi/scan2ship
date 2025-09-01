@@ -58,6 +58,33 @@ export class JWTSecretManager {
    * Get the primary active secret
    */
   getPrimarySecret(): string {
+    // Auto-initialize if not already initialized
+    if (this.secrets.length === 0) {
+      console.log('🔄 Auto-initializing JWT secret manager...');
+      this.initialize().catch(error => {
+        console.error('❌ Auto-initialization failed:', error);
+        throw error;
+      });
+      
+      // For immediate use, try to load from environment
+      const primarySecret = process.env.JWT_SECRET;
+      if (!primarySecret) {
+        throw new Error('JWT_SECRET environment variable is required');
+      }
+      
+      // Create a temporary secret entry
+      this.secrets = [{
+        id: 'temp-primary',
+        secret: primarySecret,
+        isActive: true,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        description: 'Temporary JWT secret from environment'
+      }];
+      
+      console.log('✅ JWT secret manager auto-initialized');
+    }
+    
     const primarySecret = this.secrets.find(s => s.isActive);
     if (!primarySecret) {
       throw new Error('No active JWT secret available');
@@ -69,6 +96,33 @@ export class JWTSecretManager {
    * Get all active secrets for verification
    */
   getActiveSecrets(): string[] {
+    // Auto-initialize if not already initialized
+    if (this.secrets.length === 0) {
+      console.log('🔄 Auto-initializing JWT secret manager...');
+      this.initialize().catch(error => {
+        console.error('❌ Auto-initialization failed:', error);
+        throw error;
+      });
+      
+      // For immediate use, try to load from environment
+      const primarySecret = process.env.JWT_SECRET;
+      if (!primarySecret) {
+        throw new Error('JWT_SECRET environment variable is required');
+      }
+      
+      // Create a temporary secret entry
+      this.secrets = [{
+        id: 'temp-primary',
+        secret: primarySecret,
+        isActive: true,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        description: 'Temporary JWT secret from environment'
+      }];
+      
+      console.log('✅ JWT secret manager auto-initialized');
+    }
+    
     return this.secrets
       .filter(s => s.isActive)
       .map(s => s.secret);
