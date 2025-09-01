@@ -775,6 +775,16 @@ export default function OrderList() {
     }
   }
 
+  const getCourierServiceName = (courierCode: string): string => {
+    const courierMap: { [key: string]: string } = {
+      'delhivery': 'Delhivery',
+      'dtdc': 'DTDC',
+      'india_post': 'India Post',
+      'manual': 'Manual'
+    }
+    return courierMap[courierCode.toLowerCase()] || courierCode
+  }
+
 
 
   // Checkbox functions
@@ -1484,15 +1494,15 @@ export default function OrderList() {
                 </div>
               ) : (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-3">India Post Tracking</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">{getCourierServiceName(selectedOrder.courier_service)} Tracking</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-900">
                     <div>
-                      <div><span className="font-medium">Tracking Number:</span> {selectedOrder.delhivery_waybill_number || 'Not assigned'}</div>
-                      <div><span className="font-medium">Order ID:</span> {selectedOrder.delhivery_order_id || 'Not assigned'}</div>
+                      <div><span className="font-medium">Tracking Number:</span> {selectedOrder.tracking_id || selectedOrder.reference_number || 'Not assigned'}</div>
+                      <div><span className="font-medium">Reference Number:</span> {selectedOrder.reference_number || 'Not assigned'}</div>
                     </div>
                     <div>
-                      <div><span className="font-medium">Service:</span> India Post</div>
-                      <div><span className="font-medium">Status:</span> <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">ℹ️ Not Applicable</span></div>
+                      <div><span className="font-medium">Service:</span> {getCourierServiceName(selectedOrder.courier_service)}</div>
+                      <div><span className="font-medium">Status:</span> <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✅ Active</span></div>
                     </div>
                   </div>
                 </div>

@@ -154,8 +154,8 @@ export class DelhiveryService {
         if (!text) return '';
         return String(text)
           .replace(/[\r\n\t]/g, ' ') // Replace newlines and tabs with spaces
-          .replace(/"/g, '"') // Escape double quotes
-          .replace(/\\/g, '\\\\') // Escape backslashes
+          .replace(/[;]/g, ' ') // Remove semicolons and replace with spaces
+          .replace(/\s+/g, ' ') // Replace multiple spaces with single space
           .trim(); // Remove leading/trailing whitespace
       };
 
@@ -209,9 +209,32 @@ export class DelhiveryService {
       try {
         jsonString = JSON.stringify(jsonData);
         console.log('✅ JSON validation successful');
+        console.log('📏 JSON string length:', jsonString.length);
+        
+        // Additional validation: check for unterminated strings
+        if (jsonString.includes('\\"') && !jsonString.includes('"')) {
+          console.warn('⚠️ Potential unterminated string detected in JSON');
+        }
+        
+        // Test parsing the JSON back to ensure it's valid
+        JSON.parse(jsonString);
+        console.log('✅ JSON parsing test successful');
+        
       } catch (jsonError) {
-        console.error('❌ JSON stringification failed:', jsonError);
-        console.error('❌ Problematic data:', jsonData);
+        console.error('❌ JSON stringification/parsing failed:', jsonError);
+        console.error('❌ Problematic data:', JSON.stringify(jsonData, null, 2));
+        
+        // Log each field to identify the problematic one
+        console.error('🔍 Debugging JSON fields:');
+        Object.entries(shipmentData).forEach(([key, value]) => {
+          try {
+            JSON.stringify({ [key]: value });
+          } catch (fieldError) {
+            console.error(`❌ Problematic field "${key}":`, value);
+            console.error(`❌ Field error:`, fieldError);
+          }
+        });
+        
         throw new Error(`JSON preparation failed: ${jsonError instanceof Error ? jsonError.message : 'Unknown error'}`);
       }
 
@@ -239,18 +262,30 @@ export class DelhiveryService {
       // Check if the API call was successful
       if (response.success === false || response.error === true) {
         let errorMessage = 'Delhivery API returned an error';
+        let detailedError = '';
         
         // Try to extract error message from remarks array if available
         if (response.packages && response.packages.length > 0) {
           const packageInfo = response.packages[0];
           if (packageInfo.remarks && Array.isArray(packageInfo.remarks) && packageInfo.remarks.length > 0) {
-            errorMessage = `Delhivery API Error: ${packageInfo.remarks.join(', ')}`;
+            detailedError = packageInfo.remarks.join(', ');
+            errorMessage = `Delhivery API Error: ${detailedError}`;
+          }
+          
+          // Also check if package status is "Fail"
+          if (packageInfo.status === 'Fail') {
+            console.log('❌ [DELHIVERY] Package status is Fail');
+            if (packageInfo.remarks && Array.isArray(packageInfo.remarks) && packageInfo.remarks.length > 0) {
+              detailedError = packageInfo.remarks.join(', ');
+              errorMessage = `Delhivery API Error: ${detailedError}`;
+            }
           }
         }
         
         // Fallback to rmk field if available
-        if (response.rmk) {
-          errorMessage = `Delhivery API Error: ${response.rmk}`;
+        if (!detailedError && response.rmk) {
+          detailedError = response.rmk;
+          errorMessage = `Delhivery API Error: ${detailedError}`;
         }
         
         // Log detailed error information for debugging
@@ -259,6 +294,7 @@ export class DelhiveryService {
           error: response.error,
           rmk: response.rmk,
           packages: response.packages,
+          detailedError: detailedError,
           fullResponse: response
         });
         
