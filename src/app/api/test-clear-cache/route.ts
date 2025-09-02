@@ -1,7 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 export async function POST(request: NextRequest) {
   try {
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
     console.log('🧹 [TEST_CLEAR_CACHE] Clearing courier service cache');
     
     // Clear courier service cache

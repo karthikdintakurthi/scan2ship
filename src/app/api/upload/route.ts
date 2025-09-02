@@ -1,41 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { enhancedJwtConfig } from '@/lib/jwt-config';
 import { prisma } from '@/lib/prisma';
 import { 
   applySecurityMiddleware, 
   FileUploadValidator,
-  InputValidator 
+  InputValidator,
+  securityHeaders
 } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import crypto from 'crypto';
 
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  try {
-    const decoded = enhancedJwtConfig.verifyToken(token);
-    
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: { clients: true }
-    });
-
-    if (!user || !user.isActive || !user.clients.isActive) {
-      return null;
-    }
-    return user;
-  } catch (error) {
-    console.error('JWT verification error:', error);
-    return null;
-  }
-}
+// Authentication handled by centralized middleware
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,11 +26,20 @@ export async function POST(request: NextRequest) {
       return securityResponse;
     }
 
-    // Check authentication
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
+
+    const user = authResult.user!;
 
     // Parse form data
     const formData = await request.formData();

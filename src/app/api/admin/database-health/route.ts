@@ -1,47 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { enhancedJwtConfig } from '@/lib/jwt-config';
 import { DatabaseConnectionManager, safeQuery } from '@/lib/database-security';
-
-// Helper function to get authenticated admin user
-async function getAuthenticatedAdmin(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const decoded = enhancedJwtConfig.verifyToken(token);
-    
-    // Get user and client data from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    if (!user || !user.isActive || (user.role !== 'admin' && user.role !== 'master_admin')) {
-      return null;
-    }
-
-    return {
-      user: user,
-      client: user.clients
-    };
-  } catch (error) {
-    return null;
-  }
-}
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     // Get comprehensive database health information
@@ -64,14 +51,29 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
 
-    // Only master admin can perform database operations
-    if (auth.user.role !== 'master_admin') {
-      return NextResponse.json({ error: 'Master admin privileges required' }, { status: 403 });
+    // Authorize master admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.MASTER_ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const { action } = await request.json();

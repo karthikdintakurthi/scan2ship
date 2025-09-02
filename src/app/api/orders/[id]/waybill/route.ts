@@ -1,41 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import jwt from 'jsonwebtoken'
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 const prisma = new PrismaClient()
 
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const decoded = jwt.verify(token, enhancedJwtConfig.getSecret()) as any;
-    
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    if (!user || !user.isActive || !user.clients.isActive) {
-      return null;
-    }
-
-    return {
-      user: user,
-      client: user.clients
-    };
-  } catch (error) {
-    return null;
-  }
-}
+// Authentication handled by centralized middleware
 
 // Function to generate barcode for tracking number using external service
 async function generateBarcode(trackingNumber: string): Promise<string> {
@@ -242,11 +212,32 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authenticate user
-    const auth = await getAuthenticatedUser(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const auth = { user: authResult.user!, client: authResult.user!.client };
 
     const { id } = await params
     const orderId = parseInt(id)

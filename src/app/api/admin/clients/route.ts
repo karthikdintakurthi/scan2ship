@@ -86,11 +86,32 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const auth = { user: authResult.user! };
 
     const clientData = await request.json();
 

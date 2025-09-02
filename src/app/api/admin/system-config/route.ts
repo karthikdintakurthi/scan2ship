@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
       requiredRole: UserRole.ADMIN,
       requiredPermissions: [PermissionLevel.ADMIN],
       requireActiveUser: true,
-      requireActiveClient: true
+      requireActiveClient: false  // System config should be accessible regardless of client status
     });
 
     if (authResult.response) {
@@ -147,23 +147,38 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate admin user
-    const auth = await authorizeUser(request, {
+    console.log('🚀 [API_ADMIN_SYSTEM_CONFIG_POST] Starting request...');
+    
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
       requiredRole: UserRole.ADMIN,
       requiredPermissions: [PermissionLevel.ADMIN],
       requireActiveUser: true,
-      requireActiveClient: true
+      requireActiveClient: false  // System config should be accessible regardless of client status
     });
 
-    if (auth.response) {
-      securityHeaders(auth.response);
-      return auth.response;
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const createData = await request.json();
     const { configs } = createData;
 
     console.log('📝 [API_ADMIN_SYSTEM_CONFIG_POST] Creating/updating system configuration in database');
+    console.log('📝 [API_ADMIN_SYSTEM_CONFIG_POST] Received data:', JSON.stringify(createData, null, 2));
 
     // Create or update each configuration
     const upsertPromises = configs.map(async (config: any) => {
@@ -213,17 +228,31 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // Authenticate admin user
-    const auth = await authorizeUser(request, {
+    console.log('🚀 [API_ADMIN_SYSTEM_CONFIG_PUT] Starting request...');
+    
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
       requiredRole: UserRole.ADMIN,
       requiredPermissions: [PermissionLevel.ADMIN],
       requireActiveUser: true,
-      requireActiveClient: true
+      requireActiveClient: false  // System config should be accessible regardless of client status
     });
 
-    if (auth.response) {
-      securityHeaders(auth.response);
-      return auth.response;
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const updateData = await request.json();

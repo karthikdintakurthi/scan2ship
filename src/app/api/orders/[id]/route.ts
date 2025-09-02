@@ -1,11 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
     const { id } = await params
     const orderId = parseInt(id)
     const order = await prisma.orders.findUnique({
@@ -34,6 +61,31 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
     const { id } = await params
     const orderId = parseInt(id)
     const body = await request.json()
@@ -58,6 +110,31 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.DELETE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
     const { id } = await params
     const orderId = parseInt(id)
     await prisma.orders.delete({

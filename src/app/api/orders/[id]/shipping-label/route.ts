@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 const prisma = new PrismaClient()
 
@@ -165,6 +167,31 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
     const { id } = await params
     const orderId = parseInt(id)
     

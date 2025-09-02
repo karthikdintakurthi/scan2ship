@@ -10,7 +10,8 @@ import { prisma } from '@/lib/prisma';
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
-  SUPER_ADMIN = 'super_admin'
+  SUPER_ADMIN = 'super_admin',
+  MASTER_ADMIN = 'master_admin'
 }
 
 // Permission levels
@@ -34,6 +35,12 @@ export const ROLE_PERMISSIONS = {
     PermissionLevel.ADMIN
   ],
   [UserRole.SUPER_ADMIN]: [
+    PermissionLevel.READ,
+    PermissionLevel.WRITE,
+    PermissionLevel.DELETE,
+    PermissionLevel.ADMIN
+  ],
+  [UserRole.MASTER_ADMIN]: [
     PermissionLevel.READ,
     PermissionLevel.WRITE,
     PermissionLevel.DELETE,
@@ -130,6 +137,11 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
 
     // Get user permissions based on role
     const permissions = ROLE_PERMISSIONS[user.role as UserRole] || [];
+    
+    console.log(`🔍 [AUTH] User role from DB: ${user.role}`);
+    console.log(`🔍 [AUTH] Cast role to enum: ${user.role as UserRole}`);
+    console.log(`🔍 [AUTH] Available roles: ${Object.values(UserRole).join(', ')}`);
+    console.log(`🔍 [AUTH] User permissions: ${permissions.join(', ')}`);
 
     return {
       id: user.id,
@@ -154,10 +166,18 @@ export function hasRequiredRole(user: AuthenticatedUser, requiredRole: UserRole)
   const roleHierarchy = {
     [UserRole.USER]: 1,
     [UserRole.ADMIN]: 2,
-    [UserRole.SUPER_ADMIN]: 3
+    [UserRole.SUPER_ADMIN]: 3,
+    [UserRole.MASTER_ADMIN]: 4
   };
 
-  return roleHierarchy[user.role] >= roleHierarchy[requiredRole];
+  const userRoleLevel = roleHierarchy[user.role];
+  const requiredRoleLevel = roleHierarchy[requiredRole];
+
+  console.log(`🔒 [ROLE_CHECK] User role: ${user.role}, level: ${userRoleLevel}`);
+  console.log(`🔒 [ROLE_CHECK] Required role: ${requiredRole}, level: ${requiredRoleLevel}`);
+  console.log(`🔒 [ROLE_CHECK] Comparison: ${userRoleLevel} >= ${requiredRoleLevel} = ${userRoleLevel >= requiredRoleLevel}`);
+
+  return userRoleLevel >= requiredRoleLevel;
 }
 
 /**
@@ -232,6 +252,8 @@ export async function authorizeUser(
 
   // Check if user has required role
   if (!hasRequiredRole(user, requiredRole)) {
+    console.log(`🔒 [AUTHORIZATION] Role check failed: user.role=${user.role}, requiredRole=${requiredRole}`);
+    console.log(`🔒 [AUTHORIZATION] User permissions: ${user.permissions.join(', ')}`);
     return {
       user: null,
       response: NextResponse.json(
