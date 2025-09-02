@@ -26,7 +26,8 @@ export enum PermissionLevel {
 export const ROLE_PERMISSIONS = {
   [UserRole.USER]: [
     PermissionLevel.READ,
-    PermissionLevel.WRITE
+    PermissionLevel.WRITE,
+    PermissionLevel.DELETE  // Client users need to delete their own orders
   ],
   [UserRole.ADMIN]: [
     PermissionLevel.READ,
@@ -184,7 +185,13 @@ export function hasRequiredRole(user: AuthenticatedUser, requiredRole: UserRole)
  * Check if user has required permissions
  */
 export function hasRequiredPermissions(user: AuthenticatedUser, requiredPermissions: PermissionLevel[]): boolean {
-  return requiredPermissions.every(permission => user.permissions.includes(permission));
+  const hasAllPermissions = requiredPermissions.every(permission => user.permissions.includes(permission));
+  
+  console.log(`🔒 [PERMISSION_CHECK] User permissions: ${user.permissions.join(', ')}`);
+  console.log(`🔒 [PERMISSION_CHECK] Required permissions: ${requiredPermissions.join(', ')}`);
+  console.log(`🔒 [PERMISSION_CHECK] Has all permissions: ${hasAllPermissions}`);
+  
+  return hasAllPermissions;
 }
 
 /**

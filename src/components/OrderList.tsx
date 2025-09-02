@@ -1311,17 +1311,7 @@ export default function OrderList() {
                           View Details
                         </button>
                         
-                        {order.courier_service.toLowerCase() === 'delhivery' && 
-                         order.delhivery_api_status === 'failed' && 
-                         (order.delhivery_retry_count || 0) < 3 && (
-                          <button
-                            onClick={() => retryDelhiveryOrder(order.id)}
-                            disabled={retrying === order.id}
-                            className="block w-full px-3 py-1 text-xs bg-orange-100 text-orange-800 rounded hover:bg-orange-200 disabled:opacity-50"
-                          >
-                            {retrying === order.id ? 'Retrying...' : 'Retry Delhivery'}
-                          </button>
-                        )}
+
                       </div>
                     </td>
                   </tr>
@@ -1498,21 +1488,7 @@ export default function OrderList() {
                     </div>
                   </div>
                   
-                  {selectedOrder.delhivery_api_status === 'failed' && 
-                   (selectedOrder.delhivery_retry_count || 0) < 3 && (
-                    <div className="mt-3">
-                      <button
-                        onClick={() => {
-                          retryDelhiveryOrder(selectedOrder.id)
-                          setSelectedOrder(null)
-                        }}
-                        disabled={retrying === selectedOrder.id}
-                        className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
-                      >
-                        {retrying === selectedOrder.id ? 'Retrying...' : 'Retry Delhivery API'}
-                      </button>
-                    </div>
-                  )}
+
                 </div>
               ) : (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg">
