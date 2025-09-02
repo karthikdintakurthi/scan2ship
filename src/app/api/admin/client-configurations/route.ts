@@ -1,58 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 const prisma = new PrismaClient();
 
-async function getAuthenticatedAdmin(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ [ADMIN_AUTH] No authorization header');
-      return null;
-    }
-
-    const token = authHeader.substring(7);
-    
-    // Verify JWT token directly instead of calling verify endpoint
-    let decoded;
-    try {
-      decoded = jwt.verify(token, enhancedJwtConfig.getSecret()) as any;
-    } catch (error) {
-      console.log('❌ [ADMIN_AUTH] Invalid JWT token');
-      return null;
-    }
-
-    // Get user from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    if (!user || !user.isActive || (user.role !== 'admin' && user.role !== 'master_admin')) {
-      console.log('❌ [ADMIN_AUTH] User is not admin or master_admin, role:', user?.role);
-      return null;
-    }
-
-    console.log(`✅ [ADMIN_AUTH] Authenticated admin: ${user.email} (${user.role})`);
-    return { user };
-
-  } catch (error) {
-    console.error('❌ [ADMIN_AUTH] Error:', error);
-    return null;
-  }
-}
-
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const auth = { user: authResult.user! };
 
     console.log('📊 [API_ADMIN_CLIENT_CONFIGS_GET] Fetching all clients with configurations for admin:', auth.user.email);
 
