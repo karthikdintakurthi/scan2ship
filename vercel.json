@@ -2,13 +2,6 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "master": true,
-      "qa-env": true
-    }
-  },
   "functions": {
     "src/app/api/**/*.ts": {
       "maxDuration": 30
@@ -16,11 +9,5 @@
   },
   "env": {
     "PRISMA_GENERATE_DATAPROXY": "true"
-  },
-  "regions": ["bom1"],
-  "build": {
-    "env": {
-      "NODE_ENV": "production"
-    }
   }
 }
