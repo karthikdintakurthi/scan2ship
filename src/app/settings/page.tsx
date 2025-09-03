@@ -76,6 +76,9 @@ interface ClientConfigData {
     
     // Reseller settings
     enableResellerFallback: boolean;
+    
+    // Thermal print settings
+    enableThermalPrint: boolean;
   };
   dtdcSlips?: {
     from: string;
@@ -455,6 +458,74 @@ export default function ClientSettingsPage() {
           clientOrderConfig: {
             ...prev.clientOrderConfig,
             enableResellerFallback: !enabled
+          }
+        };
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Function to handle thermal print checkbox change
+  const handleThermalPrintChange = async (enabled: boolean) => {
+    if (!config?.clientOrderConfig) return;
+    
+    try {
+      setIsSaving(true);
+      setError('');
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
+
+      // Update the local state immediately for better UX
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableThermalPrint: enabled
+          }
+        };
+      });
+
+      // Save to database
+      const response = await fetch('/api/order-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          enableThermalPrint: enabled
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update thermal print setting');
+      }
+
+      setSuccess('Thermal print setting updated successfully!');
+      
+      // Refresh the config to ensure consistency
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error('❌ [THERMAL_PRINT] Error updating setting:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update thermal print setting');
+      
+      // Revert the local state change on error
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableThermalPrint: !enabled
           }
         };
       });
@@ -1032,6 +1103,31 @@ export default function ClientSettingsPage() {
                         </dd>
                         <dd className="text-xs text-gray-500 mt-1">
                           When enabled, empty reseller fields automatically use company name/phone
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-gray-500">Thermal Print Mode</dt>
+                        <dd className="text-sm text-gray-900">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={config.clientOrderConfig.enableThermalPrint}
+                              onChange={(e) => handleThermalPrintChange(e.target.checked)}
+                              disabled={isSaving}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                              {config.clientOrderConfig.enableThermalPrint ? 'Enabled' : 'Disabled'}
+                            </span>
+                            {isSaving && (
+                              <span className="ml-2 text-xs text-gray-500">
+                                Saving...
+                              </span>
+                            )}
+                          </label>
+                        </dd>
+                        <dd className="text-xs text-gray-500 mt-1">
+                          When enabled, only thermal print options will be shown in order list
                         </dd>
                       </div>
                     </dl>

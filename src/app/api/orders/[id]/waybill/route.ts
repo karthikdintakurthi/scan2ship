@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import jwt from 'jsonwebtoken'
+import { generateThermalLabelHTML, createThermalLabelData } from '@/lib/thermal-label-generator'
 
 const prisma = new PrismaClient()
 
@@ -253,6 +254,10 @@ export async function GET(
     const { id } = await params
     const orderId = parseInt(id)
     
+    // Check for thermal printer format query parameter
+    const url = new URL(request.url)
+    const isThermal = url.searchParams.get('thermal') === 'true'
+    
     // Get order details with client information
     const order = await prisma.orders.findUnique({
       where: { id: orderId },
@@ -284,16 +289,33 @@ export async function GET(
       barcodeDataURL = await generateBarcode(trackingNumber);
     }
     
-    // Generate universal waybill HTML
-    const htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service)
-    
-    console.log('✅ Universal waybill generated for order:', orderId, 'Courier:', order.courier_service)
+    let htmlContent: string
+    let filename: string
+
+    if (isThermal) {
+      // Generate thermal printer label
+      const packageInfo = {
+        wbn: trackingNumber,
+        barcode: barcodeDataURL,
+        pt: 'Pre-paid',
+        oid: order.reference_number
+      }
+      const thermalData = createThermalLabelData(order, packageInfo)
+      htmlContent = generateThermalLabelHTML(thermalData)
+      filename = `thermal-waybill-${trackingNumber}.html`
+      console.log('✅ Thermal waybill generated for order:', orderId, 'Courier:', order.courier_service)
+    } else {
+      // Generate universal waybill HTML
+      htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service)
+      filename = `waybill-${trackingNumber}.html`
+      console.log('✅ Universal waybill generated for order:', orderId, 'Courier:', order.courier_service)
+    }
 
     return new NextResponse(htmlContent, {
       status: 200,
       headers: {
         'Content-Type': 'text/html',
-        'Content-Disposition': `attachment; filename="waybill-${trackingNumber}.html"`
+        'Content-Disposition': `attachment; filename="${filename}"`
       }
     })
 

@@ -77,6 +77,7 @@ model client_order_configs {
   requireWeight             Boolean @default(true)
   requireTotalItems         Boolean @default(true)
   enableResellerFallback    Boolean @default(true)
+  enableThermalPrint        Boolean @default(false)
   clientId                  String  @unique
   clients                   clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }

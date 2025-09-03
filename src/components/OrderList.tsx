@@ -91,6 +91,7 @@ export default function OrderList() {
   const [pickupLocations, setPickupLocations] = useState<Array<{value: string, label: string}>>([])
   const [courierServices, setCourierServices] = useState<Array<{value: string, label: string}>>([])
   const [configLoaded, setConfigLoaded] = useState(false)
+  const [thermalPrintEnabled, setThermalPrintEnabled] = useState(false)
   
   // Pagination helper variables
   const hasNextPage = currentPage < (totalPages || 1)
@@ -132,6 +133,31 @@ export default function OrderList() {
     };
 
     loadConfiguration();
+  }, []);
+
+  // Load thermal print setting
+  useEffect(() => {
+    const loadThermalPrintSetting = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+
+        const response = await fetch('/api/order-config', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setThermalPrintEnabled(data.orderConfig?.enableThermalPrint || false);
+        }
+      } catch (error) {
+        console.error('Error loading thermal print setting:', error);
+      }
+    };
+
+    loadThermalPrintSetting();
   }, []);
 
   // Initial load - only run once
@@ -333,7 +359,7 @@ export default function OrderList() {
         throw new Error('Authentication token not found. Please log in again.');
       }
 
-      const response = await fetch(`/api/orders/${orderId}/shipping-label`, {
+      const response = await fetch(`/api/orders/${orderId}/waybill`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -366,7 +392,7 @@ export default function OrderList() {
     }
   }
 
-  const downloadWaybill = async (orderId: number) => {
+  const downloadWaybill = async (orderId: number, isThermal: boolean = false) => {
     try {
       // Get auth token from localStorage
       const token = localStorage.getItem('authToken');
@@ -374,7 +400,13 @@ export default function OrderList() {
         throw new Error('Authentication token not found. Please log in again.');
       }
 
-      const response = await fetch(`/api/orders/${orderId}/waybill`, {
+      // Add thermal parameter if needed
+      const url = new URL(`/api/orders/${orderId}/waybill`, window.location.origin)
+      if (isThermal) {
+        url.searchParams.set('thermal', 'true')
+      }
+
+      const response = await fetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -393,7 +425,8 @@ export default function OrderList() {
           // Focus the new window
           newWindow.focus()
           
-          console.log('✅ Waybill opened in new tab. Use browser print function (Ctrl+P) to save as PDF.')
+          const labelType = isThermal ? 'thermal' : 'standard'
+          console.log(`✅ ${labelType} waybill opened in new tab. Use browser print function (Ctrl+P) to save as PDF.`)
         } else {
           alert('Please allow popups to view the waybill')
         }
@@ -419,7 +452,7 @@ export default function OrderList() {
         return
       }
 
-      console.log(`🚀 Starting bulk download for ${selectedOrderObjects.length} orders`)
+      console.log(`🚀 Starting bulk download for ${selectedOrderObjects.length} orders (thermal: ${thermalPrintEnabled})`)
 
       // Fetch all labels/waybills and combine them
       const labelContents = []
@@ -438,18 +471,23 @@ export default function OrderList() {
           let endpoint = ''
           let waybillNumber = ''
 
-          // Determine endpoint based on courier service
+          // Use universal waybill endpoint for all courier services
+          endpoint = `/api/orders/${order.id}/waybill`
+          
+          // Determine waybill number based on courier service
           if (order.courier_service.toLowerCase() === 'delhivery' && order.delhivery_waybill_number) {
-            // Use Delhivery shipping label for Delhivery orders with waybill numbers
-            endpoint = `/api/orders/${order.id}/shipping-label`
             waybillNumber = order.delhivery_waybill_number
           } else {
-            // Use universal waybill for all other couriers or Delhivery without waybill
-            endpoint = `/api/orders/${order.id}/waybill`
             waybillNumber = order.tracking_id || order.reference_number || `ORDER-${order.id}`
           }
 
-          const response = await fetch(endpoint, {
+          // Add thermal parameter if needed
+          const url = new URL(endpoint, window.location.origin)
+          if (thermalPrintEnabled) {
+            url.searchParams.set('thermal', 'true')
+          }
+
+          const response = await fetch(url.toString(), {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -479,7 +517,7 @@ export default function OrderList() {
       }
 
       // Create combined HTML content
-      const combinedHTML = await createCombinedLabelsHTML(labelContents)
+      const combinedHTML = await createCombinedLabelsHTML(labelContents, thermalPrintEnabled)
       
       // Create a new window/tab with the combined HTML content
       const newWindow = window.open('', '_blank')
@@ -491,7 +529,8 @@ export default function OrderList() {
         newWindow.focus()
         
         console.log('🎉 Bulk download completed!')
-        alert(`Bulk download completed! ${labelContents.length} label(s) opened in new tab. Use browser print function (Ctrl+P) to save as PDF.`)
+        const labelType = thermalPrintEnabled ? 'thermal printer' : 'standard'
+        alert(`Bulk download completed! ${labelContents.length} ${labelType} label(s) opened in new tab. Use browser print function (Ctrl+P) to save as PDF.`)
       } else {
         alert('Please allow popups to view the combined labels')
       }
@@ -502,7 +541,7 @@ export default function OrderList() {
     }
   }
 
-  const createCombinedLabelsHTML = async (labelContents: Array<{orderId: number, waybill: string, htmlContent: string}>) => {
+  const createCombinedLabelsHTML = async (labelContents: Array<{orderId: number, waybill: string, htmlContent: string}>, isThermal: boolean = false) => {
     try {
       // Create a combined HTML page with all labels
       const combinedHTML = `
@@ -510,12 +549,12 @@ export default function OrderList() {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Bulk Labels & Waybills - ${labelContents.length} Orders</title>
+    <title>Bulk ${isThermal ? 'Thermal' : 'Standard'} Labels & Waybills - ${labelContents.length} Orders</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: ${isThermal ? '0' : '20px'};
             background-color: #f5f5f5;
         }
         .page-break {
@@ -526,10 +565,11 @@ export default function OrderList() {
         }
         .label-container {
             background-color: white;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border: 2px solid #333;
+            margin-bottom: ${isThermal ? '0' : '20px'};
+            border-radius: ${isThermal ? '0' : '8px'};
+            box-shadow: ${isThermal ? 'none' : '0 2px 10px rgba(0,0,0,0.1)'};
+            border: ${isThermal ? 'none' : '2px solid #333'};
+            ${isThermal ? 'width: 80mm; max-width: 80mm; margin: 0 auto;' : ''}
         }
         .label-header {
             text-align: center;
@@ -538,6 +578,22 @@ export default function OrderList() {
             border-bottom: 1px solid #ddd;
             font-weight: bold;
         }
+        ${isThermal ? `
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            .label-container {
+                page-break-inside: avoid;
+                margin: 0;
+            }
+        }
+        ` : ''}
     </style>
 </head>
 <body>
@@ -1107,15 +1163,27 @@ export default function OrderList() {
               </span>
             </div>
             <div className="flex items-center space-x-3">
-              <button
-                onClick={downloadBulkLabels}
-                className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                                            Download {selectedOrders.size} Label{selectedOrders.size !== 1 ? 's' : ''} & Waybill{selectedOrders.size !== 1 ? 's' : ''}
-              </button>
+              {thermalPrintEnabled ? (
+                <button
+                  onClick={() => downloadBulkLabels()}
+                  className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                  </svg>
+                  Thermal Labels
+                </button>
+              ) : (
+                <button
+                  onClick={() => downloadBulkLabels()}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Standard Labels
+                </button>
+              )}
               <button
                 onClick={() => setSelectedOrders(new Set())}
                 className="text-sm text-blue-600 hover:text-blue-800 underline"
@@ -1266,25 +1334,27 @@ export default function OrderList() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-2">
-                        {order.courier_service.toLowerCase() === 'delhivery' && order.delhivery_waybill_number ? (
+                        {thermalPrintEnabled ? (
+                          // Show only thermal option when thermal print is enabled
                           <button
-                            onClick={() => downloadPackingSlip(order.id)}
-                            className="text-green-600 hover:text-green-800 text-sm font-medium flex items-center"
+                            onClick={() => downloadWaybill(order.id, true)}
+                            className="text-green-600 hover:text-green-800 text-xs font-medium flex items-center"
                           >
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
                             </svg>
-                            Generate Label
+                            Thermal
                           </button>
                         ) : (
+                          // Show only standard option when thermal print is disabled
                           <button
-                            onClick={() => downloadWaybill(order.id)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+                            onClick={() => downloadWaybill(order.id, false)}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center"
                           >
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            Generate Waybill
+                            Standard
                           </button>
                         )}
                       </div>
