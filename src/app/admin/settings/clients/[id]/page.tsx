@@ -352,6 +352,18 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
     }
   }, [currentUser, clientId]);
 
+  // Log config changes for debugging
+  useEffect(() => {
+    if (config?.clientOrderConfig) {
+      console.log('🔍 [CONFIG_STATE_CHANGE] Config state updated:', {
+        enableOrderIdPrefix: config.clientOrderConfig.enableOrderIdPrefix,
+        type: typeof config.clientOrderConfig.enableOrderIdPrefix,
+        checkboxChecked: config.clientOrderConfig.enableOrderIdPrefix !== false,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [config?.clientOrderConfig?.enableOrderIdPrefix]);
+
   const fetchClientConfig = async () => {
     try {
       setIsLoading(true);
@@ -372,7 +384,34 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
       if (response.ok) {
         const data = await response.json();
         console.log('🔍 [ADMIN_CLIENT_SETTINGS] Response data:', data);
+        
+        // Log Order ID Settings specifically
+        console.log('🔍 [ADMIN_CLIENT_SETTINGS] ===== ORDER ID SETTINGS LOG ====');
+        console.log('🔍 [ADMIN_CLIENT_SETTINGS] Client order config:', data.config?.clientOrderConfig);
+        console.log('🔍 [ADMIN_CLIENT_SETTINGS] enableOrderIdPrefix value:', data.config?.clientOrderConfig?.enableOrderIdPrefix);
+        console.log('🔍 [ADMIN_CLIENT_SETTINGS] enableOrderIdPrefix type:', typeof data.config?.clientOrderConfig?.enableOrderIdPrefix);
+        console.log('🔍 [ADMIN_CLIENT_SETTINGS] All clientOrderConfig keys:', Object.keys(data.config?.clientOrderConfig || {}));
+        
+        if (data.config?.clientOrderConfig?.enableOrderIdPrefix !== undefined) {
+          console.log('✅ [ADMIN_CLIENT_SETTINGS] Order ID Prefix setting found:', {
+            enabled: data.config.clientOrderConfig.enableOrderIdPrefix,
+            description: data.config.clientOrderConfig.enableOrderIdPrefix 
+              ? 'Reference numbers will be in format "ABC123-9876543210"'
+              : 'Reference numbers will be just the mobile number "9876543210"'
+          });
+        } else {
+          console.log('⚠️ [ADMIN_CLIENT_SETTINGS] Order ID Prefix setting not found, will use default (true)');
+        }
+        console.log('🔍 [ADMIN_CLIENT_SETTINGS] ===== END ORDER ID SETTINGS LOG ====');
+        
         setConfig(data.config);
+        
+        // Log the Order ID Settings after setting config
+        console.log('🔍 [CONFIG_LOADED] Order ID Settings loaded:', {
+          enableOrderIdPrefix: data.config?.clientOrderConfig?.enableOrderIdPrefix,
+          type: typeof data.config?.clientOrderConfig?.enableOrderIdPrefix,
+          checkboxChecked: data.config?.clientOrderConfig?.enableOrderIdPrefix !== false
+        });
       } else {
         const errorText = await response.text();
         console.error('❌ [ADMIN_CLIENT_SETTINGS] API error:', errorText);
@@ -1706,7 +1745,15 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                         type="checkbox"
                         id="enableOrderIdPrefix"
                         checked={config.clientOrderConfig?.enableOrderIdPrefix !== false} // Default to true
-                        onChange={(e) => setConfig({
+                        onChange={(e) => {
+                          console.log('🔍 [CHECKBOX_CHANGE] Order ID Prefix checkbox changed:', {
+                            previousValue: config.clientOrderConfig?.enableOrderIdPrefix,
+                            newValue: e.target.checked,
+                            previousType: typeof config.clientOrderConfig?.enableOrderIdPrefix,
+                            newType: typeof e.target.checked
+                          });
+                          
+                          setConfig({
                           ...config,
                           clientOrderConfig: {
                             ...config.clientOrderConfig,
@@ -1729,7 +1776,8 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                             enableResellerFallback: config.clientOrderConfig?.enableResellerFallback || false,
                             enableOrderIdPrefix: e.target.checked
                           }
-                        })}
+                        });
+                        }}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                       <label htmlFor="enableOrderIdPrefix" className="ml-2 block text-sm text-gray-900">

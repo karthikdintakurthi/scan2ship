@@ -133,13 +133,35 @@ export async function POST(request: NextRequest) {
     let referenceNumber: string;
     const enablePrefix = clientOrderConfig.enableOrderIdPrefix;
     
+    // Log Order ID Settings usage
+    console.log('🔍 [API_ORDERS_POST] ===== ORDER ID SETTINGS USAGE ====');
+    console.log('🔍 [API_ORDERS_POST] Client order config:', clientOrderConfig);
+    console.log('🔍 [API_ORDERS_POST] enableOrderIdPrefix value:', enablePrefix);
+    console.log('🔍 [API_ORDERS_POST] enableOrderIdPrefix type:', typeof enablePrefix);
+    console.log('🔍 [API_ORDERS_POST] Mobile number:', orderData.mobile);
+    console.log('🔍 [API_ORDERS_POST] Custom reference number provided:', orderData.reference_number ? 'Yes' : 'No');
+    
     if (orderData.reference_number && orderData.reference_number.trim()) {
       // Use custom reference value with or without mobile number based on setting
       referenceNumber = formatReferenceNumber(orderData.reference_number.trim(), orderData.mobile, enablePrefix);
+      console.log('🔍 [API_ORDERS_POST] Using custom reference with prefix setting:', {
+        customValue: orderData.reference_number.trim(),
+        enablePrefix,
+        result: referenceNumber,
+        format: enablePrefix ? 'CUSTOMVALUE-MOBILE' : 'MOBILE_ONLY'
+      });
     } else {
       // Auto-generate reference number with or without mobile number based on setting
       referenceNumber = generateReferenceNumber(orderData.mobile, enablePrefix);
+      console.log('🔍 [API_ORDERS_POST] Auto-generated reference with prefix setting:', {
+        enablePrefix,
+        result: referenceNumber,
+        format: enablePrefix ? 'ALPHANUMERIC-MOBILE' : 'MOBILE_ONLY'
+      });
     }
+    
+    console.log('🔍 [API_ORDERS_POST] Final reference number:', referenceNumber);
+    console.log('🔍 [API_ORDERS_POST] ===== END ORDER ID SETTINGS USAGE ====');
 
     // Convert string values to appropriate data types and map fields
     const processedOrderData = {

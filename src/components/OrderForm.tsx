@@ -125,6 +125,26 @@ export default function OrderForm() {
         
         setConfigLoaded(true);
         console.log('✅ [ORDER_FORM] Configuration loaded:', { formConfig, clientConfig });
+        
+        // Log Order ID Settings specifically
+        if (clientConfig) {
+          console.log('🔍 [ORDER_FORM] ===== ORDER ID SETTINGS LOADED ====');
+          console.log('🔍 [ORDER_FORM] Client order config:', clientConfig);
+          console.log('🔍 [ORDER_FORM] enableOrderIdPrefix value:', clientConfig.enableOrderIdPrefix);
+          console.log('🔍 [ORDER_FORM] enableOrderIdPrefix type:', typeof clientConfig.enableOrderIdPrefix);
+          
+          if (clientConfig.enableOrderIdPrefix !== undefined) {
+            console.log('✅ [ORDER_FORM] Order ID Prefix setting loaded:', {
+              enabled: clientConfig.enableOrderIdPrefix,
+              description: clientConfig.enableOrderIdPrefix 
+                ? 'Reference numbers will be in format "ABC123-9876543210"'
+                : 'Reference numbers will be just the mobile number "9876543210"'
+            });
+          } else {
+            console.log('⚠️ [ORDER_FORM] Order ID Prefix setting not found, will use default (true)');
+          }
+          console.log('🔍 [ORDER_FORM] ===== END ORDER ID SETTINGS LOG ====');
+        }
       } catch (error) {
         console.error('❌ [ORDER_FORM] Error loading configuration:', error);
         setConfigLoaded(true);
@@ -156,6 +176,12 @@ export default function OrderForm() {
             console.log('🔍 [PACKAGE_VALUE] Client config defaultPackageValue:', clientConfig.defaultPackageValue);
             console.log('🔍 [PACKAGE_VALUE] Pickup config commodity_value:', pickupConfig?.productDetails.commodity_value);
             console.log('🔍 [PACKAGE_VALUE] Using client setting for package value');
+            
+            // Log Order ID Settings refresh
+            console.log('🔍 [PACKAGE_VALUE] ===== ORDER ID SETTINGS REFRESH ====');
+            console.log('🔍 [PACKAGE_VALUE] enableOrderIdPrefix value:', clientConfig.enableOrderIdPrefix);
+            console.log('🔍 [PACKAGE_VALUE] enableOrderIdPrefix type:', typeof clientConfig.enableOrderIdPrefix);
+            console.log('🔍 [PACKAGE_VALUE] ===== END ORDER ID SETTINGS REFRESH ====');
             
             setFormData(prev => ({
               ...prev,
@@ -214,6 +240,12 @@ export default function OrderForm() {
                 console.log('🔍 [AUTO_REFRESH] Client config defaultPackageValue:', clientConfig.defaultPackageValue);
                 console.log('🔍 [AUTO_REFRESH] Updating package_value to client setting');
                 
+                // Log Order ID Settings auto-refresh
+                console.log('🔍 [AUTO_REFRESH] ===== ORDER ID SETTINGS AUTO-REFRESH ====');
+                console.log('🔍 [AUTO_REFRESH] enableOrderIdPrefix value:', clientConfig.enableOrderIdPrefix);
+                console.log('🔍 [AUTO_REFRESH] enableOrderIdPrefix type:', typeof clientConfig.enableOrderIdPrefix);
+                console.log('🔍 [AUTO_REFRESH] ===== END ORDER ID SETTINGS AUTO-REFRESH ====');
+                
                 // Update form data with latest client configuration
                 setFormData(prev => ({
                   ...prev,
@@ -239,6 +271,41 @@ export default function OrderForm() {
 
     return () => clearInterval(interval);
   }, [configLoaded]);
+
+  // Log reference number format when Order ID Settings change
+  useEffect(() => {
+    if (clientOrderConfig && formData.mobile_number) {
+      const enablePrefix = clientOrderConfig.enableOrderIdPrefix !== false;
+      const mobileNumber = formData.mobile_number.replace(/\D/g, '').slice(-10);
+      
+      console.log('🔍 [ORDER_FORM] ===== REFERENCE NUMBER FORMAT LOG ====');
+      console.log('🔍 [ORDER_FORM] Order ID Settings:', {
+        enableOrderIdPrefix: clientOrderConfig.enableOrderIdPrefix,
+        enablePrefix,
+        mobileNumber
+      });
+      
+      if (formData.reference_number) {
+        const customFormat = enablePrefix 
+          ? `${formData.reference_number}-${mobileNumber}`
+          : mobileNumber;
+        console.log('🔍 [ORDER_FORM] Custom reference format:', {
+          customValue: formData.reference_number,
+          enablePrefix,
+          result: customFormat
+        });
+      } else {
+        const autoFormat = enablePrefix 
+          ? `ALPHANUMERIC-${mobileNumber}`
+          : mobileNumber;
+        console.log('🔍 [ORDER_FORM] Auto-generated reference format:', {
+          enablePrefix,
+          result: autoFormat
+        });
+      }
+      console.log('🔍 [ORDER_FORM] ===== END REFERENCE NUMBER FORMAT LOG ====');
+    }
+  }, [clientOrderConfig, formData.mobile_number, formData.reference_number]);
 
   // Generate random 6-digit alphanumeric order number with mobile
   const generateOrderNumber = useCallback((mobileNumber: string) => {
@@ -1034,6 +1101,13 @@ export default function OrderForm() {
             <p className="text-xs text-gray-500 mt-1">
               Format: {formData.reference_number ? `${formData.reference_number}-${formData.mobile_number.replace(/\D/g, '').slice(-10)}` : 'ALPHANUMERIC-MOBILE'}
             </p>
+            {/* Order ID Settings indicator */}
+            {clientOrderConfig && (
+              <p className="text-xs text-blue-600 mt-1">
+                💡 Order ID Prefix: {clientOrderConfig.enableOrderIdPrefix !== false ? 'Enabled' : 'Disabled'} 
+                ({clientOrderConfig.enableOrderIdPrefix !== false ? 'ABC123-9876543210' : '9876543210'})
+              </p>
+            )}
           </div>
         </div>
       </div>
