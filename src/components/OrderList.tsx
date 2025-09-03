@@ -359,7 +359,7 @@ export default function OrderList() {
         throw new Error('Authentication token not found. Please log in again.');
       }
 
-      const response = await fetch(`/api/orders/${orderId}/shipping-label`, {
+      const response = await fetch(`/api/orders/${orderId}/waybill`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -471,14 +471,13 @@ export default function OrderList() {
           let endpoint = ''
           let waybillNumber = ''
 
-          // Determine endpoint based on courier service
+          // Use universal waybill endpoint for all courier services
+          endpoint = `/api/orders/${order.id}/waybill`
+          
+          // Determine waybill number based on courier service
           if (order.courier_service.toLowerCase() === 'delhivery' && order.delhivery_waybill_number) {
-            // Use Delhivery shipping label for Delhivery orders with waybill numbers
-            endpoint = `/api/orders/${order.id}/shipping-label`
             waybillNumber = order.delhivery_waybill_number
           } else {
-            // Use universal waybill for all other couriers or Delhivery without waybill
-            endpoint = `/api/orders/${order.id}/waybill`
             waybillNumber = order.tracking_id || order.reference_number || `ORDER-${order.id}`
           }
 

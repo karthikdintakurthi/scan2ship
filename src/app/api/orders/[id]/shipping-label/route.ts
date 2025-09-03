@@ -1,3 +1,8 @@
+// COMMENTED OUT: This Delhivery-specific shipping label endpoint is no longer used
+// All courier services now use the universal waybill endpoint at /api/orders/[id]/waybill
+// This file is kept for reference but the functionality has been moved to the universal waybill endpoint
+
+/*
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { generateThermalLabelHTML, createThermalLabelData } from '@/lib/thermal-label-generator'
@@ -274,3 +279,4 @@ export async function GET(
     }, { status: 500 })
   }
 }
+*/

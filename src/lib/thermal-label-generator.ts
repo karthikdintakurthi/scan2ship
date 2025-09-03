@@ -45,7 +45,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
             width: 80mm;
             max-width: 80mm;
             background-color: white;
-            font-size: 10px;
+            font-size: 16px;
             line-height: 1.2;
             color: #000;
             font-weight: bold;
@@ -54,7 +54,8 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         .label-container {
             width: 80mm;
             max-width: 80mm;
-            padding: 2mm;
+            padding: 0;
+            margin: 2mm;
             background-color: white;
             border: 1px solid #000;
         }
@@ -68,14 +69,14 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         }
         
         .courier-name {
-            font-size: 12px;
+            font-size: 18px;
             font-weight: bold;
             margin: 0;
             text-transform: uppercase;
         }
         
         .payment-info {
-            font-size: 9px;
+            font-size: 16px;
             margin: 1mm 0;
             color: #000;
             font-weight: bold;
@@ -92,14 +93,9 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         .barcode-image {
             max-width: 100%;
             height: auto;
-            max-height: 15mm;
-        }
-        
-        .waybill-number {
-            font-size: 11px;
-            font-weight: bold;
-            font-family: monospace;
-            margin-top: 1mm;
+            max-height: 25mm;
+            display: block;
+            margin: 0 auto;
         }
         
         /* Address Section */
@@ -110,7 +106,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         }
         
         .section-title {
-            font-size: 9px;
+            font-size: 16px;
             font-weight: bold;
             text-transform: uppercase;
             margin-bottom: 1mm;
@@ -119,7 +115,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         }
         
         .address-details {
-            font-size: 8px;
+            font-size: 16px;
             line-height: 1.3;
             color: #000;
             font-weight: bold;
@@ -146,7 +142,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
             margin: 2mm 0;
             padding: 1mm;
             border: 1px solid #000;
-            font-size: 8px;
+            font-size: 16px;
             color: #000;
             font-weight: bold;
         }
@@ -154,7 +150,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         /* Footer */
         .footer {
             text-align: center;
-            font-size: 7px;
+            font-size: 16px;
             margin-top: 2mm;
             padding-top: 1mm;
             border-top: 1px solid #000;
@@ -165,8 +161,8 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         /* Utility classes */
         .text-center { text-align: center; color: #000; font-weight: bold; }
         .text-bold { font-weight: bold; color: #000; }
-        .text-small { font-size: 7px; color: #000; font-weight: bold; }
-        .text-large { font-size: 11px; color: #000; font-weight: bold; }
+        .text-small { font-size: 16px; color: #000; font-weight: bold; }
+        .text-large { font-size: 20px; color: #000; font-weight: bold; }
         
         /* Print optimizations */
         @media print {
@@ -177,8 +173,8 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
             
             .label-container {
                 page-break-inside: avoid;
-                margin: 0;
-                padding: 2mm;
+                margin: 2mm;
+                padding: 0;
             }
         }
     </style>
@@ -196,7 +192,6 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
             ${data.barcode ? `
                 <img src="${data.barcode}" alt="Barcode" class="barcode-image" />
             ` : ''}
-            <div class="waybill-number">${data.waybillNumber}</div>
         </div>
         
         <!-- Recipient Address -->
@@ -229,12 +224,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         </div>
         ` : ''}
         
-        <!-- Package Value -->
-        ${data.packageValue ? `
-        <div class="reference-section">
-            <div class="text-bold">Value: ₹${data.packageValue}</div>
-        </div>
-        ` : ''}
+
         
         <!-- Date -->
         ${data.date ? `
@@ -320,7 +310,7 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
         .label-page {
             width: 80mm;
             max-width: 80mm;
-            margin: 0 auto;
+            margin: 2mm auto;
             page-break-after: always;
         }
         
@@ -332,7 +322,8 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
         .label-container {
             width: 80mm;
             max-width: 80mm;
-            padding: 2mm;
+            padding: 0;
+            margin: 2mm;
             background-color: white;
             border: 1px solid #000;
         }
@@ -345,14 +336,14 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
         }
         
         .courier-name {
-            font-size: 12px;
+            font-size: 18px;
             font-weight: bold;
             margin: 0;
             text-transform: uppercase;
         }
         
         .payment-info {
-            font-size: 9px;
+            font-size: 16px;
             margin: 1mm 0;
             color: #000;
             font-weight: bold;
@@ -368,14 +359,9 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
         .barcode-image {
             max-width: 100%;
             height: auto;
-            max-height: 15mm;
-        }
-        
-        .waybill-number {
-            font-size: 11px;
-            font-weight: bold;
-            font-family: monospace;
-            margin-top: 1mm;
+            max-height: 25mm;
+            display: block;
+            margin: 0 auto;
         }
         
         .address-section {
@@ -385,7 +371,7 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
         }
         
         .section-title {
-            font-size: 9px;
+            font-size: 16px;
             font-weight: bold;
             text-transform: uppercase;
             margin-bottom: 1mm;
@@ -394,7 +380,7 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
         }
         
         .address-details {
-            font-size: 8px;
+            font-size: 16px;
             line-height: 1.3;
             color: #000;
             font-weight: bold;
@@ -419,14 +405,14 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
             margin: 2mm 0;
             padding: 1mm;
             border: 1px solid #000;
-            font-size: 8px;
+            font-size: 16px;
             color: #000;
             font-weight: bold;
         }
         
         .footer {
             text-align: center;
-            font-size: 7px;
+            font-size: 16px;
             margin-top: 2mm;
             padding-top: 1mm;
             border-top: 1px solid #000;
@@ -436,8 +422,8 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
         
         .text-center { text-align: center; color: #000; font-weight: bold; }
         .text-bold { font-weight: bold; color: #000; }
-        .text-small { font-size: 7px; color: #000; font-weight: bold; }
-        .text-large { font-size: 11px; color: #000; font-weight: bold; }
+        .text-small { font-size: 16px; color: #000; font-weight: bold; }
+        .text-large { font-size: 20px; color: #000; font-weight: bold; }
         
         @media print {
             body {
@@ -447,13 +433,13 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
             
             .label-page {
                 page-break-inside: avoid;
-                margin: 0;
+                margin: 2mm auto;
             }
             
             .label-container {
                 page-break-inside: avoid;
-                margin: 0;
-                padding: 2mm;
+                margin: 2mm;
+                padding: 0;
             }
         }
     </style>
@@ -473,7 +459,6 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
                     ${data.barcode ? `
                         <img src="${data.barcode}" alt="Barcode" class="barcode-image" />
                     ` : ''}
-                    <div class="waybill-number">${data.waybillNumber}</div>
                 </div>
                 
                 <!-- Recipient Address -->
@@ -506,12 +491,7 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
                 </div>
                 ` : ''}
                 
-                <!-- Package Value -->
-                ${data.packageValue ? `
-                <div class="reference-section">
-                    <div class="text-bold">Value: ₹${data.packageValue}</div>
-                </div>
-                ` : ''}
+
                 
                 <!-- Date -->
                 ${data.date ? `
