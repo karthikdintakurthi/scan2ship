@@ -17,7 +17,17 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "node scripts/seed-data.js",
     "setup-railway": "node scripts/setup-railway-db.js",
-    "railway": "node scripts/railway-db.js"
+    "railway": "node scripts/railway-db.js",
+    "db:migrate:staging": "node scripts/migrate-database.js migrate staging",
+    "db:migrate:production": "node scripts/migrate-database.js migrate production",
+    "db:backup:staging": "node scripts/migrate-database.js backup staging",
+    "db:backup:production": "node scripts/migrate-database.js backup production",
+    "db:validate:staging": "node scripts/migrate-database.js validate staging",
+    "db:validate:production": "node scripts/migrate-database.js validate production",
+    "db:status:staging": "node scripts/migrate-database.js status staging",
+    "db:status:production": "node scripts/migrate-database.js status production",
+    "test:migration-setup": "node scripts/test-migration-setup.js",
+    "setup:env": "./scripts/setup-env.sh"
   },
   "dependencies": {
     "@prisma/client": "^6.14.0",

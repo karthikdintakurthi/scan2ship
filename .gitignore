@@ -7,8 +7,29 @@ next/
 /.next/static/chunks
 /.next/**/*.js
 .next/static/chunks/app/layout.js
-.next/static/chunks/webpack.js
+.next/next/static/chunks/webpack.js
 .next
 /.next
 /.next/cache/webpack/client-development
 /.next/cache
+
+# Database backups (keep directory structure, exclude backup files)
+backups/*/*.sql
+backups/*/*.backup
+backups/*/backup_*.sql
+backups/*/migration_backup.sql
+
+# Environment files
+.env
+.env.staging
+.env.production
+.env.local
+.env.development
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp

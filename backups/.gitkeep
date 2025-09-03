@@ -1,0 +1,3 @@
+# This file ensures the backup directories are tracked in git
+# Backup files are generated during migrations and should not be committed
+# Add backup directories to .gitignore to exclude actual backup files
