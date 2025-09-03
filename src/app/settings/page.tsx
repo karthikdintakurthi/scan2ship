@@ -10,6 +10,7 @@ interface PickupLocation {
   name: string;
   value: string;
   delhiveryApiKey: string | null;
+  isActive: boolean;
 }
 
 interface CourierService {
@@ -77,13 +78,6 @@ interface ClientConfigData {
     // Reseller settings
     enableResellerFallback: boolean;
   };
-  dtdcSlips?: {
-    from: string;
-    to: string;
-    unused: string;
-    used: string;
-    enabled?: boolean;
-  };
   configs: ClientConfig[];
   configByCategory: Record<string, ClientConfig[]>;
 }
@@ -103,15 +97,6 @@ export default function ClientSettingsPage() {
   const [editValue, setEditValue] = useState('');
   const [editingPickupLocation, setEditingPickupLocation] = useState<string | null>(null);
   const [editingCourierService, setEditingCourierService] = useState<string | null>(null);
-
-  // DTDC Slips state
-  const [dtdcSlips, setDtdcSlips] = useState({
-    from: '',
-    to: '',
-    unused: '',
-    used: ''
-  });
-  const [dtdcSlipsEnabled, setDtdcSlipsEnabled] = useState(false);
 
   // New item states
   const [newPickupLocation, setNewPickupLocation] = useState({
@@ -149,7 +134,6 @@ export default function ClientSettingsPage() {
   useEffect(() => {
     if (currentUser && currentClient && currentUser.role !== 'admin') {
       fetchClientConfig();
-      loadDtdcSlipsFromDatabase();
     }
   }, [currentUser, currentClient]);
 
@@ -202,13 +186,7 @@ export default function ClientSettingsPage() {
             isActive: true
           },
           pickupLocations: pickupData.pickupLocations || [],
-          courierServices: (courierData.courierServices || []).map((service: any) => ({
-            id: service.id,
-            name: service.label, // API returns 'label', interface expects 'name'
-            code: service.value, // API returns 'value', interface expects 'code'
-            isActive: service.isActive,
-            isDefault: service.isDefault
-          })),
+          courierServices: courierData.courierServices || [],
           clientOrderConfig: data.orderConfig,
           configs: [],
           configByCategory: {}
@@ -225,241 +203,6 @@ export default function ClientSettingsPage() {
       setError('Error fetching client configuration');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Function to load DTDC slips from database
-  const loadDtdcSlipsFromDatabase = async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) return;
-
-      const response = await fetch('/api/dtdc-slips', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.dtdcSlips) {
-          setDtdcSlips(data.dtdcSlips);
-          setDtdcSlipsEnabled(data.dtdcSlips.enabled);
-          console.log('🔍 [DTDC_SLIPS] Loaded from database:', data.dtdcSlips);
-        }
-      } else {
-        console.error('❌ [DTDC_SLIPS] Failed to load from database:', response.status);
-      }
-    } catch (error) {
-      console.error('❌ [DTDC_SLIPS] Error loading from database:', error);
-    }
-  };
-
-  // Function to process DTDC slips range and calculate totals
-  const processDtdcSlipsRange = () => {
-    console.log('🚀 [PROCESS_DTDC_RANGE] Starting process for:', { 
-      from: dtdcSlips.from, 
-      to: dtdcSlips.to 
-    });
-    
-    if (!dtdcSlips.from || !dtdcSlips.to) {
-      console.log('🚀 [PROCESS_DTDC_RANGE] Missing from/to values');
-      setError('Please enter both From and To values');
-      return;
-    }
-
-    try {
-      // Check if strings contain letters (indicating alphanumeric)
-      const hasLetters = /[A-Za-z]/.test(dtdcSlips.from) || /[A-Za-z]/.test(dtdcSlips.to);
-      
-      if (hasLetters) {
-        // Handle alphanumeric ranges
-        const result = parseAlphanumericRange(dtdcSlips.from, dtdcSlips.to);
-        if (result.success && result.prefix && result.fromNum !== undefined && result.toNum !== undefined) {
-          const range = generateAlphanumericRange(result.prefix, result.fromNum, result.toNum);
-          setDtdcSlips(prev => ({ ...prev, unused: range.join(', ') }));
-          setSuccess(`Processed alphanumeric range: ${result.count} slips generated`);
-        } else {
-          setError('Failed to process alphanumeric range');
-        }
-      } else {
-        // Handle numeric ranges
-        const fromNum = parseInt(dtdcSlips.from);
-        const toNum = parseInt(dtdcSlips.to);
-        
-        if (!isNaN(fromNum) && !isNaN(toNum)) {
-          if (fromNum > toNum) {
-            setError('From value should be less than or equal to To value');
-            return;
-          }
-          
-          const range: string[] = [];
-          for (let i = fromNum; i <= toNum; i++) {
-            range.push(i.toString());
-          }
-          
-          setDtdcSlips(prev => ({ ...prev, unused: range.join(', ') }));
-          setSuccess(`Processed numeric range: ${range.length} slips generated`);
-        } else {
-          setError('Invalid numeric values');
-        }
-      }
-    } catch (error) {
-      console.error('🚀 [PROCESS_DTDC_RANGE] Error:', error);
-      setError('Error processing range');
-    }
-  };
-
-  // Function to parse alphanumeric ranges
-  const parseAlphanumericRange = (from: string, to: string) => {
-    console.log('🔍 [PARSE_ALPHANUMERIC] Starting parse for:', { from, to });
-    
-    // Use regex to find the pattern where letters/numbers are followed by digits
-    const fromMatch = from.match(/^([A-Za-z0-9]*?)(\d+)$/);
-    const toMatch = to.match(/^([A-Za-z0-9]*?)(\d+)$/);
-    
-    console.log('🔍 [PARSE_ALPHANUMERIC] Regex matches:', { 
-      fromMatch: fromMatch ? [fromMatch[1], fromMatch[2]] : null,
-      toMatch: toMatch ? [toMatch[1], toMatch[2]] : null 
-    });
-    
-    if (fromMatch && toMatch && fromMatch[1] === toMatch[1]) {
-      const prefix = fromMatch[1];
-      const fromNum = parseInt(fromMatch[2]);
-      const toNum = parseInt(toMatch[2]);
-      
-      console.log('🔍 [PARSE_ALPHANUMERIC] Parsed values:', { 
-        prefix, 
-        fromNum, 
-        toNum,
-        fromNumValid: !isNaN(fromNum),
-        toNumValid: !isNaN(toNum)
-      });
-      
-      if (!isNaN(fromNum) && !isNaN(toNum)) {
-        const count = Math.max(0, toNum - fromNum + 1);
-        console.log('🔍 [PARSE_ALPHANUMERIC] Success! Count:', count);
-        return {
-          success: true,
-          count: count,
-          prefix: prefix,
-          fromNum: fromNum,
-          toNum: toNum
-        };
-      }
-    }
-    
-    console.log('🔍 [PARSE_ALPHANUMERIC] Failed to parse');
-    return {
-      success: false,
-      error: 'Unable to parse alphanumeric range'
-    };
-  };
-
-  // Function to generate alphanumeric range
-  const generateAlphanumericRange = (prefix: string, fromNum: number, toNum: number): string[] => {
-    const range: string[] = [];
-    for (let i = fromNum; i <= toNum; i++) {
-      range.push(`${prefix}${i}`);
-    }
-    return range;
-  };
-
-  // Function to calculate total slips
-  const calculateTotalSlips = (): number => {
-    if (!dtdcSlips.from || !dtdcSlips.to) {
-      return 0;
-    }
-
-    try {
-      // Check if strings contain letters (indicating alphanumeric)
-      const hasLetters = /[A-Za-z]/.test(dtdcSlips.from) || /[A-Za-z]/.test(dtdcSlips.to);
-      
-      if (hasLetters) {
-        // Handle alphanumeric ranges
-        const result = parseAlphanumericRange(dtdcSlips.from, dtdcSlips.to);
-        return result.success ? result.count : 0;
-      } else {
-        // Handle numeric ranges
-        const fromNum = parseInt(dtdcSlips.from);
-        const toNum = parseInt(dtdcSlips.to);
-        
-        if (!isNaN(fromNum) && !isNaN(toNum)) {
-          return Math.max(0, toNum - fromNum + 1);
-        }
-      }
-    } catch (error) {
-      console.error('🧮 [CALCULATE_TOTAL_SLIPS] Error:', error);
-    }
-    
-    return 0;
-  };
-
-  // Function to handle reseller fallback checkbox change
-  const handleResellerFallbackChange = async (enabled: boolean) => {
-    if (!config?.clientOrderConfig) return;
-    
-    try {
-      setIsSaving(true);
-      setError('');
-      
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        setError('Authentication token not found');
-        return;
-      }
-
-      // Update the local state immediately for better UX
-      setConfig(prev => {
-        if (!prev?.clientOrderConfig) return prev;
-        return {
-          ...prev,
-          clientOrderConfig: {
-            ...prev.clientOrderConfig,
-            enableResellerFallback: enabled
-          }
-        };
-      });
-
-      // Save to database
-      const response = await fetch('/api/order-config', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          enableResellerFallback: enabled
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update reseller fallback setting');
-      }
-
-      setSuccess('Reseller fallback setting updated successfully!');
-      
-      // Refresh the config to ensure consistency
-      await fetchClientConfig();
-      
-    } catch (error) {
-      console.error('❌ [RESELLER_FALLBACK] Error updating setting:', error);
-      setError(error instanceof Error ? error.message : 'Failed to update reseller fallback setting');
-      
-      // Revert the local state change on error
-      setConfig(prev => {
-        if (!prev?.clientOrderConfig) return prev;
-        return {
-          ...prev,
-          clientOrderConfig: {
-            ...prev.clientOrderConfig,
-            enableResellerFallback: !enabled
-          }
-        };
-      });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -514,98 +257,35 @@ export default function ClientSettingsPage() {
       setSuccess('');
       
       const token = localStorage.getItem('authToken');
-      
-      // Save pickup locations
-      if (config.pickupLocations.length > 0) {
-        const pickupResponse = await fetch('/api/pickup-locations', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            locations: config.pickupLocations
-          })
-        });
-        if (!pickupResponse.ok) {
-          const errorData = await pickupResponse.json();
-          throw new Error(errorData.error || 'Failed to save pickup locations');
-        }
-      }
-
-      // Save courier services
-      if (config.courierServices.length > 0) {
-        const courierResponse = await fetch('/api/courier-services', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            services: config.courierServices
-          })
-        });
-        if (!courierResponse.ok) {
-          const errorData = await courierResponse.json();
-          throw new Error(errorData.error || 'Failed to save courier services');
-        }
-      }
-
-      // Save order configuration
-      if (config.clientOrderConfig) {
-        const orderConfigResponse = await fetch('/api/order-config', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            orderConfig: config.clientOrderConfig
-          })
-        });
-        if (!orderConfigResponse.ok) {
-          const errorData = await orderConfigResponse.json();
-          throw new Error(errorData.error || 'Failed to save order configuration');
-        }
-      }
-
-      // Save DTDC slips configuration
-      const dtdcResponse = await fetch('/api/dtdc-slips', {
+      const response = await fetch(`/api/admin/settings/clients/${currentClient?.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          dtdcSlips: {
-            ...dtdcSlips,
-            enabled: dtdcSlipsEnabled
-          }
+          configs: config.configs,
+          pickupLocations: config.pickupLocations,
+          courierServices: config.courierServices,
+          clientOrderConfig: config.clientOrderConfig
         })
       });
 
-      if (!dtdcResponse.ok) {
-        const errorData = await dtdcResponse.json();
-        throw new Error(errorData.error || 'Failed to save DTDC slips configuration');
+      if (response.ok) {
+        setSuccess('Settings saved successfully!');
+        setEditingConfig(null);
+        setEditValue('');
+        setEditingPickupLocation(null);
+        setEditingCourierService(null);
+        setNewPickupLocation({ name: '', value: '', delhiveryApiKey: '' });
+        setNewCourierService({ name: '', code: '', isActive: true });
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to save settings');
       }
-
-      setSuccess('Settings saved successfully!');
-      setEditingConfig(null);
-      setEditValue('');
-      setEditingPickupLocation(null);
-      setEditingCourierService(null);
-      setNewPickupLocation({ name: '', value: '', delhiveryApiKey: '' });
-      setNewCourierService({ name: '', code: '', isActive: true });
-      
-      // Refresh the configuration to show updated data
-      await fetchClientConfig();
-      
-      // Reload DTDC slips data from database to ensure consistency
-      await loadDtdcSlipsFromDatabase();
-      
     } catch (error) {
       console.error('Error saving config:', error);
-      setError(error instanceof Error ? error.message : 'Error saving settings');
+      setError('Error saving settings');
     } finally {
       setIsSaving(false);
     }
@@ -917,8 +597,12 @@ export default function ClientSettingsPage() {
                       )}
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                        Active
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        location.isActive 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {location.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </div>
                   </div>
@@ -1012,23 +696,15 @@ export default function ClientSettingsPage() {
                       <div>
                         <dt className="text-xs text-gray-500">Auto-fallback for Reseller</dt>
                         <dd className="text-sm text-gray-900">
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={config.clientOrderConfig.enableResellerFallback}
-                              onChange={(e) => handleResellerFallbackChange(e.target.checked)}
-                              disabled={isSaving}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
-                            />
-                            <span className="ml-2 text-sm text-gray-700">
-                              {config.clientOrderConfig.enableResellerFallback ? 'Enabled' : 'Disabled'}
+                          {config.clientOrderConfig.enableResellerFallback ? (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                              Enabled
                             </span>
-                            {isSaving && (
-                              <span className="ml-2 text-xs text-gray-500">
-                                Saving...
-                              </span>
-                            )}
-                          </label>
+                          ) : (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                              Disabled
+                            </span>
+                          )}
                         </dd>
                         <dd className="text-xs text-gray-500 mt-1">
                           When enabled, empty reseller fields automatically use company name/phone
@@ -1037,120 +713,6 @@ export default function ClientSettingsPage() {
                     </dl>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* DTDC Slips */}
-        <div className="bg-white shadow rounded-lg mb-8 mt-8">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-medium text-gray-900">DTDC Slips</h2>
-                <p className="text-sm text-gray-600 mt-1">Manage your DTDC courier slip inventory and tracking</p>
-              </div>
-              <div className="flex items-center space-x-3">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={dtdcSlipsEnabled}
-                    onChange={(e) => setDtdcSlipsEnabled(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Enable</span>
-                </label>
-              </div>
-            </div>
-          </div>
-          
-          {dtdcSlipsEnabled && (
-            <div className="px-6 py-4">
-              {/* Summary Section */}
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="text-sm font-medium text-blue-900 mb-2">Current Status</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-blue-700">Range:</span>
-                    <span className="ml-2 text-blue-900">
-                      {dtdcSlips.from && dtdcSlips.to ? `${dtdcSlips.from} - ${dtdcSlips.to}` : 'Not set'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-blue-700">Total Slips:</span>
-                    <span className="ml-2 text-blue-900">
-                      {dtdcSlips.from && dtdcSlips.to ? calculateTotalSlips() : '0'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="dtdc-from" className="block text-sm font-medium text-gray-700 mb-2">
-                    From <span className="text-gray-500">(Starting slip number)</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="dtdc-from"
-                    value={dtdcSlips.from}
-                    onChange={(e) => setDtdcSlips(prev => ({ ...prev, from: e.target.value }))}
-                    placeholder="e.g., DTDC001, 1001, A001"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="dtdc-to" className="block text-sm font-medium text-gray-700 mb-2">
-                    To <span className="text-gray-500">(Ending slip number)</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="dtdc-to"
-                    value={dtdcSlips.to}
-                    onChange={(e) => setDtdcSlips(prev => ({ ...prev, to: e.target.value }))}
-                    placeholder="e.g., DTDC002, 1002, A002"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-              
-              <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="dtdc-unused" className="block text-sm font-medium text-gray-700 mb-2">
-                    Unused Slips <span className="text-gray-500">(Comma-separated)</span>
-                  </label>
-                  <textarea
-                    id="dtdc-unused"
-                    value={dtdcSlips.unused}
-                    onChange={(e) => setDtdcSlips(prev => ({ ...prev, unused: e.target.value }))}
-                    placeholder="List all available/unused DTDC slip numbers (comma-separated)"
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="dtdc-used" className="block text-sm font-medium text-gray-700 mb-2">
-                    Used Slips <span className="text-gray-500">(Comma-separated)</span>
-                  </label>
-                  <textarea
-                    id="dtdc-used"
-                    value={dtdcSlips.used}
-                    onChange={(e) => setDtdcSlips(prev => ({ ...prev, used: e.target.value }))}
-                    placeholder="List all used/consumed DTDC slip numbers (comma-separated)"
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-              
-              {/* Process Button */}
-              <div className="mt-6 flex justify-center">
-                <button
-                  onClick={processDtdcSlipsRange}
-                  className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                >
-                  Process Range
-                </button>
               </div>
             </div>
           )}

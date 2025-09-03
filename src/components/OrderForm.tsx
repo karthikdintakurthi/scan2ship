@@ -98,10 +98,6 @@ export default function OrderForm() {
         setOrderConfig(formConfig);
         setClientOrderConfig(clientConfig);
         
-        // Load saved courier service from localStorage if available
-        const savedCourierService = localStorage.getItem('scan2ship_courier_service');
-        console.log('🔍 [ORDER_FORM] Saved courier service from localStorage:', savedCourierService);
-        
         if (clientConfig) {
           // Log the initial package value for debugging
           console.log('🔍 [INITIAL_CONFIG] Client config defaultPackageValue:', clientConfig.defaultPackageValue);
@@ -110,8 +106,7 @@ export default function OrderForm() {
           // Update form data with client-specific defaults
           setFormData(prev => ({
             ...prev,
-            // Priority: Saved selection > User selection > Default from config
-            courier_service: savedCourierService || prev.courier_service || (formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : 'Delhivery'),
+            courier_service: formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : 'Delhivery',
             package_value: clientConfig.defaultPackageValue.toString(),
             weight: clientConfig.defaultWeight.toString(),
             total_items: clientConfig.defaultTotalItems.toString(),
@@ -162,8 +157,8 @@ export default function OrderForm() {
               pickup_location: selectedPickupLocation,
               // Priority: Client settings first, then pickup location as fallback
               package_value: clientConfig.defaultPackageValue.toString(),
-              // Preserve user's courier service selection - don't override it
-              courier_service: prev.courier_service,
+              // Update with latest client configuration
+              courier_service: formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : prev.courier_service,
               weight: clientConfig.defaultWeight.toString(),
               total_items: clientConfig.defaultTotalItems.toString(),
               is_cod: clientConfig.codEnabledByDefault,
@@ -181,17 +176,6 @@ export default function OrderForm() {
       updatePickupLocationData();
     }
   }, [selectedPickupLocation, isLoaded, configLoaded]);
-
-  // Auto-fill DTDC tracking number when component loads and DTDC is pre-selected
-  useEffect(() => {
-    if (configLoaded && formData.courier_service.toLowerCase() === 'dtdc' && !formData.tracking_number.trim()) {
-      console.log('🔍 [ORDER_FORM] DTDC pre-selected on load, auto-filling tracking number...');
-      // Use setTimeout to ensure this runs after the component is fully rendered
-      setTimeout(() => {
-        autoFillDtdcTrackingNumber();
-      }, 100);
-    }
-  }, [configLoaded, formData.courier_service]);
 
   // Auto-refresh configuration every 5 minutes to ensure data is current
   useEffect(() => {
@@ -217,8 +201,7 @@ export default function OrderForm() {
                 // Update form data with latest client configuration
                 setFormData(prev => ({
                   ...prev,
-                  // Preserve user's courier service selection - don't override it
-                  courier_service: prev.courier_service,
+                  courier_service: formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : prev.courier_service,
                   package_value: clientConfig.defaultPackageValue.toString(),
                   weight: clientConfig.defaultWeight.toString(),
                   total_items: clientConfig.defaultTotalItems.toString(),
@@ -284,140 +267,13 @@ export default function OrderForm() {
     const { getCourierServiceByValue } = await import('@/lib/courier-service-config')
     const serviceConfig = await getCourierServiceByValue(courierService)
     
-    // Check if courier service actually changed
-    const courierServiceChanged = formData.courier_service !== courierService
-    
-    // Save courier service selection to localStorage for persistence
-    localStorage.setItem('scan2ship_courier_service', courierService);
-    console.log('💾 [ORDER_FORM] Saved courier service to localStorage:', courierService);
-    
     setFormData(prev => ({
       ...prev,
       courier_service: courierService,
-      // Only clear tracking number if courier service actually changed
-      tracking_number: courierServiceChanged ? '' : prev.tracking_number,
       // Auto-populate default values if they're empty or if user wants to update
       weight: prev.weight || (serviceConfig?.defaultWeight?.toString() || prev.weight),
       package_value: prev.package_value || (serviceConfig?.defaultPackageValue?.toString() || prev.package_value)
     }))
-
-    // Auto-fill tracking number if DTDC is selected and tracking number is empty
-    if (courierService.toLowerCase() === 'dtdc' && courierServiceChanged) {
-      await autoFillDtdcTrackingNumber()
-    }
-  }
-
-  // Function to auto-fill DTDC tracking number from available slips
-  const autoFillDtdcTrackingNumber = async () => {
-    try {
-      console.log('🔍 [DTDC_AUTO_FILL] Starting auto-fill process...');
-      
-      const token = localStorage.getItem('authToken')
-      if (!token) {
-        console.log('❌ [DTDC_AUTO_FILL] No auth token found');
-        return
-      }
-
-      console.log('🔍 [DTDC_AUTO_FILL] Fetching DTDC slips from API...');
-      const response = await fetch('/api/dtdc-slips', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      console.log('🔍 [DTDC_AUTO_FILL] API response status:', response.status);
-      
-      if (response.ok) {
-        const data = await response.json()
-        console.log('🔍 [DTDC_AUTO_FILL] API response data:', data);
-        
-        if (data.success && data.dtdcSlips && data.dtdcSlips.unused) {
-          // Get the first available unused tracking number
-          const unusedNumbers = data.dtdcSlips.unused.split(',').map((num: string) => num.trim()).filter(Boolean)
-          console.log('🔍 [DTDC_AUTO_FILL] Unused numbers found:', unusedNumbers);
-          
-          if (unusedNumbers.length > 0) {
-            const firstAvailable = unusedNumbers[0]
-            console.log('🔍 [DTDC_AUTO_FILL] Setting tracking number to:', firstAvailable);
-            
-            setFormData(prev => ({
-              ...prev,
-              tracking_number: firstAvailable
-            }))
-            console.log('✅ [DTDC_AUTO_FILL] Auto-filled tracking number:', firstAvailable)
-          } else {
-            console.log('⚠️ [DTDC_AUTO_FILL] No unused tracking numbers available');
-          }
-        } else {
-          console.log('⚠️ [DTDC_AUTO_FILL] Invalid or empty DTDC slips data:', data);
-        }
-      } else {
-        console.log('❌ [DTDC_AUTO_FILL] API request failed with status:', response.status);
-      }
-    } catch (error) {
-      console.error('❌ [DTDC_AUTO_FILL] Error auto-filling DTDC tracking number:', error)
-    }
-  }
-
-  // Function to move used DTDC tracking number from unused to used section
-  const moveDtdcTrackingNumberToUsed = async (trackingNumber: string) => {
-    try {
-      const token = localStorage.getItem('authToken')
-      if (!token) return
-
-      // First, get current DTDC slips configuration
-      const getResponse = await fetch('/api/dtdc-slips', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!getResponse.ok) {
-        console.error('❌ [DTDC_MOVE] Failed to fetch current DTDC slips configuration')
-        return
-      }
-
-      const currentData = await getResponse.json()
-      if (!currentData.success || !currentData.dtdcSlips) {
-        console.error('❌ [DTDC_MOVE] Invalid DTDC slips data')
-        return
-      }
-
-      const { unused, used } = currentData.dtdcSlips
-      
-      // Remove the tracking number from unused section
-      const unusedNumbers = unused.split(',').map((num: string) => num.trim()).filter(num => num !== trackingNumber)
-      const newUnused = unusedNumbers.join(', ')
-      
-      // Add the tracking number to used section
-      const usedNumbers = used.split(',').map((num: string) => num.trim()).filter(Boolean)
-      usedNumbers.push(trackingNumber)
-      const newUsed = usedNumbers.join(', ')
-
-      // Update the DTDC slips configuration
-      const updateResponse = await fetch('/api/dtdc-slips', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          dtdcSlips: {
-            ...currentData.dtdcSlips,
-            unused: newUnused,
-            used: newUsed
-          }
-        })
-      })
-
-      if (updateResponse.ok) {
-        console.log('✅ [DTDC_MOVE] Successfully moved tracking number to used section:', trackingNumber)
-      } else {
-        console.error('❌ [DTDC_MOVE] Failed to update DTDC slips configuration')
-      }
-    } catch (error) {
-      console.error('❌ [DTDC_MOVE] Error moving DTDC tracking number to used section:', error)
-    }
   }
 
   const processAddress = async () => {
@@ -813,11 +669,6 @@ export default function OrderForm() {
         // Refresh credit balance immediately after successful order creation
         refreshCredits();
         
-        // Move used DTDC tracking number from unused to used section if applicable
-        if (formData.courier_service.toLowerCase() === 'dtdc' && formData.tracking_number.trim()) {
-          await moveDtdcTrackingNumberToUsed(formData.tracking_number)
-        }
-        
         // Scroll to top of the page for better UX when entering next order
         window.scrollTo({ top: 0, behavior: 'smooth' })
         
@@ -840,24 +691,6 @@ export default function OrderForm() {
           // Keep Order Details fields unchanged (courier_service, package_value, weight, total_items, is_cod, cod_amount, product_description)
           // Keep pickup_location unchanged
         }))
-        
-        // Trigger DTDC auto-fill after successful order creation
-        if (formData.courier_service.toLowerCase() === 'dtdc') {
-          console.log('🔄 [ORDER_FORM] Triggering DTDC auto-fill after successful order creation...');
-          console.log('🔄 [ORDER_FORM] Current courier service:', formData.courier_service);
-          console.log('🔄 [ORDER_FORM] Current tracking number:', formData.tracking_number);
-          
-          // Use setTimeout to ensure the form reset is complete before triggering the auto-fill
-          setTimeout(async () => {
-            console.log('🔄 [ORDER_FORM] Executing DTDC auto-fill after timeout...');
-            try {
-              await autoFillDtdcTrackingNumber();
-              console.log('✅ [ORDER_FORM] DTDC auto-fill completed successfully');
-            } catch (error) {
-              console.error('❌ [ORDER_FORM] Error during DTDC auto-fill:', error);
-            }
-          }, 100);
-        }
         
         // Clear address processing fields
         setAddressDetail('')
@@ -910,24 +743,6 @@ export default function OrderForm() {
     setSuccess('')
     setCurrentStep('idle')
     setOrderNumber(null)
-    
-    // Trigger DTDC auto-fill after manual form reset
-    if (formData.courier_service.toLowerCase() === 'dtdc') {
-      console.log('🔄 [ORDER_FORM] Triggering DTDC auto-fill after manual form reset...');
-      console.log('🔄 [ORDER_FORM] Current courier service:', formData.courier_service);
-      console.log('🔄 [ORDER_FORM] Current tracking number:', formData.tracking_number);
-      
-      // Use setTimeout to ensure the form reset is complete before triggering the auto-fill
-      setTimeout(async () => {
-        console.log('🔄 [ORDER_FORM] Executing DTDC auto-fill after timeout...');
-        try {
-          await autoFillDtdcTrackingNumber();
-          console.log('✅ [ORDER_FORM] DTDC auto-fill completed successfully');
-        } catch (error) {
-          console.error('❌ [ORDER_FORM] Error during DTDC auto-fill:', error);
-        }
-      }, 100);
-    }
   }
 
   if (!isLoaded) {
@@ -1006,21 +821,6 @@ export default function OrderForm() {
                               placeholder={formData.courier_service.toLowerCase() === 'delhivery' ? "Enter tracking number (optional)" : "Enter tracking number (required)"}
                               required={formData.courier_service.toLowerCase() !== 'delhivery'}
             />
-            {/* DTDC Auto-fill indicator */}
-            {formData.courier_service.toLowerCase() === 'dtdc' && formData.tracking_number && (
-              <div className="mt-1 flex items-center">
-                <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                  🔄 Auto-filled from DTDC slips
-                </span>
-                <button
-                  type="button"
-                  onClick={autoFillDtdcTrackingNumber}
-                  className="ml-2 text-xs text-blue-600 hover:text-blue-800 underline"
-                >
-                  Get next available
-                </button>
-              </div>
-            )}
           </div>
 
           <div>
