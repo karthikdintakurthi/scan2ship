@@ -13,7 +13,14 @@ async function getAuthenticatedUser(request: NextRequest) {
   const token = authHeader.substring(7);
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    if (!process.env.JWT_SECRET) {
+      console.error('🚨 CRITICAL SECURITY ERROR: JWT_SECRET environment variable is not set');
+      return NextResponse.json(
+        { error: 'Authentication service unavailable' },
+        { status: 500 }
+      );
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
     
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },

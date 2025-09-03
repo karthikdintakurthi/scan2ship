@@ -86,6 +86,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Security Headers */}
+        <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
+        <meta httpEquiv="X-Frame-Options" content="DENY" />
+        <meta httpEquiv="X-XSS-Protection" content="1; mode=block" />
+        <meta httpEquiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+        <meta httpEquiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
         {/* Static PWA Meta Tags - will be updated by DynamicPWAHead */}
         <link rel="icon" href="/images/scan2ship.png" />
         <link rel="apple-touch-icon" href="/images/scan2ship.png" />

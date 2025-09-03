@@ -115,8 +115,8 @@ export default function RechargeModal({ isOpen, onClose, onSuccess }: RechargeMo
 
       // Construct UPI payment link using URLSearchParams for proper encoding
       const params = new URLSearchParams({
-        pa: 'scan2ship@ybl',                  // Payee VPA (UPI ID) - hardcoded
-        pn: 'Scan2Ship',                      // Payee name - hardcoded
+        pa: process.env.NEXT_PUBLIC_UPI_VPA || 'scan2ship@ybl',  // Payee VPA (UPI ID)
+        pn: process.env.NEXT_PUBLIC_UPI_NAME || 'Scan2Ship',     // Payee name
         am: String(amount),                   // Amount
         cu: "INR",                            // Currency
         tn: updatedDetails.transactionNote    // Transaction note
@@ -127,8 +127,8 @@ export default function RechargeModal({ isOpen, onClose, onSuccess }: RechargeMo
       // Log the generated UPI link for debugging
       console.log('🔗 Generated UPI Link:', upiLink);
       console.log('💰 Amount:', amount);
-      console.log('👤 Payee VPA: scan2ship@ybl (hardcoded)');
-      console.log('🏢 Payee Name: Scan2Ship (hardcoded)');
+      console.log('👤 Payee VPA:', process.env.NEXT_PUBLIC_UPI_VPA || 'scan2ship@ybl');
+      console.log('🏢 Payee Name:', process.env.NEXT_PUBLIC_UPI_NAME || 'Scan2Ship');
       console.log('📝 Transaction Note:', updatedDetails.transactionNote);
       console.log('🔍 Payment Details State:', updatedDetails);
 

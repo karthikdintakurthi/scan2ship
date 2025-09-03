@@ -21,7 +21,7 @@ function validateJwtSecret(): string {
   
   // Check for common weak secrets
   const weakSecrets = [
-    'fallback-secret',
+    // No fallback secret - environment variable must be set
     'your-secret-here',
     'change-me',
     'secret',

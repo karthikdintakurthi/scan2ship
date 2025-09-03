@@ -5,7 +5,10 @@ import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware'
 import crypto from 'crypto';
 
 // Encryption key for sensitive data (in production, use a proper key management system)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'vanitha-logistics-encryption-key-2024';
+if (!process.env.ENCRYPTION_KEY) {
+  throw new Error('ENCRYPTION_KEY environment variable is required for secure operation');
+}
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 // Helper function to encrypt sensitive data
 function encrypt(text: string): string {

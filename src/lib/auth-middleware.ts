@@ -139,10 +139,13 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
     // Get user permissions based on role
     const permissions = ROLE_PERMISSIONS[user.role as UserRole] || [];
     
-    console.log(`🔍 [AUTH] User role from DB: ${user.role}`);
-    console.log(`🔍 [AUTH] Cast role to enum: ${user.role as UserRole}`);
-    console.log(`🔍 [AUTH] Available roles: ${Object.values(UserRole).join(', ')}`);
-    console.log(`🔍 [AUTH] User permissions: ${permissions.join(', ')}`);
+    // Debug logging only in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔍 [AUTH] User role from DB: ${user.role}`);
+      console.log(`🔍 [AUTH] Cast role to enum: ${user.role as UserRole}`);
+      console.log(`🔍 [AUTH] Available roles: ${Object.values(UserRole).join(', ')}`);
+      console.log(`🔍 [AUTH] User permissions: ${permissions.join(', ')}`);
+    }
 
     return {
       id: user.id,
@@ -174,9 +177,12 @@ export function hasRequiredRole(user: AuthenticatedUser, requiredRole: UserRole)
   const userRoleLevel = roleHierarchy[user.role];
   const requiredRoleLevel = roleHierarchy[requiredRole];
 
-  console.log(`🔒 [ROLE_CHECK] User role: ${user.role}, level: ${userRoleLevel}`);
-  console.log(`🔒 [ROLE_CHECK] Required role: ${requiredRole}, level: ${requiredRoleLevel}`);
-  console.log(`🔒 [ROLE_CHECK] Comparison: ${userRoleLevel} >= ${requiredRoleLevel} = ${userRoleLevel >= requiredRoleLevel}`);
+  // Debug logging only in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`🔒 [ROLE_CHECK] User role: ${user.role}, level: ${userRoleLevel}`);
+    console.log(`🔒 [ROLE_CHECK] Required role: ${requiredRole}, level: ${requiredRoleLevel}`);
+    console.log(`🔒 [ROLE_CHECK] Comparison: ${userRoleLevel} >= ${requiredRoleLevel} = ${userRoleLevel >= requiredRoleLevel}`);
+  }
 
   return userRoleLevel >= requiredRoleLevel;
 }
@@ -187,9 +193,12 @@ export function hasRequiredRole(user: AuthenticatedUser, requiredRole: UserRole)
 export function hasRequiredPermissions(user: AuthenticatedUser, requiredPermissions: PermissionLevel[]): boolean {
   const hasAllPermissions = requiredPermissions.every(permission => user.permissions.includes(permission));
   
-  console.log(`🔒 [PERMISSION_CHECK] User permissions: ${user.permissions.join(', ')}`);
-  console.log(`🔒 [PERMISSION_CHECK] Required permissions: ${requiredPermissions.join(', ')}`);
-  console.log(`🔒 [PERMISSION_CHECK] Has all permissions: ${hasAllPermissions}`);
+  // Debug logging only in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`🔒 [PERMISSION_CHECK] User permissions: ${user.permissions.join(', ')}`);
+    console.log(`🔒 [PERMISSION_CHECK] Required permissions: ${requiredPermissions.join(', ')}`);
+    console.log(`🔒 [PERMISSION_CHECK] Has all permissions: ${hasAllPermissions}`);
+  }
   
   return hasAllPermissions;
 }
@@ -259,8 +268,11 @@ export async function authorizeUser(
 
   // Check if user has required role
   if (!hasRequiredRole(user, requiredRole)) {
-    console.log(`🔒 [AUTHORIZATION] Role check failed: user.role=${user.role}, requiredRole=${requiredRole}`);
-    console.log(`🔒 [AUTHORIZATION] User permissions: ${user.permissions.join(', ')}`);
+    // Debug logging only in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔒 [AUTHORIZATION] Role check failed: user.role=${user.role}, requiredRole=${requiredRole}`);
+      console.log(`🔒 [AUTHORIZATION] User permissions: ${user.permissions.join(', ')}`);
+    }
     return {
       user: null,
       response: NextResponse.json(
