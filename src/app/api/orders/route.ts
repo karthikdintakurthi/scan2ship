@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { DelhiveryService } from '@/lib/delhivery';
 import whatsappService, { initializeWhatsAppService } from '@/lib/whatsapp-service';
-import { generateReferenceNumber, formatReferenceNumber } from '@/lib/reference-number';
+import { generateReferenceNumber, formatReferenceNumber, generateReferenceNumberWithPrefix, formatReferenceNumberWithPrefix } from '@/lib/reference-number';
 import AnalyticsService from '@/lib/analytics-service';
 import { CreditService } from '@/lib/credit-service';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
@@ -65,14 +65,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate or format reference number
+    // Get client order configuration for reference number prefix
+    const clientOrderConfig = await prisma.client_order_configs.findUnique({
+      where: { clientId: client.id }
+    });
+
+    // Generate or format reference number with prefix configuration
     let referenceNumber: string;
     if (orderData.reference_number && orderData.reference_number.trim()) {
-      // Use custom reference value with mobile number
-      referenceNumber = formatReferenceNumber(orderData.reference_number.trim(), orderData.mobile);
+      // Use custom reference value with mobile number and prefix configuration
+      referenceNumber = formatReferenceNumberWithPrefix(
+        orderData.reference_number.trim(), 
+        orderData.mobile,
+        clientOrderConfig?.enableReferencePrefix ?? true,
+        clientOrderConfig?.referencePrefix ?? 'REF'
+      );
     } else {
-      // Auto-generate reference number
-      referenceNumber = generateReferenceNumber(orderData.mobile);
+      // Auto-generate reference number with prefix configuration
+      referenceNumber = generateReferenceNumberWithPrefix(
+        orderData.mobile,
+        clientOrderConfig?.enableReferencePrefix ?? true,
+        clientOrderConfig?.referencePrefix ?? 'REF'
+      );
     }
 
     // Convert string values to appropriate data types and map fields

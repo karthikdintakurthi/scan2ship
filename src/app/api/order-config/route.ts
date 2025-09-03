@@ -76,7 +76,11 @@ export async function GET(request: NextRequest) {
           enableResellerFallback: true,
           
           // Thermal print settings
-          enableThermalPrint: false
+          enableThermalPrint: false,
+          
+          // Reference prefix settings
+          enableReferencePrefix: true,
+
         }
       });
     }
@@ -119,7 +123,11 @@ export async function GET(request: NextRequest) {
         enableResellerFallback: orderConfig.enableResellerFallback,
         
         // Thermal print settings
-        enableThermalPrint: orderConfig.enableThermalPrint
+        enableThermalPrint: orderConfig.enableThermalPrint,
+        
+        // Reference prefix settings
+        enableReferencePrefix: orderConfig.enableReferencePrefix,
+
       },
       clientId: user.clientId,
       clientName: user.client.companyName || user.client.id
@@ -154,29 +162,50 @@ export async function PUT(request: NextRequest) {
     
     console.log(`📝 [API_ORDER_CONFIG_PUT] Updating order config for client: ${client.companyName}`, body);
 
-    // Check if this is a partial update (just reseller fallback or thermal print) or full update
+    // Check if this is a partial update (just specific settings) or full update
     if ((body.hasOwnProperty('enableResellerFallback') && Object.keys(body).length === 1) ||
-        (body.hasOwnProperty('enableThermalPrint') && Object.keys(body).length === 1)) {
-      // Partial update - just update the specific setting
-      const updateData: any = {};
-      
-      if (body.hasOwnProperty('enableResellerFallback')) {
-        updateData.enableResellerFallback = body.enableResellerFallback;
-        console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reseller fallback: ${body.enableResellerFallback}`);
-      }
-      
-      if (body.hasOwnProperty('enableThermalPrint')) {
-        updateData.enableThermalPrint = body.enableThermalPrint;
-        console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - thermal print: ${body.enableThermalPrint}`);
-      }
+        (body.hasOwnProperty('enableThermalPrint') && Object.keys(body).length === 1) ||
+        (body.hasOwnProperty('enableReferencePrefix') && Object.keys(body).length === 1)) {
+              // Partial update - just update the specific setting
+        const updateData: any = {};
+        
+        if (body.hasOwnProperty('enableResellerFallback')) {
+          updateData.enableResellerFallback = body.enableResellerFallback;
+          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reseller fallback: ${body.enableResellerFallback}`);
+        }
+        
+        if (body.hasOwnProperty('enableThermalPrint')) {
+          updateData.enableThermalPrint = body.enableThermalPrint;
+          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - thermal print: ${body.enableThermalPrint}`);
+        }
+        
+        if (body.hasOwnProperty('enableReferencePrefix')) {
+          updateData.enableReferencePrefix = body.enableReferencePrefix;
+          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reference prefix: ${body.enableReferencePrefix}`);
+        }
+        
+
       
       const updatedConfig = await prisma.client_order_configs.update({
         where: { clientId: client.id },
         data: updateData
       });
 
-      const settingName = body.hasOwnProperty('enableResellerFallback') ? 'reseller fallback' : 'thermal print';
-      const settingValue = body.hasOwnProperty('enableResellerFallback') ? body.enableResellerFallback : body.enableThermalPrint;
+      let settingName = 'unknown';
+      let settingValue = 'unknown';
+      
+      if (body.hasOwnProperty('enableResellerFallback')) {
+        settingName = 'reseller fallback';
+        settingValue = body.enableResellerFallback;
+      } else if (body.hasOwnProperty('enableThermalPrint')) {
+        settingName = 'thermal print';
+        settingValue = body.enableThermalPrint;
+      } else if (body.hasOwnProperty('enableReferencePrefix')) {
+        settingName = 'reference prefix';
+        settingValue = body.enableReferencePrefix;
+
+      }
+      
       console.log(`✅ [API_ORDER_CONFIG_PUT] ${settingName} updated for client ${client.companyName}: ${settingValue}`);
 
       return NextResponse.json({
@@ -216,7 +245,9 @@ export async function PUT(request: NextRequest) {
         requireWeight: orderConfig.requireWeight,
         requireTotalItems: orderConfig.requireTotalItems,
         enableResellerFallback: orderConfig.enableResellerFallback,
-        enableThermalPrint: orderConfig.enableThermalPrint
+        enableThermalPrint: orderConfig.enableThermalPrint,
+        enableReferencePrefix: orderConfig.enableReferencePrefix,
+
       },
       create: {
         id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -238,7 +269,9 @@ export async function PUT(request: NextRequest) {
         requireWeight: orderConfig.requireWeight,
         requireTotalItems: orderConfig.requireTotalItems,
         enableResellerFallback: orderConfig.enableResellerFallback,
-        enableThermalPrint: orderConfig.enableThermalPrint
+        enableThermalPrint: orderConfig.enableThermalPrint,
+        enableReferencePrefix: orderConfig.enableReferencePrefix,
+
       }
     });
 

@@ -79,6 +79,9 @@ interface ClientConfigData {
     
     // Thermal print settings
     enableThermalPrint: boolean;
+    
+    // Reference number prefix settings
+    enableReferencePrefix: boolean;
   };
   dtdcSlips?: {
     from: string;
@@ -533,6 +536,76 @@ export default function ClientSettingsPage() {
       setIsSaving(false);
     }
   };
+
+  // Function to handle reference prefix checkbox change
+  const handleReferencePrefixChange = async (enabled: boolean) => {
+    if (!config?.clientOrderConfig) return;
+    
+    try {
+      setIsSaving(true);
+      setError('');
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
+
+      // Update the local state immediately for better UX
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableReferencePrefix: enabled
+          }
+        };
+      });
+
+      // Save to database
+      const response = await fetch('/api/order-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          enableReferencePrefix: enabled
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update reference prefix setting');
+      }
+
+      setSuccess('Reference prefix setting updated successfully!');
+      
+      // Refresh the config to ensure consistency
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error('❌ [REFERENCE_PREFIX] Error updating setting:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update reference prefix setting');
+      
+      // Revert the local state change on error
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableReferencePrefix: !enabled
+          }
+        };
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+
 
   // Function to fetch order configuration for a specific client
   const fetchOrderConfigForClient = async (clientId: string) => {
@@ -1130,6 +1203,32 @@ export default function ClientSettingsPage() {
                           When enabled, only thermal print options will be shown in order list
                         </dd>
                       </div>
+                      <div>
+                        <dt className="text-xs text-gray-500">Reference Number Prefix</dt>
+                        <dd className="text-sm text-gray-900">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={config.clientOrderConfig.enableReferencePrefix}
+                              onChange={(e) => handleReferencePrefixChange(e.target.checked)}
+                              disabled={isSaving}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                              {config.clientOrderConfig.enableReferencePrefix ? 'Enabled' : 'Disabled'}
+                            </span>
+                            {isSaving && (
+                              <span className="ml-2 text-xs text-gray-500">
+                                Saving...
+                              </span>
+                            )}
+                          </label>
+                        </dd>
+                        <dd className="text-xs text-gray-500 mt-1">
+                          When enabled, auto-generated reference numbers use alphanumeric + mobile format. When disabled, auto-generated uses only mobile number, but custom values still use custom + mobile format.
+                        </dd>
+                      </div>
+
                     </dl>
                   </div>
                 </div>
