@@ -184,6 +184,7 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             <div class="payment-status">Payment: ${order.is_cod ? 'COD' : 'Pre-paid'}${order.is_cod && order.cod_amount ? ` (₹${order.cod_amount})` : ''}</div>
         </div>
         
+        ${order.courier_service.toLowerCase() !== 'india_post' ? `
         <div class="waybill-section">
             <div class="waybill-label">Tracking Number:</div>
             ${barcodeDataURL ? `
@@ -192,6 +193,7 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             </div>
             ` : ''}
         </div>
+        ` : ''}
         
         <div class="recipient-section">
             <div class="recipient-title">Recipient Details:</div>
@@ -276,8 +278,11 @@ export async function GET(
       trackingNumber = order.delhivery_waybill_number
     }
 
-    // Generate barcode for tracking number
-    const barcodeDataURL = await generateBarcode(trackingNumber)
+    // TEMPORARY: Don't generate barcode for India Post orders
+    let barcodeDataURL = '';
+    if (order.courier_service.toLowerCase() !== 'india_post') {
+      barcodeDataURL = await generateBarcode(trackingNumber);
+    }
     
     // Generate universal waybill HTML
     const htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service)

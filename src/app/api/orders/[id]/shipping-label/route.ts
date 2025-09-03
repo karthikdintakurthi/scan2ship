@@ -188,7 +188,7 @@ export async function GET(
 
     // Get Delhivery API configuration from pickup location
     const { getDelhiveryApiKey } = await import('@/lib/pickup-location-config');
-    const apiKey = await getDelhiveryApiKey(order.pickup_location);
+    const apiKey = await getDelhiveryApiKey(order.pickup_location, order.clientId);
     const baseUrl = process.env.DELHIVERY_BASE_URL || 'https://track.delhivery.com'
 
     if (!apiKey) {
