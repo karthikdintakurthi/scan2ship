@@ -96,7 +96,16 @@ export default function OrderList() {
   const hasNextPage = currentPage < (totalPages || 1)
   const hasPrevPage = currentPage > 1
 
+  // Helper functions to get human-readable labels
+  const getCourierServiceLabel = (value: string) => {
+    const service = courierServices.find(s => s.value === value);
+    return service ? service.label : value;
+  };
 
+  const getPickupLocationLabel = (value: string) => {
+    const location = pickupLocations.find(l => l.value === value);
+    return location ? location.label : value;
+  };
 
   // Load dynamic configuration
   useEffect(() => {
@@ -1214,8 +1223,8 @@ export default function OrderList() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm">
-                        <div className="font-medium text-gray-900">{order.courier_service}</div>
-                        <div className="text-gray-500">{order.pickup_location}</div>
+                        <div className="font-medium text-gray-900">{getCourierServiceLabel(order.courier_service)}</div>
+                        <div className="text-gray-500">{getPickupLocationLabel(order.pickup_location)}</div>
                         {order.is_cod && (
                           <div className="text-orange-600 font-medium">COD: {formatCurrency(order.cod_amount || 0)}</div>
                         )}
@@ -1225,7 +1234,7 @@ export default function OrderList() {
                       <div className="space-y-2">
                         <div>
                           <label className="block text-sm font-medium text-gray-700">
-                            {order.courier_service}
+                            {getCourierServiceLabel(order.courier_service)}
                           </label>
                           <p className="text-sm text-gray-900">
                             {order.courier_service.toLowerCase() === 'delhivery' 
