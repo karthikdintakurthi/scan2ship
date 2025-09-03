@@ -12,3 +12,4 @@ next/
 /.next
 /.next/cache/webpack/client-development
 /.next/cache
+.env.qa
