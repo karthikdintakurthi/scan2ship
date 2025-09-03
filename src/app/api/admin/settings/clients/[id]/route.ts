@@ -229,7 +229,10 @@ export async function GET(
           requireTotalItems: client.client_order_configs.requireTotalItems,
           
           // Reseller settings
-          enableResellerFallback: client.client_order_configs.enableResellerFallback
+          enableResellerFallback: client.client_order_configs.enableResellerFallback,
+          
+          // Order ID settings
+          enableOrderIdPrefix: client.client_order_configs.enableOrderIdPrefix
         } : null,
 
         orderConfig: {

@@ -88,7 +88,10 @@ export async function GET(request: NextRequest) {
           requireTotalItems: true,
           
           // Reseller settings
-          enableResellerFallback: true
+          enableResellerFallback: true,
+          
+          // Order ID settings
+          enableOrderIdPrefix: true
         }
       });
     }
@@ -155,9 +158,32 @@ export async function PUT(request: NextRequest) {
     const { user, client } = auth;
     const body = await request.json();
     
-    console.log(`📝 [API_ORDER_CONFIG_PUT] Updating order config for client: ${client.companyName}`, body);
+    console.log(`🔍 [API_ORDER_CONFIG_PUT] ===== START ====`);
+    console.log(`📝 [API_ORDER_CONFIG_PUT] Updating order config for client: ${client.companyName}`);
+    console.log(`🔍 [API_ORDER_CONFIG_PUT] Full request body:`, JSON.stringify(body, null, 2));
+    console.log(`🔍 [API_ORDER_CONFIG_PUT] Body keys:`, Object.keys(body));
+    console.log(`🔍 [API_ORDER_CONFIG_PUT] Body type:`, typeof body);
+    
+    if (body.orderConfig) {
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] OrderConfig object found`);
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] OrderConfig keys:`, Object.keys(body.orderConfig));
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] OrderConfig type:`, typeof body.orderConfig);
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] enableOrderIdPrefix value:`, body.orderConfig.enableOrderIdPrefix);
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] enableOrderIdPrefix type:`, typeof body.orderConfig.enableOrderIdPrefix);
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] enableResellerFallback value:`, body.orderConfig.enableResellerFallback);
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] enableResellerFallback type:`, typeof body.orderConfig.enableResellerFallback);
+    }
+    
+    if (body.hasOwnProperty('enableOrderIdPrefix')) {
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] Direct enableOrderIdPrefix found:`, body.enableOrderIdPrefix);
+    }
+    
+    if (body.hasOwnProperty('enableResellerFallback')) {
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] Direct enableResellerFallback found:`, body.enableResellerFallback);
+    }
+    console.log(`🔍 [API_ORDER_CONFIG_PUT] ===== END ====`);
 
-    // Check if this is a partial update (just reseller fallback) or full update
+    // Check if this is a partial update (just reseller fallback or order ID prefix) or full update
     if (body.hasOwnProperty('enableResellerFallback') && Object.keys(body).length === 1) {
       // Partial update - just update the reseller fallback setting
       console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reseller fallback: ${body.enableResellerFallback}`);
@@ -178,10 +204,80 @@ export async function PUT(request: NextRequest) {
       });
     }
 
+    if (body.hasOwnProperty('enableOrderIdPrefix') && Object.keys(body).length === 1) {
+      // Partial update - just update the order ID prefix setting
+      console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - order ID prefix: ${body.enableOrderIdPrefix}`);
+      
+      const updatedConfig = await prisma.client_order_configs.update({
+        where: { clientId: client.id },
+        data: {
+          enableOrderIdPrefix: body.enableOrderIdPrefix
+        }
+      });
+
+      console.log(`✅ [API_ORDER_CONFIG_PUT] Order ID prefix updated for client ${client.companyName}: ${body.enableOrderIdPrefix}`);
+
+      return NextResponse.json({
+        success: true,
+        message: 'Order ID prefix setting updated successfully',
+        orderConfig: updatedConfig
+      });
+    }
+
+    // Check if this is a partial update inside orderConfig object
+    if (body.orderConfig && Object.keys(body.orderConfig).length === 1) {
+      const orderConfig = body.orderConfig;
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] Partial update via orderConfig detected`);
+      console.log(`🔍 [API_ORDER_CONFIG_PUT] OrderConfig has exactly 1 key:`, Object.keys(orderConfig));
+      
+      if (orderConfig.hasOwnProperty('enableResellerFallback')) {
+        // Partial update - just update the reseller fallback setting
+        console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update via orderConfig - reseller fallback: ${orderConfig.enableResellerFallback}`);
+        
+        const updatedConfig = await prisma.client_order_configs.update({
+          where: { clientId: client.id },
+          data: {
+            enableResellerFallback: orderConfig.enableResellerFallback
+          }
+        });
+
+        console.log(`✅ [API_ORDER_CONFIG_PUT] Reseller fallback updated for client ${client.companyName}: ${orderConfig.enableResellerFallback}`);
+
+        return NextResponse.json({
+          success: true,
+          message: 'Reseller fallback setting updated successfully',
+          orderConfig: updatedConfig
+        });
+      }
+
+      if (orderConfig.hasOwnProperty('enableOrderIdPrefix')) {
+        // Partial update - just update the order ID prefix setting
+        console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update via orderConfig - order ID prefix: ${orderConfig.enableOrderIdPrefix}`);
+        console.log(`🔍 [API_ORDER_CONFIG_PUT] About to update database with enableOrderIdPrefix: ${orderConfig.enableOrderIdPrefix}`);
+        
+        const updatedConfig = await prisma.client_order_configs.update({
+          where: { clientId: client.id },
+          data: {
+            enableOrderIdPrefix: orderConfig.enableOrderIdPrefix
+          }
+        });
+
+        console.log(`✅ [API_ORDER_CONFIG_PUT] Order ID prefix updated for client ${client.companyName}: ${orderConfig.enableOrderIdPrefix}`);
+        console.log(`🔍 [API_ORDER_CONFIG_PUT] Updated config:`, updatedConfig);
+
+        return NextResponse.json({
+          success: true,
+          message: 'Order ID prefix setting updated successfully',
+          orderConfig: updatedConfig
+        });
+      }
+    }
+
     // Full update - handle the complete orderConfig object
     const { orderConfig } = body;
 
     if (!orderConfig) {
+      console.log(`❌ [API_ORDER_CONFIG_PUT] No orderConfig found in body`);
       return NextResponse.json({ error: 'Order config is required' }, { status: 400 });
     }
 
@@ -207,7 +303,8 @@ export async function PUT(request: NextRequest) {
         requirePackageValue: orderConfig.requirePackageValue,
         requireWeight: orderConfig.requireWeight,
         requireTotalItems: orderConfig.requireTotalItems,
-        enableResellerFallback: orderConfig.enableResellerFallback
+        enableResellerFallback: orderConfig.enableResellerFallback,
+        enableOrderIdPrefix: orderConfig.enableOrderIdPrefix
       },
       create: {
         id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -228,7 +325,8 @@ export async function PUT(request: NextRequest) {
         requirePackageValue: orderConfig.requirePackageValue,
         requireWeight: orderConfig.requireWeight,
         requireTotalItems: orderConfig.requireTotalItems,
-        enableResellerFallback: orderConfig.enableResellerFallback
+        enableResellerFallback: orderConfig.enableResellerFallback,
+        enableOrderIdPrefix: orderConfig.enableOrderIdPrefix
       }
     });
 
@@ -242,6 +340,7 @@ export async function PUT(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ [API_ORDER_CONFIG_PUT] Error updating order config:', error);
+    console.error('❌ [API_ORDER_CONFIG_PUT] Error stack:', error.stack);
     return NextResponse.json(
       { error: 'Failed to update order configuration' },
       { status: 500 }

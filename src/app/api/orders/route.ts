@@ -90,14 +90,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate or format reference number
+    // Get client order configuration to check prefix setting
+    let clientOrderConfig = await prisma.client_order_configs.findUnique({
+      where: { clientId: client.id }
+    });
+    
+    // If no config exists, create default one
+    if (!clientOrderConfig) {
+      clientOrderConfig = await prisma.client_order_configs.create({
+        data: {
+          id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          clientId: client.id,
+          // Default values
+          defaultProductDescription: 'ARTIFICAL JEWELLERY',
+          defaultPackageValue: 5000,
+          defaultWeight: 100,
+          defaultTotalItems: 1,
+          // COD settings
+          codEnabledByDefault: false,
+          defaultCodAmount: null,
+          // Validation rules
+          minPackageValue: 100,
+          maxPackageValue: 100000,
+          minWeight: 1,
+          maxWeight: 50000,
+          minTotalItems: 1,
+          maxTotalItems: 100,
+          // Field requirements
+          requireProductDescription: true,
+          requirePackageValue: true,
+          requireWeight: true,
+          requireTotalItems: true,
+          // Reseller settings
+          enableResellerFallback: true,
+          // Order ID settings
+          enableOrderIdPrefix: true // Default to true for backward compatibility
+        }
+      });
+    }
+    
+    // Generate or format reference number based on client configuration
     let referenceNumber: string;
+    const enablePrefix = clientOrderConfig.enableOrderIdPrefix;
+    
     if (orderData.reference_number && orderData.reference_number.trim()) {
-      // Use custom reference value with mobile number
-      referenceNumber = formatReferenceNumber(orderData.reference_number.trim(), orderData.mobile);
+      // Use custom reference value with or without mobile number based on setting
+      referenceNumber = formatReferenceNumber(orderData.reference_number.trim(), orderData.mobile, enablePrefix);
     } else {
-      // Auto-generate reference number
-      referenceNumber = generateReferenceNumber(orderData.mobile);
+      // Auto-generate reference number with or without mobile number based on setting
+      referenceNumber = generateReferenceNumber(orderData.mobile, enablePrefix);
     }
 
     // Convert string values to appropriate data types and map fields

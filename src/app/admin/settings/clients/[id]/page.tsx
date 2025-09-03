@@ -81,6 +81,12 @@ interface ClientConfigData {
     requirePackageValue: boolean;
     requireWeight: boolean;
     requireTotalItems: boolean;
+    
+    // Reseller settings
+    enableResellerFallback?: boolean;
+    
+    // Order ID settings
+    enableOrderIdPrefix?: boolean;
   };
 
   orderConfig: {
@@ -269,26 +275,53 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
 
       const token = localStorage.getItem('authToken');
       
-      const response = await fetch(`/api/admin/settings/clients/${clientId}`, {
+      // Comprehensive debugging
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] ===== START ====');
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] Full config object:', config);
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] Client order config:', config.clientOrderConfig);
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] enableOrderIdPrefix value:', config.clientOrderConfig?.enableOrderIdPrefix);
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] enableOrderIdPrefix type:', typeof config.clientOrderConfig?.enableOrderIdPrefix);
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] All clientOrderConfig keys:', Object.keys(config.clientOrderConfig || {}));
+      
+      const payload = {
+        orderConfig: config.clientOrderConfig
+      };
+      
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] Payload being sent:', payload);
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] Payload keys:', Object.keys(payload));
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] orderConfig keys:', Object.keys(payload.orderConfig || {}));
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] ===== END ====');
+      
+      const response = await fetch(`/api/order-config`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          clientOrderConfig: config.clientOrderConfig
-        })
+        body: JSON.stringify(payload)
       });
 
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] Response status:', response.status);
+      console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (response.ok) {
+        const responseData = await response.json();
+        console.log('🔍 [CLIENT_SAVE_ORDER_CONFIG] Response data:', responseData);
         setOrderConfigSuccess('Order configuration updated successfully!');
         setTimeout(() => setOrderConfigSuccess(''), 3000);
         fetchClientConfig(); // Refresh data
       } else {
-        const data = await response.json();
-        setOrderConfigError(data.error || 'Failed to update order configuration');
+        const errorText = await response.text();
+        console.error('❌ [CLIENT_SAVE_ORDER_CONFIG] Error response:', errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          setOrderConfigError(errorData.error || 'Failed to update order configuration');
+        } catch {
+          setOrderConfigError(`HTTP ${response.status}: ${errorText}`);
+        }
       }
     } catch (error) {
+      console.error('❌ [CLIENT_SAVE_ORDER_CONFIG] Exception:', error);
       setOrderConfigError('Error updating order configuration');
     } finally {
       setSavingOrderConfig(false);
@@ -1661,6 +1694,71 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                         Require Total Items
                       </label>
                     </div>
+                  </div>
+                </div>
+
+                {/* Order ID Settings */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h3 className="font-medium text-gray-900 mb-3">Order ID Settings</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="enableOrderIdPrefix"
+                        checked={config.clientOrderConfig?.enableOrderIdPrefix !== false} // Default to true
+                        onChange={(e) => setConfig({
+                          ...config,
+                          clientOrderConfig: {
+                            ...config.clientOrderConfig,
+                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
+                            defaultPackageValue: config.clientOrderConfig?.defaultPackageValue || 0,
+                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
+                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
+                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
+                            defaultCodAmount: config.clientOrderConfig?.defaultCodAmount,
+                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
+                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
+                            minWeight: config.clientOrderConfig?.minWeight || 0,
+                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
+                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
+                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
+                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
+                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
+                            requireWeight: config.clientOrderConfig?.requireWeight || false,
+                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false,
+                            enableResellerFallback: config.clientOrderConfig?.enableResellerFallback || false,
+                            enableOrderIdPrefix: e.target.checked
+                          }
+                        })}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="enableOrderIdPrefix" className="ml-2 block text-sm text-gray-900">
+                        Enable Order ID Prefix (Add mobile number to reference number)
+                      </label>
+                    </div>
+                    <div className="text-xs text-gray-600 ml-6">
+                      When enabled: Reference numbers will be in format "ABC123-9876543210"<br />
+                      When disabled: Reference numbers will be just the mobile number "9876543210"
+                    </div>
+                    
+                    {/* Save Button */}
+                    <div className="flex justify-end pt-4">
+                      <button
+                        onClick={handleSaveOrderConfig}
+                        disabled={savingOrderConfig}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {savingOrderConfig ? 'Saving...' : 'Save Order Configuration'}
+                      </button>
+                    </div>
+                    
+                    {/* Success/Error Messages */}
+                    {orderConfigSuccess && (
+                      <div className="text-green-600 text-sm mt-2">{orderConfigSuccess}</div>
+                    )}
+                    {orderConfigError && (
+                      <div className="text-red-600 text-sm mt-2">{orderConfigError}</div>
+                    )}
                   </div>
                 </div>
               </div>

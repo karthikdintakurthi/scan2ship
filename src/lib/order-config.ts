@@ -25,6 +25,9 @@ export interface OrderConfig {
   
   // Reseller settings
   enableResellerFallback: boolean;
+  
+  // Order ID settings
+  enableOrderIdPrefix: boolean;
 }
 
 // Default fallback configuration
@@ -54,7 +57,10 @@ const defaultOrderConfig: OrderConfig = {
   requireTotalItems: true,
   
   // Reseller settings
-  enableResellerFallback: true
+  enableResellerFallback: true,
+  
+  // Order ID settings
+  enableOrderIdPrefix: true
 };
 
 // Cache for order configuration
