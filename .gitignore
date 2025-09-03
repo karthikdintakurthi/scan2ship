@@ -73,3 +73,7 @@ node_modules/
 
 # TernJS port file
 .tern-port
+/.next
+/.next/cache/webpack/client-development
+/.next/cache
+.env.qa

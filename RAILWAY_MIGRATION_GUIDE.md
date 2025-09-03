@@ -114,7 +114,7 @@ npm run db:reset
 npm run db:studio
 ```
 
-## Cost Considerations
+## Cost Considerations Test
 
 - Railway offers a free tier with limited usage
 - Monitor your usage in Railway dashboard

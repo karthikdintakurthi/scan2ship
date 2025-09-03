@@ -13,7 +13,7 @@ The Vanitha Logistics API provides comprehensive endpoints for managing logistic
 All API endpoints require authentication using JWT tokens. Include the token in the Authorization header:
 
 ```
-Authorization: Bearer <your-jwt-token>
+Authorization: Bearer <your-jwt-token> Test
 ```
 
 ### Getting a Token

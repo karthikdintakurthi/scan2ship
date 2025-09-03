@@ -48,11 +48,13 @@ export async function GET(request: NextRequest) {
         console.log(`🔑 [PICKUP_LOCATIONS] Raw API key for ${location.label}: ${apiKey.substring(0, 8)}...`);
       }
 
-      return {
-        value: location.value,
-        label: location.label,
-        delhiveryApiKey: apiKey,
-        // Add default configuration for other required fields
+              return {
+          id: location.id,
+          value: location.value,
+          label: location.label,
+          delhiveryApiKey: apiKey,
+          // Note: isActive field doesn't exist in pickup_locations table
+          // Add default configuration for other required fields
         productDetails: {
           description: 'ARTIFICAL JEWELLERY',
           commodity_value: 5000,
@@ -101,5 +103,102 @@ export async function GET(request: NextRequest) {
     );
     securityHeaders(response);
     return response;
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    // Authenticate user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { name, value, delhiveryApiKey } = body;
+
+    if (!name || !value) {
+      return NextResponse.json({ error: 'Name and value are required' }, { status: 400 });
+    }
+
+    console.log(`📝 [API_PICKUP_LOCATIONS_POST] Creating pickup location for client: ${user.clients.companyName}`);
+
+    // Create new pickup location
+    const newLocation = await prisma.pickup_locations.create({
+      data: {
+        label: name,
+        value: value,
+        delhiveryApiKey: delhiveryApiKey || null,
+        clientId: user.clients.id
+      }
+    });
+
+    console.log(`✅ [API_PICKUP_LOCATIONS_POST] Created pickup location: ${newLocation.label}`);
+
+    return NextResponse.json({
+      success: true,
+      location: {
+        id: newLocation.id,
+        value: newLocation.value,
+        label: newLocation.label,
+        delhiveryApiKey: newLocation.delhiveryApiKey
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [API_PICKUP_LOCATIONS_POST] Error creating pickup location:', error);
+    return NextResponse.json(
+      { error: 'Failed to create pickup location' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    // Authenticate user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { locations } = body;
+
+    if (!Array.isArray(locations)) {
+      return NextResponse.json({ error: 'Locations array is required' }, { status: 400 });
+    }
+
+    console.log(`📝 [API_PICKUP_LOCATIONS_PUT] Updating pickup locations for client: ${user.clients.companyName}`);
+
+    // Update pickup locations
+    const updatePromises = locations.map(async (location: any) => {
+      if (location.id) {
+        return prisma.pickup_locations.update({
+          where: { id: location.id },
+          data: {
+            label: location.label,
+            value: location.value,
+            delhiveryApiKey: location.delhiveryApiKey || null
+          }
+        });
+      }
+    });
+
+    await Promise.all(updatePromises.filter(Boolean));
+
+    console.log(`✅ [API_PICKUP_LOCATIONS_PUT] Updated ${locations.length} pickup locations`);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Pickup locations updated successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ [API_PICKUP_LOCATIONS_PUT] Error updating pickup locations:', error);
+    return NextResponse.json(
+      { error: 'Failed to update pickup locations' },
+      { status: 500 }
+    );
   }
 }
