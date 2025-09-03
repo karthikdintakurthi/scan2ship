@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import jwt from 'jsonwebtoken'
+import { generateThermalLabelHTML, createThermalLabelData } from '@/lib/thermal-label-generator'
 
 const prisma = new PrismaClient()
 
@@ -154,6 +156,7 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             <div class="payment-status">Payment: ${order.is_cod ? 'COD' : 'Pre-paid'}${order.is_cod && order.cod_amount ? ` (₹${order.cod_amount})` : ''}</div>
         </div>
         
+        ${order.courier_service.toLowerCase() !== 'india_post' ? `
         <div class="waybill-section">
             <div class="waybill-label">Tracking Number:</div>
             ${barcodeDataURL ? `
@@ -162,6 +165,7 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             </div>
             ` : ''}
         </div>
+        ` : ''}
         
         <div class="recipient-section">
             <div class="recipient-title">Recipient Details:</div>
@@ -242,6 +246,10 @@ export async function GET(
     const { id } = await params
     const orderId = parseInt(id)
     
+    // Check for thermal printer format query parameter
+    const url = new URL(request.url)
+    const isThermal = url.searchParams.get('thermal') === 'true'
+    
     // Get order details with client information
     const order = await prisma.orders.findUnique({
       where: { id: orderId },
@@ -267,19 +275,39 @@ export async function GET(
       trackingNumber = order.delhivery_waybill_number
     }
 
-    // Generate barcode for tracking number
-    const barcodeDataURL = await generateBarcode(trackingNumber)
+    // TEMPORARY: Don't generate barcode for India Post orders
+    let barcodeDataURL = '';
+    if (order.courier_service.toLowerCase() !== 'india_post') {
+      barcodeDataURL = await generateBarcode(trackingNumber);
+    }
     
-    // Generate universal waybill HTML
-    const htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service)
-    
-    console.log('✅ Universal waybill generated for order:', orderId, 'Courier:', order.courier_service)
+    let htmlContent: string
+    let filename: string
+
+    if (isThermal) {
+      // Generate thermal printer label
+      const packageInfo = {
+        wbn: trackingNumber,
+        barcode: barcodeDataURL,
+        pt: 'Pre-paid',
+        oid: order.reference_number
+      }
+      const thermalData = createThermalLabelData(order, packageInfo)
+      htmlContent = generateThermalLabelHTML(thermalData)
+      filename = `thermal-waybill-${trackingNumber}.html`
+      console.log('✅ Thermal waybill generated for order:', orderId, 'Courier:', order.courier_service)
+    } else {
+      // Generate universal waybill HTML
+      htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service)
+      filename = `waybill-${trackingNumber}.html`
+      console.log('✅ Universal waybill generated for order:', orderId, 'Courier:', order.courier_service)
+    }
 
     return new NextResponse(htmlContent, {
       status: 200,
       headers: {
         'Content-Type': 'text/html',
-        'Content-Disposition': `attachment; filename="waybill-${trackingNumber}.html"`
+        'Content-Disposition': `attachment; filename="${filename}"`
       }
     })
 

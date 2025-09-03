@@ -1,7 +1,13 @@
+// COMMENTED OUT: This Delhivery-specific shipping label endpoint is no longer used
+// All courier services now use the universal waybill endpoint at /api/orders/[id]/waybill
+// This file is kept for reference but the functionality has been moved to the universal waybill endpoint
+
+/*
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { generateThermalLabelHTML, createThermalLabelData } from '@/lib/thermal-label-generator'
 
 const prisma = new PrismaClient()
 
@@ -195,6 +201,10 @@ export async function GET(
     const { id } = await params
     const orderId = parseInt(id)
     
+    // Check for thermal printer format query parameter
+    const url = new URL(request.url)
+    const isThermal = url.searchParams.get('thermal') === 'true'
+    
     // Get order details
     const order = await prisma.orders.findUnique({
       where: { id: orderId }
@@ -215,7 +225,7 @@ export async function GET(
 
     // Get Delhivery API configuration from pickup location
     const { getDelhiveryApiKey } = await import('@/lib/pickup-location-config');
-    const apiKey = await getDelhiveryApiKey(order.pickup_location);
+    const apiKey = await getDelhiveryApiKey(order.pickup_location, order.clientId);
     const baseUrl = process.env.DELHIVERY_BASE_URL || 'https://track.delhivery.com'
 
     if (!apiKey) {
@@ -283,15 +293,27 @@ export async function GET(
       const packageInfo = jsonResponse.packages[0]
       console.log('📋 Package info:', packageInfo)
 
-      // Generate custom HTML packing slip
-      const htmlContent = generateCustomPackingSlipHTML(packageInfo, order)
-      console.log('✅ Custom HTML packing slip generated')
+      let htmlContent: string
+      let filename: string
+
+      if (isThermal) {
+        // Generate thermal printer label
+        const thermalData = createThermalLabelData(order, packageInfo)
+        htmlContent = generateThermalLabelHTML(thermalData)
+        filename = `thermal-label-${order.delhivery_waybill_number}.html`
+        console.log('✅ Thermal printer label generated')
+      } else {
+        // Generate standard packing slip
+        htmlContent = generateCustomPackingSlipHTML(packageInfo, order)
+        filename = `packing-slip-${order.delhivery_waybill_number}.html`
+        console.log('✅ Custom HTML packing slip generated')
+      }
 
       return new NextResponse(htmlContent, {
         status: 200,
         headers: {
           'Content-Type': 'text/html',
-          'Content-Disposition': `attachment; filename="packing-slip-${order.delhivery_waybill_number}.html"`
+          'Content-Disposition': `attachment; filename="${filename}"`
         }
       })
 
@@ -311,3 +333,4 @@ export async function GET(
     }, { status: 500 })
   }
 }
+*/

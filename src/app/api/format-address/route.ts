@@ -167,6 +167,8 @@ Examples of special character cleanup:
     })
 
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ OpenAI API Error Response:', errorText)
       throw new Error(`OpenAI API error: ${response.status}`)
     }
 

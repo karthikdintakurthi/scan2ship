@@ -61,7 +61,7 @@ export default function OrderForm() {
     reference_number: '',
     reseller_name: '',
     reseller_mobile: '',
-    courier_service: 'Delhivery', // Default, will be updated when config loads
+            courier_service: 'delhivery', // Default, will be updated when config loads
     package_value: '5000',
     weight: '100',
     total_items: '1',
@@ -111,7 +111,7 @@ export default function OrderForm() {
           setFormData(prev => ({
             ...prev,
             // Priority: Saved selection > User selection > Default from config
-            courier_service: savedCourierService || prev.courier_service || (formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : 'Delhivery'),
+            courier_service: savedCourierService || prev.courier_service || (formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : 'delhivery'),
             package_value: clientConfig.defaultPackageValue.toString(),
             weight: clientConfig.defaultWeight.toString(),
             total_items: clientConfig.defaultTotalItems.toString(),
@@ -654,11 +654,8 @@ export default function OrderForm() {
       return
     }
 
-    // Validate tracking number based on courier service
-    if (formData.courier_service.toLowerCase() !== 'delhivery' && !formData.tracking_number.trim()) {
-      setError('Tracking number is mandatory for non-Delhivery courier services')
-      return
-    }
+    // Tracking number is now optional for all courier services
+    // No validation needed here
 
     // Validate courier service restrictions
     console.log('🔍 [ORDER_FORM] Validating courier service:', formData.courier_service)
@@ -992,10 +989,8 @@ export default function OrderForm() {
 
           <div>
             <label htmlFor="tracking_number" className="block text-sm font-medium text-blue-800 mb-2">
-                              Tracking Number {formData.courier_service.toLowerCase() !== 'delhivery' && <span className="text-red-500">*</span>}
-                              <span className="text-xs text-blue-600 ml-2">
-                  {formData.courier_service.toLowerCase() === 'delhivery' ? '(Optional)' : '(Required)'}
-                </span>
+              Tracking Number
+              <span className="text-xs text-blue-600 ml-2">(Optional)</span>
             </label>
             <input
               type="text"
@@ -1003,8 +998,8 @@ export default function OrderForm() {
               value={formData.tracking_number}
               onChange={(e) => handleInputChange('tracking_number', e.target.value)}
               className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                              placeholder={formData.courier_service.toLowerCase() === 'delhivery' ? "Enter tracking number (optional)" : "Enter tracking number (required)"}
-                              required={formData.courier_service.toLowerCase() !== 'delhivery'}
+                              placeholder="Enter tracking number (optional)"
+                              required={false}
             />
             {/* DTDC Auto-fill indicator */}
             {formData.courier_service.toLowerCase() === 'dtdc' && formData.tracking_number && (

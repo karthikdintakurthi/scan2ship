@@ -73,7 +73,10 @@ export async function GET(request: NextRequest) {
           requireTotalItems: true,
           
           // Reseller settings
-          enableResellerFallback: true
+          enableResellerFallback: true,
+          
+          // Thermal print settings
+          enableThermalPrint: false
         }
       });
     }
@@ -113,7 +116,10 @@ export async function GET(request: NextRequest) {
         requireTotalItems: orderConfig.requireTotalItems,
         
         // Reseller settings
-        enableResellerFallback: orderConfig.enableResellerFallback
+        enableResellerFallback: orderConfig.enableResellerFallback,
+        
+        // Thermal print settings
+        enableThermalPrint: orderConfig.enableThermalPrint
       },
       clientId: user.clientId,
       clientName: user.client.companyName || user.client.id
@@ -148,23 +154,34 @@ export async function PUT(request: NextRequest) {
     
     console.log(`📝 [API_ORDER_CONFIG_PUT] Updating order config for client: ${client.companyName}`, body);
 
-    // Check if this is a partial update (just reseller fallback) or full update
-    if (body.hasOwnProperty('enableResellerFallback') && Object.keys(body).length === 1) {
-      // Partial update - just update the reseller fallback setting
-      console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reseller fallback: ${body.enableResellerFallback}`);
+    // Check if this is a partial update (just reseller fallback or thermal print) or full update
+    if ((body.hasOwnProperty('enableResellerFallback') && Object.keys(body).length === 1) ||
+        (body.hasOwnProperty('enableThermalPrint') && Object.keys(body).length === 1)) {
+      // Partial update - just update the specific setting
+      const updateData: any = {};
+      
+      if (body.hasOwnProperty('enableResellerFallback')) {
+        updateData.enableResellerFallback = body.enableResellerFallback;
+        console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reseller fallback: ${body.enableResellerFallback}`);
+      }
+      
+      if (body.hasOwnProperty('enableThermalPrint')) {
+        updateData.enableThermalPrint = body.enableThermalPrint;
+        console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - thermal print: ${body.enableThermalPrint}`);
+      }
       
       const updatedConfig = await prisma.client_order_configs.update({
         where: { clientId: client.id },
-        data: {
-          enableResellerFallback: body.enableResellerFallback
-        }
+        data: updateData
       });
 
-      console.log(`✅ [API_ORDER_CONFIG_PUT] Reseller fallback updated for client ${client.companyName}: ${body.enableResellerFallback}`);
+      const settingName = body.hasOwnProperty('enableResellerFallback') ? 'reseller fallback' : 'thermal print';
+      const settingValue = body.hasOwnProperty('enableResellerFallback') ? body.enableResellerFallback : body.enableThermalPrint;
+      console.log(`✅ [API_ORDER_CONFIG_PUT] ${settingName} updated for client ${client.companyName}: ${settingValue}`);
 
       return NextResponse.json({
         success: true,
-        message: 'Reseller fallback setting updated successfully',
+        message: `${settingName} setting updated successfully`,
         orderConfig: updatedConfig
       });
     }
@@ -198,7 +215,8 @@ export async function PUT(request: NextRequest) {
         requirePackageValue: orderConfig.requirePackageValue,
         requireWeight: orderConfig.requireWeight,
         requireTotalItems: orderConfig.requireTotalItems,
-        enableResellerFallback: orderConfig.enableResellerFallback
+        enableResellerFallback: orderConfig.enableResellerFallback,
+        enableThermalPrint: orderConfig.enableThermalPrint
       },
       create: {
         id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -219,7 +237,8 @@ export async function PUT(request: NextRequest) {
         requirePackageValue: orderConfig.requirePackageValue,
         requireWeight: orderConfig.requireWeight,
         requireTotalItems: orderConfig.requireTotalItems,
-        enableResellerFallback: orderConfig.enableResellerFallback
+        enableResellerFallback: orderConfig.enableResellerFallback,
+        enableThermalPrint: orderConfig.enableThermalPrint
       }
     });
 

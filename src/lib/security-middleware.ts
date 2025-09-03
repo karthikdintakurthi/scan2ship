@@ -84,7 +84,8 @@ function getClientIdentifier(request: NextRequest): string {
 export const corsConfig = {
   origin: process.env.ALLOWED_ORIGINS?.split(',') || [
     'http://localhost:3000',
-    'http://localhost:3001'
+    'http://localhost:3001',
+    'https://qa.scan2ship.in'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
@@ -170,10 +171,12 @@ export class InputValidator {
       return { valid: false, error: 'This field is required' };
     }
     
-    // Skip validation if not required and value is empty
+    // Skip validation if not required and value is empty, but still sanitize
     if (!required && (value === undefined || value === null || value === '')) {
       return { valid: true, value: '' };
     }
+    
+    // Always validate and sanitize non-empty values, even if not required
     
     // Ensure it's a string
     if (typeof value !== 'string') {
@@ -252,6 +255,17 @@ export class FileUploadValidator {
     type: string;
     size: number;
   }): { valid: boolean; error?: string } {
+    // Check file extension for additional security
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx'];
+    
+    if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
+      return {
+        valid: false,
+        error: `File extension '${fileExtension}' is not allowed`
+      };
+    }
+    
     // Check file type
     if (!fileUploadConfig.allowedTypes.includes(file.type)) {
       return {
