@@ -155,7 +155,22 @@ export async function OPTIONS(request: NextRequest) {
   // Handle preflight request for CORS
   const response = new NextResponse(null, { status: 200 });
   
-  response.headers.set('Access-Control-Allow-Origin', '*');
+  // Use the same CORS configuration as the main middleware
+  const origin = request.headers.get('origin');
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://qa.scan2ship.in'
+  ];
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    response.headers.set('Access-Control-Allow-Origin', origin);
+  } else if (!origin && process.env.NODE_ENV === 'development') {
+    response.headers.set('Access-Control-Allow-Origin', '*');
+  } else {
+    response.headers.set('Access-Control-Allow-Origin', 'https://qa.scan2ship.in');
+  }
+  
   response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   response.headers.set('Access-Control-Max-Age', '86400');

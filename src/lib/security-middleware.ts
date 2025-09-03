@@ -84,7 +84,8 @@ function getClientIdentifier(request: NextRequest): string {
 export const corsConfig = {
   origin: process.env.ALLOWED_ORIGINS?.split(',') || [
     'http://localhost:3000',
-    'http://localhost:3001'
+    'http://localhost:3001',
+    'https://qa.scan2ship.in'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
@@ -112,9 +113,12 @@ export function cors(request: NextRequest): NextResponse | null {
     // For preflight, allow the requesting origin if it's valid
     if (origin && corsConfig.origin.includes(origin)) {
       response.headers.set('Access-Control-Allow-Origin', origin);
-    } else if (!origin) {
-      // Allow requests without origin header (e.g., local development, Postman)
+    } else if (!origin && process.env.NODE_ENV === 'development') {
+      // Allow requests without origin header only in development
       response.headers.set('Access-Control-Allow-Origin', '*');
+    } else if (!origin && process.env.NODE_ENV === 'production') {
+      // In production, default to QA environment for requests without origin
+      response.headers.set('Access-Control-Allow-Origin', 'https://qa.scan2ship.in');
     } else {
       // Block requests from unauthorized origins
       return NextResponse.json(
