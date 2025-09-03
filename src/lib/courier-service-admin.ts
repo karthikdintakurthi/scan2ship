@@ -118,7 +118,7 @@ export const courierServiceModifications = {
   // Disable all courier services except Delhivery
   enableOnlyDelhivery(): void {
     runtimeConfigs.forEach(service => {
-      service.isActive = service.value === 'Delhivery'
+      service.isActive = service.value === 'delhivery'
     })
   },
 
