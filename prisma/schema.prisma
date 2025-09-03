@@ -80,7 +80,6 @@ model client_order_configs {
   enableThermalPrint        Boolean @default(false)
   enableReferencePrefix     Boolean @default(true)
   clientId                  String  @unique
-  enableResellerFallback    Boolean @default(true)
   clients                   clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
