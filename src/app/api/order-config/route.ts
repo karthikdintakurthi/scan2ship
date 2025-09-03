@@ -142,3 +142,109 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    // Authenticate user
+    const auth = await getAuthenticatedUser(request);
+    if (!auth) {
+      console.log('❌ [API_ORDER_CONFIG_PUT] Authentication failed');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { user, client } = auth;
+    const body = await request.json();
+    
+    console.log(`📝 [API_ORDER_CONFIG_PUT] Updating order config for client: ${client.companyName}`, body);
+
+    // Check if this is a partial update (just reseller fallback) or full update
+    if (body.hasOwnProperty('enableResellerFallback') && Object.keys(body).length === 1) {
+      // Partial update - just update the reseller fallback setting
+      console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reseller fallback: ${body.enableResellerFallback}`);
+      
+      const updatedConfig = await prisma.client_order_configs.update({
+        where: { clientId: client.id },
+        data: {
+          enableResellerFallback: body.enableResellerFallback
+        }
+      });
+
+      console.log(`✅ [API_ORDER_CONFIG_PUT] Reseller fallback updated for client ${client.companyName}: ${body.enableResellerFallback}`);
+
+      return NextResponse.json({
+        success: true,
+        message: 'Reseller fallback setting updated successfully',
+        orderConfig: updatedConfig
+      });
+    }
+
+    // Full update - handle the complete orderConfig object
+    const { orderConfig } = body;
+
+    if (!orderConfig) {
+      return NextResponse.json({ error: 'Order config is required' }, { status: 400 });
+    }
+
+    console.log(`📝 [API_ORDER_CONFIG_PUT] Full update for client: ${client.companyName}`);
+
+    // Update or create order configuration
+    const updatedConfig = await prisma.client_order_configs.upsert({
+      where: { clientId: client.id },
+      update: {
+        defaultProductDescription: orderConfig.defaultProductDescription,
+        defaultPackageValue: orderConfig.defaultPackageValue,
+        defaultWeight: orderConfig.defaultWeight,
+        defaultTotalItems: orderConfig.defaultTotalItems,
+        codEnabledByDefault: orderConfig.codEnabledByDefault,
+        defaultCodAmount: orderConfig.defaultCodAmount,
+        minPackageValue: orderConfig.minPackageValue,
+        maxPackageValue: orderConfig.maxPackageValue,
+        minWeight: orderConfig.minWeight,
+        maxWeight: orderConfig.maxWeight,
+        minTotalItems: orderConfig.minTotalItems,
+        maxTotalItems: orderConfig.maxTotalItems,
+        requireProductDescription: orderConfig.requireProductDescription,
+        requirePackageValue: orderConfig.requirePackageValue,
+        requireWeight: orderConfig.requireWeight,
+        requireTotalItems: orderConfig.requireTotalItems,
+        enableResellerFallback: orderConfig.enableResellerFallback
+      },
+      create: {
+        id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        clientId: client.id,
+        defaultProductDescription: orderConfig.defaultProductDescription,
+        defaultPackageValue: orderConfig.defaultPackageValue,
+        defaultWeight: orderConfig.defaultWeight,
+        defaultTotalItems: orderConfig.defaultTotalItems,
+        codEnabledByDefault: orderConfig.codEnabledByDefault,
+        defaultCodAmount: orderConfig.defaultCodAmount,
+        minPackageValue: orderConfig.minPackageValue,
+        maxPackageValue: orderConfig.maxPackageValue,
+        minWeight: orderConfig.minWeight,
+        maxWeight: orderConfig.maxWeight,
+        minTotalItems: orderConfig.minTotalItems,
+        maxTotalItems: orderConfig.maxTotalItems,
+        requireProductDescription: orderConfig.requireProductDescription,
+        requirePackageValue: orderConfig.requirePackageValue,
+        requireWeight: orderConfig.requireWeight,
+        requireTotalItems: orderConfig.requireTotalItems,
+        enableResellerFallback: orderConfig.enableResellerFallback
+      }
+    });
+
+    console.log(`✅ [API_ORDER_CONFIG_PUT] Order config updated for client ${client.companyName}`);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Order configuration updated successfully',
+      orderConfig: updatedConfig
+    });
+
+  } catch (error) {
+    console.error('❌ [API_ORDER_CONFIG_PUT] Error updating order config:', error);
+    return NextResponse.json(
+      { error: 'Failed to update order configuration' },
+      { status: 500 }
+    );
+  }
+}
