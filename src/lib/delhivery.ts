@@ -134,13 +134,23 @@ export class DelhiveryService {
       
       // Get API key from pickup location configuration
       const { getDelhiveryApiKey } = await import('./pickup-location-config');
-      const apiKey = await getDelhiveryApiKey(orderData.pickup_location);
+      
+      // Extract client ID from order data if available
+      const clientId = orderData.clientId;
+      if (!clientId) {
+        console.warn('⚠️ [DELHIVERY] No client ID provided in order data - API key selection may be incorrect');
+      }
+      
+      const apiKey = await getDelhiveryApiKey(orderData.pickup_location, clientId);
       
       if (!apiKey) {
-        throw new Error(`No Delhivery API key found for pickup location: ${orderData.pickup_location}. Please configure the API key in the client settings for this pickup location.`);
+        throw new Error(`No Delhivery API key found for pickup location: ${orderData.pickup_location}${clientId ? ` and client: ${clientId}` : ''}. Please configure the API key in the client settings for this pickup location.`);
       }
       
       console.log('🔑 Using Delhivery API key from pickup location:', orderData.pickup_location);
+      if (clientId) {
+        console.log('🔑 API key retrieved for client:', clientId);
+      }
       
       // Log reseller information if present
       if (orderData.reseller_name || orderData.reseller_mobile) {
