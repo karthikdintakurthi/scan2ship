@@ -61,7 +61,7 @@ export default function OrderForm() {
     reference_number: '',
     reseller_name: '',
     reseller_mobile: '',
-    courier_service: 'Delhivery', // Default, will be updated when config loads
+            courier_service: 'delhivery', // Default, will be updated when config loads
     package_value: '5000',
     weight: '100',
     total_items: '1',
@@ -111,7 +111,7 @@ export default function OrderForm() {
           setFormData(prev => ({
             ...prev,
             // Priority: Saved selection > User selection > Default from config
-            courier_service: savedCourierService || prev.courier_service || (formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : 'Delhivery'),
+            courier_service: savedCourierService || prev.courier_service || (formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : 'delhivery'),
             package_value: clientConfig.defaultPackageValue.toString(),
             weight: clientConfig.defaultWeight.toString(),
             total_items: clientConfig.defaultTotalItems.toString(),

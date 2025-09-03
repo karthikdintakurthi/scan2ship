@@ -20,7 +20,7 @@ export interface CourierService {
 // Default fallback configuration
 const defaultCourierServices: CourierService[] = [
   {
-    value: 'Delhivery',
+    value: 'delhivery',
     label: 'Delhivery',
     description: 'Fast and reliable courier service with nationwide coverage',
     isActive: true,
@@ -158,7 +158,7 @@ export async function validateCourierServiceRestrictions(
   const services = await getCourierServices();
   console.log('🔍 [COURIER_VALIDATION] Available services:', services.map(s => s.value));
   
-  const service = services.find(s => s.value === courierService);
+  const service = services.find(s => s.value.toLowerCase() === courierService.toLowerCase());
   if (!service) {
     console.error('❌ [COURIER_VALIDATION] Invalid courier service:', courierService);
     console.error('❌ [COURIER_VALIDATION] Available services:', services.map(s => s.value));
