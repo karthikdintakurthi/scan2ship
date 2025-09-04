@@ -102,17 +102,17 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
         }
         .header h1 {
             margin: 0;
-            color: #333;
+            color: #000;
             font-size: 28px;
         }
         .courier-info {
             margin: 10px 0;
-            color: #666;
+            color: #000;
             font-size: 18px;
         }
         .payment-status {
             margin: 10px 0;
-            color: #666;
+            color: #000;
             font-size: 16px;
         }
         .waybill-section {
@@ -126,7 +126,7 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             font-size: 18px;
             font-weight: bold;
             margin-bottom: 15px;
-            color: #333;
+            color: #000;
         }
         .barcode-image {
             margin: 15px 0;
@@ -138,7 +138,7 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
         .tracking-number {
             font-size: 24px;
             font-weight: bold;
-            color: #333;
+            color: #000;
             font-family: monospace;
             margin-top: 10px;
         }
@@ -149,11 +149,11 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             font-size: 20px;
             font-weight: bold;
             margin-bottom: 15px;
-            color: #333;
+            color: #000;
         }
         .recipient-details {
             line-height: 1.6;
-            color: #555;
+            color: #000;
         }
         .sender-section {
             margin: 30px 0;
@@ -168,13 +168,14 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             padding-top: 20px;
             border-top: 1px solid #ddd;
             text-align: center;
-            color: #666;
+            color: #000;
+            font-weight: bold;
         }
         .footer {
             margin-top: 30px;
             text-align: center;
             font-size: 12px;
-            color: #999;
+            color: #000;
         }
     </style>
 </head>
@@ -182,7 +183,7 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
     <div class="container">
         <div class="header">
             <h1>${getCourierServiceName(courierService)} Courier</h1>
-            <div class="payment-status">Payment: ${order.is_cod ? 'COD' : 'Pre-paid'}${order.is_cod && order.cod_amount ? ` (₹${order.cod_amount})` : ''}</div>
+            <div class="payment-status">Payment: ${order.is_cod ? 'COD' : 'Pre-paid'}</div>
         </div>
         
         ${order.courier_service.toLowerCase() !== 'india_post' ? `
