@@ -183,7 +183,7 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
     <div class="container">
         <div class="header">
             <h1>${getCourierServiceName(courierService)} Courier</h1>
-            <div class="payment-status">Payment: ${order.is_cod ? 'COD' : 'Pre-paid'}</div>
+            <div class="payment-status">Payment: ${order.is_cod ? 'COD' : 'Pre-paid'}${order.is_cod && order.cod_amount ? ` (₹${order.cod_amount})` : ''}</div>
         </div>
         
         ${order.courier_service.toLowerCase() !== 'india_post' ? `
