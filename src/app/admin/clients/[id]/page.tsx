@@ -198,29 +198,29 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{client.companyName}</h1>
-            <p className="text-gray-600 mt-2">Client Details</p>
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-gray-900 leading-tight">{client.companyName}</h1>
+            <p className="text-gray-600 mt-1 text-lg">Client Details</p>
           </div>
-          <div className="flex space-x-3">
+          <div className="flex flex-col sm:flex-row gap-3 ml-6">
             <Link
               href={`/admin/clients/${client.id}/edit`}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-center whitespace-nowrap"
             >
               Edit Client
             </Link>
             <button
               onClick={handleDeleteClient}
-              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
+              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-center whitespace-nowrap"
             >
               Delete Client
             </button>
             <Link
               href="/admin/clients"
-              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors text-center whitespace-nowrap"
             >
               Back to Clients
             </Link>
@@ -231,28 +231,28 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Client Information */}
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Client Information</h2>
-          <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-2">Client Information</h2>
+          <div className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Company Name</label>
-              <p className="mt-1 text-sm text-gray-900">{client.companyName}</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+              <p className="text-sm text-gray-900 font-medium">{client.companyName}</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Contact Person</label>
-              <p className="mt-1 text-sm text-gray-900">{client.name}</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+              <p className="text-sm text-gray-900 font-medium">{client.name}</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
-              <p className="mt-1 text-sm text-gray-900">{client.email}</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <p className="text-sm text-gray-900 font-medium">{client.email}</p>
             </div>
             {client.phone && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Phone</label>
-                <p className="mt-1 text-sm text-gray-900">{client.phone}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <p className="text-sm text-gray-900 font-medium">{client.phone}</p>
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Status</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <div className="mt-1">{getStatusBadge(client.isActive)}</div>
             </div>
           </div>
@@ -260,32 +260,32 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
 
         {/* Address Information */}
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Address Information</h2>
-          <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-2">Address Information</h2>
+          <div className="space-y-5">
             {client.address && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Address</label>
-                <p className="mt-1 text-sm text-gray-900">{client.address}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <p className="text-sm text-gray-900 font-medium leading-relaxed">{client.address}</p>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700">City</label>
-                <p className="mt-1 text-sm text-gray-900">{client.city || 'Not specified'}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <p className="text-sm text-gray-900 font-medium">{client.city || 'Not specified'}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">State</label>
-                <p className="mt-1 text-sm text-gray-900">{client.state || 'Not specified'}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <p className="text-sm text-gray-900 font-medium">{client.state || 'Not specified'}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Country</label>
-                <p className="mt-1 text-sm text-gray-900">{client.country}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                <p className="text-sm text-gray-900 font-medium">{client.country}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Pincode</label>
-                <p className="mt-1 text-sm text-gray-900">{client.pincode || 'Not specified'}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
+                <p className="text-sm text-gray-900 font-medium">{client.pincode || 'Not specified'}</p>
               </div>
             </div>
           </div>
@@ -293,20 +293,20 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
 
         {/* Subscription Information */}
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Subscription Details</h2>
-          <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-2">Subscription Details</h2>
+          <div className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Subscription Status</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subscription Status</label>
               <div className="mt-1">{getSubscriptionBadge(client.subscriptionStatus)}</div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Plan</label>
-              <p className="mt-1 text-sm text-gray-900 capitalize">{client.subscriptionPlan}</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+              <p className="text-sm text-gray-900 font-medium capitalize">{client.subscriptionPlan}</p>
             </div>
             {client.subscriptionExpiresAt && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Expires At</label>
-                <p className="mt-1 text-sm text-gray-900">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Expires At</label>
+                <p className="text-sm text-gray-900 font-medium">
                   {new Date(client.subscriptionExpiresAt).toLocaleDateString()}
                 </p>
               </div>
@@ -316,7 +316,7 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
 
         {/* Statistics */}
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Statistics</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-2">Statistics</h2>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
