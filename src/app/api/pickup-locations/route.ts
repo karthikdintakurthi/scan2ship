@@ -47,10 +47,28 @@ export async function GET(request: NextRequest) {
     console.log(`📊 [API_PICKUP_LOCATIONS_GET] Fetching pickup locations for client: ${user.clients.companyName}`);
 
     // Get pickup locations for the current client
-    const pickupLocations = await prisma.pickup_locations.findMany({
-      where: { clientId: user.clients.id },
-      orderBy: { label: 'asc' }
-    });
+    let pickupLocations;
+    
+    if (user.role === 'child_user') {
+      // For child users, only show assigned pickup locations
+      pickupLocations = await prisma.pickup_locations.findMany({
+        where: { 
+          clientId: user.clients.id,
+          user_pickup_locations: {
+            some: {
+              userId: user.id
+            }
+          }
+        },
+        orderBy: { label: 'asc' }
+      });
+    } else {
+      // For other users, show all pickup locations for the client
+      pickupLocations = await prisma.pickup_locations.findMany({
+        where: { clientId: user.clients.id },
+        orderBy: { label: 'asc' }
+      });
+    }
 
     // Transform pickup locations to match the expected format
     const formattedLocations = pickupLocations.map(location => {
@@ -129,9 +147,13 @@ export async function POST(request: NextRequest) {
 
     console.log(`📝 [API_PICKUP_LOCATIONS_POST] Creating pickup location for client: ${user.clients.companyName}`);
 
+    // Generate a unique ID for the pickup location
+    const locationId = `pickup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Create new pickup location
     const newLocation = await prisma.pickup_locations.create({
       data: {
+        id: locationId,
         label: name,
         value: value,
         delhiveryApiKey: delhiveryApiKey || null,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { getOrderFormConfig } from '@/lib/order-form-config'
 import { usePickupLocation } from '@/hooks/usePickupLocation'
 import { useAuth } from '@/contexts/AuthContext'
@@ -47,6 +47,9 @@ export default function OrderForm() {
   
   // Use the persistent pickup location hook
   const { selectedPickupLocation, updatePickupLocation, pickupLocations, isLoaded } = usePickupLocation()
+  
+  // Ref for image input
+  const imageInputRef = useRef<HTMLInputElement>(null)
   
   const [formData, setFormData] = useState<AddressFormData>({
     customer_name: '',
@@ -1055,7 +1058,6 @@ export default function OrderForm() {
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
             <h3 className="text-lg font-medium text-blue-900 mb-4">📍 Address Detail</h3>
             
-            {/* Image Upload Section */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-blue-700 mb-2">
                 📷 Upload Address Image (Optional)
@@ -1066,10 +1068,10 @@ export default function OrderForm() {
                     ? 'border-green-400 bg-green-50'
                     : 'border-blue-300 hover:border-blue-400 bg-white'
                 }`}
-                onClick={() => document.getElementById('imageInput')?.click()}
+                onClick={() => imageInputRef.current?.click()}
               >
                 <input
-                  id="imageInput"
+                  ref={imageInputRef}
                   type="file"
                   accept="image/*"
                   onChange={handleImageChange}
@@ -1144,16 +1146,14 @@ export default function OrderForm() {
                   </div>
                 </div>
               )}
-            </div>
+              </div>
 
             <div className="mb-4 flex items-center">
               <div className="flex-1 border-t border-blue-200"></div>
               <span className="px-3 text-sm text-blue-600 bg-blue-50">OR</span>
               <div className="flex-1 border-t border-blue-200"></div>
             </div>
-
-            {/* Manual Address Input */}
-            <div className={selectedImage ? 'opacity-50 pointer-events-none' : ''}>
+              <div className={selectedImage ? 'opacity-50 pointer-events-none' : ''}>
               <label htmlFor="addressDetail" className="block text-sm font-medium text-blue-700 mb-2">
                 ✍️ Paste the full address here
               </label>
@@ -1206,7 +1206,7 @@ export default function OrderForm() {
                   </div>
                 </div>
               )}
-            </div>
+              </div>
           </div>
 
           {/* Customer Information */}

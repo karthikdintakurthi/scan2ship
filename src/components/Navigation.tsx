@@ -7,11 +7,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import Image from 'next/image';
 import CreditWallet from './CreditWallet';
 import { getClientBranding } from '@/lib/pwa-config';
+import { usePickupLocations } from '@/hooks/usePickupLocations';
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pathname = usePathname();
   const { currentUser, currentClient, logout } = useAuth();
+  const { pickupLocations } = usePickupLocations();
 
   // Get dynamic branding based on current client
   const branding = getClientBranding(currentClient);
@@ -36,10 +38,13 @@ export default function Navigation() {
       { name: 'Client Configurations', href: '/admin/client-configurations', current: pathname === '/admin/client-configurations' },
     ];
   } else if (currentUser?.role === 'admin') {
-    console.log('✅ [NAVIGATION] Setting up admin navigation');
-    // Regular admin view
+    console.log('✅ [NAVIGATION] Setting up client admin navigation');
+    // Client admin view
     navigation = [
       { name: 'Admin Dashboard', href: '/admin', current: pathname === '/admin' },
+      { name: 'Create Order', href: '/orders', current: pathname === '/orders' },
+      { name: 'View Orders', href: '/admin/orders', current: pathname === '/admin/orders' },
+      { name: 'Settings', href: '/admin/settings', current: pathname === '/admin/settings' },
     ];
   } else {
     console.log('✅ [NAVIGATION] Setting up regular user navigation');
@@ -48,8 +53,12 @@ export default function Navigation() {
       { name: 'Dashboard', href: '/', current: pathname === '/' },
       { name: 'Create Order', href: '/orders', current: pathname === '/orders' },
       { name: 'View Orders', href: '/view-orders', current: pathname === '/view-orders' },
-      { name: 'Wallet', href: '/credits', current: pathname === '/credits' },
     ];
+    
+    // Add Wallet menu only for non-child users
+    if (currentUser?.role !== 'child_user') {
+      navigation.push({ name: 'Wallet', href: '/credits', current: pathname === '/credits' });
+    }
   }
 
   const handleLogout = () => {
@@ -74,6 +83,14 @@ export default function Navigation() {
                 <h1 className="text-xl font-bold text-gray-900">{branding.shortName}</h1>
                 {currentClient && (
                   <p className="text-xs text-gray-600">{currentClient.companyName}</p>
+                )}
+                {/* Show pickup locations for child users */}
+                {currentUser?.role === 'child_user' && pickupLocations.length > 0 && (
+                  <div className="mt-1">
+                    <p className="text-xs text-blue-600 font-medium">
+                      📍 {pickupLocations.map(pl => pl.label).join(', ')}
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -101,8 +118,8 @@ export default function Navigation() {
             <div className="hidden md:ml-4 md:flex md:items-center">
               <div className="ml-3 relative">
                 <div className="flex items-center space-x-4">
-                  {/* Credit Wallet - Only show for non-master-admin users */}
-                  {currentUser && currentUser.role !== 'master_admin' && (
+                  {/* Credit Wallet - Only show for non-master-admin and non-child-user users */}
+                  {currentUser && currentUser.role !== 'master_admin' && currentUser.role !== 'child_user' && (
                     <CreditWallet />
                   )}
                   
@@ -170,8 +187,8 @@ export default function Navigation() {
             
             {/* Mobile User Info */}
             <div className="px-3 py-2 border-t border-gray-200">
-              {/* Credit Wallet - Only show for non-master-admin users */}
-              {currentUser && currentUser.role !== 'master_admin' && (
+              {/* Credit Wallet - Only show for non-master-admin and non-child-user users */}
+              {currentUser && currentUser.role !== 'master_admin' && currentUser.role !== 'child_user' && (
                 <div className="mb-3">
                   <CreditWallet />
                 </div>

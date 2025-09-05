@@ -1,0 +1,78 @@
+{
+  "timestamp": "2025-09-05T08:57:57.928Z",
+  "duration": 184.376,
+  "dryRun": false,
+  "results": [
+    {
+      "tableName": "clients",
+      "rowCount": 8,
+      "success": true
+    },
+    {
+      "tableName": "users",
+      "rowCount": 13,
+      "success": true
+    },
+    {
+      "tableName": "sessions",
+      "rowCount": 302,
+      "success": true
+    },
+    {
+      "tableName": "system_config",
+      "rowCount": 15,
+      "success": true
+    },
+    {
+      "tableName": "client_config",
+      "rowCount": 20,
+      "success": true
+    },
+    {
+      "tableName": "client_credits",
+      "rowCount": 8,
+      "success": true
+    },
+    {
+      "tableName": "client_credit_costs",
+      "rowCount": 20,
+      "success": true
+    },
+    {
+      "tableName": "client_order_configs",
+      "rowCount": 8,
+      "success": true
+    },
+    {
+      "tableName": "courier_services",
+      "rowCount": 16,
+      "success": true
+    },
+    {
+      "tableName": "pickup_locations",
+      "rowCount": 8,
+      "success": true
+    },
+    {
+      "tableName": "orders",
+      "rowCount": 1518,
+      "success": true
+    },
+    {
+      "tableName": "credit_transactions",
+      "rowCount": 3285,
+      "success": true
+    },
+    {
+      "tableName": "order_analytics",
+      "rowCount": 0,
+      "success": false,
+      "error": "insert or update on table \"order_analytics\" violates foreign key constraint \"order_analytics_orderId_fkey\""
+    }
+  ],
+  "summary": {
+    "totalTables": 13,
+    "successful": 12,
+    "failed": 1
+  }
+}

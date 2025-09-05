@@ -37,8 +37,8 @@ export default function Home() {
     return null;
   }
 
-  // For client users (role: 'user' or 'viewer'), show the client dashboard
-  if (currentUser && (currentUser.role === 'user' || currentUser.role === 'viewer')) {
+  // For client users (role: 'user', 'viewer', or 'child_user'), show the client dashboard
+  if (currentUser && (currentUser.role === 'user' || currentUser.role === 'viewer' || currentUser.role === 'child_user')) {
     return (
       <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50">
         {/* Hero Section */}

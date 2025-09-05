@@ -216,12 +216,13 @@ model orders {
 }
 
 model pickup_locations {
-  id              String  @id
-  value           String
-  label           String
-  delhiveryApiKey String?
-  clientId        String
-  clients         clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id                     String                     @id
+  value                  String
+  label                  String
+  delhiveryApiKey        String?
+  clientId               String
+  clients                clients                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user_pickup_locations  user_pickup_locations[]
 
   @@unique([label, clientId])
 }
@@ -250,20 +251,35 @@ model system_config {
 }
 
 model users {
-  id                  String                @id
-  email               String
-  name                String
-  password            String?
-  role                String                @default("user")
-  isActive            Boolean               @default(true)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime
-  clientId            String
-  analytics_events    analytics_events[]
-  credit_transactions credit_transactions[]
-  order_analytics     order_analytics[]
-  sessions            sessions[]
-  clients             clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id                     String                     @id
+  email                  String
+  name                   String
+  password               String?
+  role                   String                     @default("user")
+  isActive               Boolean                    @default(true)
+  aiImageProcessingEnabled Boolean                  @default(true)
+  aiTextProcessingEnabled  Boolean                  @default(true)
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime
+  clientId               String
+  analytics_events       analytics_events[]
+  credit_transactions    credit_transactions[]
+  order_analytics        order_analytics[]
+  sessions               sessions[]
+  user_pickup_locations  user_pickup_locations[]
+  clients                clients                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([email, clientId])
+}
+
+model user_pickup_locations {
+  id                String           @id
+  userId            String
+  pickupLocationId  String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime
+  users             users            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pickup_locations  pickup_locations @relation(fields: [pickupLocationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pickupLocationId])
 }

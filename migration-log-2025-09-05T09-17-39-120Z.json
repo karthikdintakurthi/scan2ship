@@ -1,0 +1,73 @@
+{
+  "timestamp": "2025-09-05T09:17:39.120Z",
+  "duration": 167.233,
+  "dryRun": false,
+  "results": [
+    {
+      "tableName": "clients",
+      "rowCount": 8,
+      "success": true
+    },
+    {
+      "tableName": "users",
+      "rowCount": 13,
+      "success": true
+    },
+    {
+      "tableName": "sessions",
+      "rowCount": 303,
+      "success": true
+    },
+    {
+      "tableName": "system_config",
+      "rowCount": 15,
+      "success": true
+    },
+    {
+      "tableName": "client_config",
+      "rowCount": 20,
+      "success": true
+    },
+    {
+      "tableName": "client_credits",
+      "rowCount": 8,
+      "success": true
+    },
+    {
+      "tableName": "client_credit_costs",
+      "rowCount": 20,
+      "success": true
+    },
+    {
+      "tableName": "client_order_configs",
+      "rowCount": 8,
+      "success": true
+    },
+    {
+      "tableName": "courier_services",
+      "rowCount": 16,
+      "success": true
+    },
+    {
+      "tableName": "pickup_locations",
+      "rowCount": 8,
+      "success": true
+    },
+    {
+      "tableName": "orders",
+      "rowCount": 1530,
+      "success": true
+    },
+    {
+      "tableName": "credit_transactions",
+      "rowCount": 0,
+      "success": false,
+      "error": "insert or update on table \"credit_transactions\" violates foreign key constraint \"credit_transactions_orderId_fkey\""
+    }
+  ],
+  "summary": {
+    "totalTables": 12,
+    "successful": 11,
+    "failed": 1
+  }
+}

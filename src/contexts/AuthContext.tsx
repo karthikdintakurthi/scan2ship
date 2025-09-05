@@ -40,6 +40,8 @@ interface User {
   role: string;
   isActive: boolean;
   clientId: string;
+  aiImageProcessingEnabled?: boolean;
+  aiTextProcessingEnabled?: boolean;
 }
 
 interface Session {

@@ -352,6 +352,40 @@ export async function GET(request: NextRequest) {
     const whereClause: any = {
       clientId: client.id // Ensure client isolation
     };
+
+    // For child users, filter by assigned pickup locations
+    if (auth.user.role === 'child_user') {
+      // Get user's assigned pickup location IDs
+      const userPickupLocations = await prisma.user_pickup_locations.findMany({
+        where: { userId: auth.user.id },
+        select: { pickupLocationId: true }
+      });
+      
+      const assignedPickupLocationIds = userPickupLocations.map(upl => upl.pickupLocationId);
+      
+      if (assignedPickupLocationIds.length > 0) {
+        // Get pickup location values for the assigned IDs
+        const assignedPickupLocations = await prisma.pickup_locations.findMany({
+          where: { 
+            id: { in: assignedPickupLocationIds },
+            clientId: client.id
+          },
+          select: { value: true }
+        });
+        
+        const assignedPickupLocationValues = assignedPickupLocations.map(pl => pl.value);
+        
+        if (assignedPickupLocationValues.length > 0) {
+          whereClause.pickup_location = { in: assignedPickupLocationValues };
+        } else {
+          // If no pickup locations are assigned, return no orders
+          whereClause.pickup_location = { in: [] };
+        }
+      } else {
+        // If no pickup locations are assigned, return no orders
+        whereClause.pickup_location = { in: [] };
+      }
+    }
     
     if (search) {
       whereClause.OR = [

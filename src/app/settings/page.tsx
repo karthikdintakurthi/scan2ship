@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -130,6 +130,9 @@ export default function ClientSettingsPage() {
     code: '',
     isActive: true
   });
+
+  // Ref for client ID input
+  const clientIdInputRef = useRef<HTMLInputElement>(null);
 
   // Check authentication and redirect if needed
   useEffect(() => {
@@ -915,16 +918,15 @@ export default function ClientSettingsPage() {
           <div className="px-6 py-4">
             <div className="flex items-center space-x-4">
               <input
+                ref={clientIdInputRef}
                 type="text"
                 placeholder="Enter Client ID (e.g., client-1756653250197-7ltxt67xn)"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                id="clientIdInput"
                 defaultValue="client-1756653250197-7ltxt67xn"
               />
               <button
                 onClick={async () => {
-                  const clientIdInput = document.getElementById('clientIdInput') as HTMLInputElement;
-                  const clientId = clientIdInput.value.trim();
+                  const clientId = clientIdInputRef.current?.value.trim();
                   if (clientId) {
                     try {
                       const orderConfig = await fetchOrderConfigForClient(clientId);

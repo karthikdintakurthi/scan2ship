@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { authenticatedGet, authenticatedDelete } from '@/lib/api-client';
+import { authenticatedGet, authenticatedDelete, authenticatedPut } from '@/lib/api-client';
+import EditUserModal from '@/components/EditUserModal';
 
 interface Client {
   id: string;
@@ -50,6 +51,10 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [clientId, setClientId] = useState<string>('');
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
 
   // Get client ID from params
   useEffect(() => {
@@ -126,6 +131,68 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
       if (error instanceof Error && error.message.includes('Authentication failed')) {
         router.push('/login');
       }
+    }
+  };
+
+  const handleEditUser = async (user: any) => {
+    try {
+      // Fetch user details with pickup locations
+      const response = await authenticatedGet(`/api/admin/users/${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setEditingUser(data.user);
+        setShowEditModal(true);
+      } else {
+        setError('Failed to fetch user details');
+      }
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      setError('Error fetching user details');
+    }
+  };
+
+  const handleDeleteUser = (user: any) => {
+    setUserToDelete(user);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    try {
+      const response = await authenticatedDelete(`/api/admin/users/${userToDelete.id}`);
+      
+      if (response.ok) {
+        // Refresh client data
+        await fetchClientDetails();
+        setShowDeleteConfirm(false);
+        setUserToDelete(null);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      setError('Error deleting user');
+    }
+  };
+
+  const handleUpdateUser = async (userData: any) => {
+    try {
+      const response = await authenticatedPut(`/api/admin/users/${editingUser.id}`, userData);
+      
+      if (response.ok) {
+        // Refresh client data
+        await fetchClientDetails();
+        setShowEditModal(false);
+        setEditingUser(null);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to update user');
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      setError('Error updating user');
     }
   };
 
@@ -368,6 +435,9 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -384,6 +454,22 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(user.isActive)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEditUser(user)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -436,6 +522,50 @@ export default function ViewClientPage({ params }: { params: Promise<{ id: strin
             </table>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && userToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3 text-center">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Delete User</h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Are you sure you want to delete user <strong>{userToDelete.name}</strong> ({userToDelete.email})? 
+                This action cannot be undone.
+              </p>
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setUserToDelete(null);
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteUser}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditModal && editingUser && (
+        <EditUserModal
+          user={editingUser}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingUser(null);
+          }}
+          onSave={handleUpdateUser}
+        />
       )}
     </div>
   );

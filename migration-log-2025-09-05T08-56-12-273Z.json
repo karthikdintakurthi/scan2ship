@@ -1,0 +1,18 @@
+{
+  "timestamp": "2025-09-05T08:56:12.273Z",
+  "duration": 0.338,
+  "dryRun": false,
+  "results": [
+    {
+      "tableName": "clients",
+      "rowCount": 0,
+      "success": false,
+      "error": "column \"companyname\" does not exist"
+    }
+  ],
+  "summary": {
+    "totalTables": 1,
+    "successful": 0,
+    "failed": 1
+  }
+}

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Header Preview - Child User</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-6">Header Preview for Child User</h1>
+        
+        <!-- Current Header (Child User) -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4">Current Header (Child User)</h2>
+            <nav className="bg-white shadow-lg">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between h-16">
+                        <div className="flex items-center">
+                            <!-- Logo -->
+                            <div className="flex-shrink-0 flex items-center">
+                                <img
+                                    src="/images/scan2ship.png"
+                                    alt="Scan2Ship"
+                                    width="40"
+                                    height="40"
+                                    className="rounded-lg"
+                                />
+                                <div className="ml-3">
+                                    <h1 className="text-xl font-bold text-gray-900">Scan2Ship</h1>
+                                    <p className="text-xs text-gray-600">Route Master Courier and Cargo</p>
+                                    <!-- Show pickup locations for child users -->
+                                    <div className="mt-1">
+                                        <p className="text-xs text-blue-600 font-medium">
+                                            📍 SuRCLe Technology Pvt. Ltd.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </div>
+
+        <!-- Comparison: Regular User Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-lg font-semibold mb-4">Comparison: Regular User Header</h2>
+            <nav className="bg-white shadow-lg">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between h-16">
+                        <div className="flex items-center">
+                            <!-- Logo -->
+                            <div className="flex-shrink-0 flex items-center">
+                                <img
+                                    src="/images/scan2ship.png"
+                                    alt="Scan2Ship"
+                                    width="40"
+                                    height="40"
+                                    className="rounded-lg"
+                                />
+                                <div className="ml-3">
+                                    <h1 className="text-xl font-bold text-gray-900">Scan2Ship</h1>
+                                    <p className="text-xs text-gray-600">Route Master Courier and Cargo</p>
+                                    <!-- No pickup locations shown for regular users -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </div>
+
+        <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h3 class="font-semibold text-blue-800 mb-2">Key Changes for Child Users:</h3>
+            <ul class="text-blue-700 space-y-1">
+                <li>• ✅ Added pickup location display in header with 📍 icon</li>
+                <li>• ❌ Hidden credit wallet component from header</li>
+                <li>• ❌ Removed "Wallet" menu item from navigation</li>
+                <li>• ✅ Streamlined interface focused on order management</li>
+                <li>• 🔧 <strong>Backend functionality preserved</strong> - all credit operations work normally</li>
+            </ul>
+        </div>
+
+        <!-- Header Visibility Summary -->
+        <div class="mt-6 p-4 bg-green-50 rounded-lg">
+            <h3 class="font-semibold text-green-800 mb-3">Header Visibility by User Role:</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-green-200 rounded-lg">
+                    <thead class="bg-green-100">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-green-800 font-semibold">User Role</th>
+                            <th class="px-4 py-2 text-center text-green-800 font-semibold">Credit Wallet</th>
+                            <th class="px-4 py-2 text-center text-green-800 font-semibold">Pickup Locations</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-green-200">
+                            <td class="px-4 py-2 font-medium">master_admin</td>
+                            <td class="px-4 py-2 text-center">❌ Hidden</td>
+                            <td class="px-4 py-2 text-center">❌ Hidden</td>
+                        </tr>
+                        <tr class="border-b border-green-200 bg-blue-50">
+                            <td class="px-4 py-2 font-medium text-blue-800">child_user</td>
+                            <td class="px-4 py-2 text-center text-red-600">❌ Hidden</td>
+                            <td class="px-4 py-2 text-center text-green-600">✅ Shown</td>
+                        </tr>
+                        <tr class="border-b border-green-200">
+                            <td class="px-4 py-2 font-medium">user</td>
+                            <td class="px-4 py-2 text-center text-green-600">✅ Shown</td>
+                            <td class="px-4 py-2 text-center">❌ Hidden</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-2 font-medium">viewer</td>
+                            <td class="px-4 py-2 text-center text-green-600">✅ Shown</td>
+                            <td class="px-4 py-2 text-center">❌ Hidden</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Backend Functionality Note -->
+        <div class="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <h3 class="font-semibold text-yellow-800 mb-2">🔧 Backend Functionality Preserved</h3>
+            <p class="text-yellow-700 text-sm">
+                <strong>Important:</strong> While the wallet and credits UI is hidden from child users, all backend functionality remains intact:
+            </p>
+            <ul class="text-yellow-700 text-sm mt-2 space-y-1">
+                <li>• Credit calculations and deductions still work normally</li>
+                <li>• Order creation still consumes credits as configured</li>
+                <li>• Master admins can still manage credits for child users</li>
+                <li>• All credit-related APIs continue to function</li>
+                <li>• Credit balance tracking and reporting unaffected</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

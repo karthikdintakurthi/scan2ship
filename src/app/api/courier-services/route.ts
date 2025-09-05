@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, code, isActive } = body;
+    const { name, code, isActive, isDefault } = body;
 
     if (!name || !code) {
       return NextResponse.json({ error: 'Name and code are required' }, { status: 400 });
@@ -99,13 +99,30 @@ export async function POST(request: NextRequest) {
 
     console.log(`📝 [API_COURIER_SERVICES_POST] Creating courier service for client: ${user.clients.companyName}`);
 
+    // If setting as default, unset other defaults
+    if (isDefault) {
+      await prisma.courier_services.updateMany({
+        where: {
+          clientId: user.clients.id,
+          isDefault: true
+        },
+        data: {
+          isDefault: false
+        }
+      });
+    }
+
+    // Generate a unique ID for the courier service
+    const serviceId = `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Create new courier service
     const newService = await prisma.courier_services.create({
       data: {
+        id: serviceId,
         name: name,
         code: code,
         isActive: isActive !== false,
-        isDefault: false,
+        isDefault: isDefault || false,
         clientId: user.clients.id
       }
     });
