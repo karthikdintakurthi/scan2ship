@@ -90,6 +90,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate mobile number format
+    const validateMobileNumber = (mobile: string): boolean => {
+      // Remove any non-digit characters
+      const cleanMobile = mobile.replace(/\D/g, '');
+      
+      // Handle different cases:
+      // 1. 10 digits starting with 6-9 (direct mobile number)
+      // 2. 12 digits starting with 91 (country code + mobile)
+      // 3. 13 digits starting with 91 (country code + mobile with leading 0)
+      
+      if (cleanMobile.length === 10) {
+        return /^[6-9]\d{9}$/.test(cleanMobile);
+      } else if (cleanMobile.length === 12 && cleanMobile.startsWith('91')) {
+        const mobilePart = cleanMobile.substring(2);
+        return /^[6-9]\d{9}$/.test(mobilePart);
+      } else if (cleanMobile.length === 13 && cleanMobile.startsWith('91')) {
+        const mobilePart = cleanMobile.substring(3); // Remove 91 and leading 0
+        return /^[6-9]\d{9}$/.test(mobilePart);
+      }
+      
+      return false;
+    };
+
+    if (!validateMobileNumber(orderData.mobile)) {
+      return NextResponse.json({ error: 'Mobile number must be exactly 10 digits and start with 6, 7, 8, or 9' }, { status: 400 });
+    }
+
+    // Validate alternate mobile number if provided
+    if (orderData.alt_mobile && !validateMobileNumber(orderData.alt_mobile)) {
+      return NextResponse.json({ error: 'Alternate mobile number must be exactly 10 digits and start with 6, 7, 8, or 9' }, { status: 400 });
+    }
+
+    // Validate reseller mobile number if provided
+    if (orderData.reseller_mobile && !validateMobileNumber(orderData.reseller_mobile)) {
+      return NextResponse.json({ error: 'Reseller mobile number must be exactly 10 digits and start with 6, 7, 8, or 9' }, { status: 400 });
+    }
+
     // Get client order configuration for reference number prefix
     const clientOrderConfig = await prisma.client_order_configs.findUnique({
       where: { clientId: client.id }

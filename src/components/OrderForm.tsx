@@ -82,6 +82,7 @@ export default function OrderForm() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isProcessingImage, setIsProcessingImage] = useState(false)
   const [imageProcessingError, setImageProcessingError] = useState('')
+  const [isDragOver, setIsDragOver] = useState(false)
 
   // Load dynamic configuration
   useEffect(() => {
@@ -582,29 +583,58 @@ export default function OrderForm() {
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setImageProcessingError('Please select a valid image file')
-        return
-      }
-      
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        setImageProcessingError('Image size should be less than 5MB')
-        return
-      }
-      
-      setSelectedImage(file)
-      setImageProcessingError('')
-      
-      // Create preview and auto-process
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string)
-        // Auto-trigger image processing with the file directly
-        processImage(file)
-      }
-      reader.readAsDataURL(file)
+      processFile(file)
+    }
+  }
+
+  const processFile = (file: File) => {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setImageProcessingError('Please select a valid image file')
+      return
+    }
+    
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      setImageProcessingError('Image size should be less than 5MB')
+      return
+    }
+    
+    setSelectedImage(file)
+    setImageProcessingError('')
+    
+    // Create preview and auto-process
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string)
+      // Auto-trigger image processing with the file directly
+      processImage(file)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      processFile(file)
     }
   }
 
@@ -615,6 +645,7 @@ export default function OrderForm() {
     setSelectedImage(null)
     setImagePreview(null)
     setImageProcessingError('')
+    setIsDragOver(false)
     // Clear form - preserve Order Details fields, only reset customer info and tracking number
     setFormData(prev => ({
       ...prev,
@@ -641,6 +672,29 @@ export default function OrderForm() {
     setOrderNumber(null)
   }
 
+  // Mobile number validation function
+  const validateMobileNumber = (mobile: string): boolean => {
+    // Remove any non-digit characters
+    const cleanMobile = mobile.replace(/\D/g, '');
+    
+    // Handle different cases:
+    // 1. 10 digits starting with 6-9 (direct mobile number)
+    // 2. 12 digits starting with 91 (country code + mobile)
+    // 3. 13 digits starting with 91 (country code + mobile with leading 0)
+    
+    if (cleanMobile.length === 10) {
+      return /^[6-9]\d{9}$/.test(cleanMobile);
+    } else if (cleanMobile.length === 12 && cleanMobile.startsWith('91')) {
+      const mobilePart = cleanMobile.substring(2);
+      return /^[6-9]\d{9}$/.test(mobilePart);
+    } else if (cleanMobile.length === 13 && cleanMobile.startsWith('91')) {
+      const mobilePart = cleanMobile.substring(3); // Remove 91 and leading 0
+      return /^[6-9]\d{9}$/.test(mobilePart);
+    }
+    
+    return false;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -651,6 +705,24 @@ export default function OrderForm() {
 
     if (!formData.customer_name || !formData.mobile_number || !formData.address || !formData.pincode || !formData.product_description) {
       setError('Please fill in all required fields')
+      return
+    }
+
+    // Validate mobile number format
+    if (!validateMobileNumber(formData.mobile_number)) {
+      setError('Mobile number must be exactly 10 digits and start with 6, 7, 8, or 9')
+      return
+    }
+
+    // Validate alternate mobile number if provided
+    if (formData.alt_mobile_number && !validateMobileNumber(formData.alt_mobile_number)) {
+      setError('Alternate mobile number must be exactly 10 digits and start with 6, 7, 8, or 9')
+      return
+    }
+
+    // Validate reseller mobile number if provided
+    if (formData.reseller_mobile && !validateMobileNumber(formData.reseller_mobile)) {
+      setError('Reseller mobile number must be exactly 10 digits and start with 6, 7, 8, or 9')
       return
     }
 
@@ -1064,9 +1136,14 @@ export default function OrderForm() {
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
                   selectedImage
                     ? 'border-green-400 bg-green-50'
+                    : isDragOver
+                    ? 'border-blue-500 bg-blue-50'
                     : 'border-blue-300 hover:border-blue-400 bg-white'
                 }`}
                 onClick={() => document.getElementById('imageInput')?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
                 <input
                   id="imageInput"
@@ -1122,9 +1199,18 @@ export default function OrderForm() {
                 ) : (
                   <div>
                     <div className="text-4xl mb-2">📷</div>
-                    <p className="text-blue-600 font-medium">Click to upload image</p>
-                    <p className="text-blue-700 font-medium">or drag and drop</p>
-                    <p className="text-xs text-blue-600 mt-1">Supports: JPG, PNG, GIF (Max: 5MB)</p>
+                    {isDragOver ? (
+                      <>
+                        <p className="text-blue-600 font-medium">Drop image here</p>
+                        <p className="text-xs text-blue-600 mt-1">Release to upload</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-blue-600 font-medium">Click to upload image</p>
+                        <p className="text-blue-700 font-medium">or drag and drop</p>
+                        <p className="text-xs text-blue-600 mt-1">Supports: JPG, PNG, GIF (Max: 5MB)</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
