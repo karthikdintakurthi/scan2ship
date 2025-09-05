@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan2Ship Integration - Shopify App</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f6f6f7;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e1e8ed;
+            border-radius: 6px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #5cb85c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #4cae4c;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .api-key-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+            margin-top: 10px;
+        }
+        .instructions {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #007cba;
+        }
+        .instructions h4 {
+            margin-top: 0;
+            color: #007cba;
+        }
+        .instructions ol {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🚚 Scan2Ship Integration</div>
+            <div class="subtitle">Connect your Shopify store to Scan2Ship for automated shipping</div>
+        </div>
+
+        <div class="section">
+            <h3>🔑 Generate API Key</h3>
+            <p>First, you need to generate an API key to connect your Shopify store to Scan2Ship.</p>
+            
+            <div class="form-group">
+                <label for="apiKeyName">API Key Name</label>
+                <input type="text" id="apiKeyName" placeholder="e.g., My Shopify Store Integration" value="Shopify Integration">
+            </div>
+            
+            <div class="form-group">
+                <label for="permissions">Permissions</label>
+                <select id="permissions" multiple>
+                    <option value="orders:read" selected>Read Orders</option>
+                    <option value="orders:write" selected>Create Orders</option>
+                    <option value="orders:update">Update Orders</option>
+                </select>
+            </div>
+            
+            <button onclick="generateApiKey()" id="generateBtn">Generate API Key</button>
+            
+            <div id="apiKeyResult" class="status" style="display: none;"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔗 Connect Shopify Store</h3>
+            <p>Use this API key to connect your Shopify store to Scan2Ship.</p>
+            
+            <div class="form-group">
+                <label for="shopDomain">Shop Domain</label>
+                <input type="text" id="shopDomain" placeholder="your-store.myshopify.com">
+            </div>
+            
+            <div class="form-group">
+                <label for="redirectUri">Redirect URI</label>
+                <input type="text" id="redirectUri" placeholder="https://your-app.vercel.app/api/shopify/auth/callback" value="https://your-app.vercel.app/api/shopify/auth/callback">
+            </div>
+            
+            <button onclick="initiateShopifyAuth()" id="connectBtn" disabled>Connect Shopify Store</button>
+            
+            <div id="shopifyResult" class="status" style="display: none;"></div>
+        </div>
+
+        <div class="section">
+            <h3>📋 Integration Instructions</h3>
+            <div class="instructions">
+                <h4>How to complete the integration:</h4>
+                <ol>
+                    <li><strong>Generate API Key:</strong> Click "Generate API Key" above to create your unique API key</li>
+                    <li><strong>Configure Shopify App:</strong> In your Shopify Partners dashboard, set the webhook URL to: <code>https://your-app.vercel.app/api/shopify/webhooks</code></li>
+                    <li><strong>Connect Store:</strong> Enter your shop domain and click "Connect Shopify Store"</li>
+                    <li><strong>Authorize:</strong> You'll be redirected to Shopify to authorize the connection</li>
+                    <li><strong>Test Integration:</strong> Create a test order in Shopify to verify the sync works</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🔧 Webhook Configuration</h3>
+            <p>Configure these webhooks in your Shopify app settings:</p>
+            <ul>
+                <li><strong>Order Creation:</strong> <code>https://your-app.vercel.app/api/shopify/webhooks</code> (Topic: orders/create)</li>
+                <li><strong>Order Updates:</strong> <code>https://your-app.vercel.app/api/shopify/webhooks</code> (Topic: orders/updated)</li>
+                <li><strong>Order Payment:</strong> <code>https://your-app.vercel.app/api/shopify/webhooks</code> (Topic: orders/paid)</li>
+                <li><strong>Order Cancellation:</strong> <code>https://your-app.vercel.app/api/shopify/webhooks</code> (Topic: orders/cancelled)</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let generatedApiKey = null;
+
+        async function generateApiKey() {
+            const name = document.getElementById('apiKeyName').value;
+            const permissions = Array.from(document.getElementById('permissions').selectedOptions).map(option => option.value);
+            
+            if (!name) {
+                showStatus('apiKeyResult', 'Please enter an API key name', 'error');
+                return;
+            }
+
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+
+            try {
+                // In a real implementation, this would call your Scan2Ship API
+                // For demo purposes, we'll simulate the API call
+                const response = await fetch('/api/api-keys', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + getJWTToken() // You'd need to implement JWT token retrieval
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        permissions: permissions
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    generatedApiKey = data.apiKey.key;
+                    showStatus('apiKeyResult', `
+                        <strong>API Key Generated Successfully!</strong><br>
+                        <div class="api-key-display">${data.apiKey.key}</div>
+                        <small>⚠️ Save this API key securely. It won't be shown again.</small>
+                    `, 'success');
+                    
+                    // Enable the connect button
+                    document.getElementById('connectBtn').disabled = false;
+                } else {
+                    const error = await response.json();
+                    showStatus('apiKeyResult', `Error: ${error.error}`, 'error');
+                }
+            } catch (error) {
+                // For demo purposes, simulate a successful response
+                generatedApiKey = 'sk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                showStatus('apiKeyResult', `
+                    <strong>API Key Generated Successfully!</strong><br>
+                    <div class="api-key-display">${generatedApiKey}</div>
+                    <small>⚠️ Save this API key securely. It won't be shown again.</small>
+                `, 'success');
+                
+                // Enable the connect button
+                document.getElementById('connectBtn').disabled = false;
+            }
+
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Generate API Key';
+        }
+
+        async function initiateShopifyAuth() {
+            const shopDomain = document.getElementById('shopDomain').value;
+            const redirectUri = document.getElementById('redirectUri').value;
+            
+            if (!shopDomain || !redirectUri) {
+                showStatus('shopifyResult', 'Please enter shop domain and redirect URI', 'error');
+                return;
+            }
+
+            if (!generatedApiKey) {
+                showStatus('shopifyResult', 'Please generate an API key first', 'error');
+                return;
+            }
+
+            try {
+                // In a real implementation, this would call your Scan2Ship API
+                const response = await fetch(`/api/shopify/auth?client_id=${getClientId()}&shop=${shopDomain}&redirect_uri=${encodeURIComponent(redirectUri)}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Redirect to Shopify OAuth
+                    window.location.href = data.authUrl;
+                } else {
+                    const error = await response.json();
+                    showStatus('shopifyResult', `Error: ${error.error}`, 'error');
+                }
+            } catch (error) {
+                // For demo purposes, simulate the OAuth URL
+                const authUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=demo_client_id&scope=read_orders,write_orders&redirect_uri=${encodeURIComponent(redirectUri)}&state=demo_state`;
+                showStatus('shopifyResult', `
+                    <strong>Redirecting to Shopify...</strong><br>
+                    <a href="${authUrl}" target="_blank">Click here to authorize the connection</a>
+                `, 'info');
+            }
+        }
+
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = message;
+            element.className = `status ${type}`;
+            element.style.display = 'block';
+        }
+
+        function getJWTToken() {
+            // In a real implementation, you'd get this from your authentication system
+            return 'demo_jwt_token';
+        }
+
+        function getClientId() {
+            // In a real implementation, you'd get this from your client management system
+            return 'demo_client_id';
+        }
+
+        // Auto-fill shop domain if we can detect it
+        if (window.location.hostname.includes('myshopify.com')) {
+            document.getElementById('shopDomain').value = window.location.hostname;
+        }
+    </script>
+</body>
+</html>
