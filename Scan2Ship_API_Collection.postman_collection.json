@@ -1,0 +1,1112 @@
+{
+  "info": {
+    "name": "Scan2Ship API Collection",
+    "description": "Complete API collection for Scan2Ship logistics courier aggregator application",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "client_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('auth_token', response.token);",
+                  "    pm.collectionVariables.set('client_id', response.user.clientId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Client Name\",\n  \"companyName\": \"Company Name\",\n  \"email\": \"client@example.com\",\n  \"phone\": \"+1234567890\",\n  \"address\": \"Client Address\",\n  \"city\": \"City\",\n  \"state\": \"State\",\n  \"country\": \"India\",\n  \"pincode\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register-client",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register-client"]
+            }
+          }
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"User Name\",\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"clientId\": \"{{client_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register-user",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register-user"]
+            }
+          }
+        },
+        {
+          "name": "Verify Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/verify",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "verify"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Customer Name\",\n  \"mobile\": \"9876543210\",\n  \"phone\": \"9876543210\",\n  \"address\": \"Delivery Address\",\n  \"city\": \"City\",\n  \"state\": \"State\",\n  \"country\": \"India\",\n  \"pincode\": \"123456\",\n  \"courier_service\": \"DELHIVERY\",\n  \"pickup_location\": \"Pickup Location\",\n  \"package_value\": 1000.00,\n  \"weight\": 1.5,\n  \"total_items\": 1,\n  \"is_cod\": false,\n  \"cod_amount\": null,\n  \"reference_number\": \"REF123\",\n  \"tracking_id\": \"TRK123\",\n  \"reseller_name\": \"Reseller Name\",\n  \"reseller_mobile\": \"9876543210\",\n  \"product_description\": \"Product Description\",\n  \"shipment_length\": 10.0,\n  \"shipment_breadth\": 10.0,\n  \"shipment_height\": 10.0,\n  \"return_address\": \"Return Address\",\n  \"return_pincode\": \"123456\",\n  \"fragile_shipment\": false,\n  \"seller_name\": \"Seller Name\",\n  \"seller_address\": \"Seller Address\",\n  \"seller_gst\": \"GST123\",\n  \"invoice_number\": \"INV123\",\n  \"commodity_value\": 1000.00,\n  \"tax_value\": 180.00,\n  \"category_of_goods\": \"Electronics\",\n  \"vendor_pickup_location\": \"Vendor Location\",\n  \"hsn_code\": \"8517\",\n  \"seller_cst_no\": \"CST123\",\n  \"seller_tin\": \"TIN123\",\n  \"invoice_date\": \"2024-01-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('order_id', response.order.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders?page=1&limit=10&search=&fromDate=&toDate=&pickupLocation=&courierService=",
+              "host": ["{{base_url}}"],
+              "path": ["orders"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                },
+                {
+                  "key": "fromDate",
+                  "value": ""
+                },
+                {
+                  "key": "toDate",
+                  "value": ""
+                },
+                {
+                  "key": "pickupLocation",
+                  "value": ""
+                },
+                {
+                  "key": "courierService",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Order",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Customer Name\",\n  \"mobile\": \"9876543210\",\n  \"address\": \"Updated Delivery Address\",\n  \"city\": \"Updated City\",\n  \"state\": \"Updated State\",\n  \"country\": \"India\",\n  \"pincode\": \"123456\",\n  \"courier_service\": \"DELHIVERY\",\n  \"pickup_location\": \"Pickup Location\",\n  \"package_value\": 1500.00,\n  \"weight\": 2.0,\n  \"total_items\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Order",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Shipping Label",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/shipping-label",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}", "shipping-label"]
+            }
+          }
+        },
+        {
+          "name": "Get Waybill",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/waybill",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}", "waybill"]
+            }
+          }
+        },
+        {
+          "name": "Retry Delhivery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/retry-delhivery",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}", "retry-delhivery"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Courier Services",
+      "item": [
+        {
+          "name": "Get Courier Services",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/courier-services",
+              "host": ["{{base_url}}"],
+              "path": ["courier-services"]
+            }
+          }
+        },
+        {
+          "name": "Create Courier Service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Service Name\",\n  \"code\": \"SERVICE_CODE\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/courier-services",
+              "host": ["{{base_url}}"],
+              "path": ["courier-services"]
+            }
+          }
+        },
+        {
+          "name": "Update Courier Service",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"service-id\",\n  \"name\": \"Updated Service Name\",\n  \"code\": \"UPDATED_CODE\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/courier-services",
+              "host": ["{{base_url}}"],
+              "path": ["courier-services"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pickup Locations",
+      "item": [
+        {
+          "name": "Get Pickup Locations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pickup-locations",
+              "host": ["{{base_url}}"],
+              "path": ["pickup-locations"]
+            }
+          }
+        },
+        {
+          "name": "Create Pickup Location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"LOCATION_CODE\",\n  \"label\": \"Location Name\",\n  \"delhiveryApiKey\": \"api-key\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pickup-locations",
+              "host": ["{{base_url}}"],
+              "path": ["pickup-locations"]
+            }
+          }
+        },
+        {
+          "name": "Update Pickup Location",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"location-id\",\n  \"value\": \"UPDATED_CODE\",\n  \"label\": \"Updated Location Name\",\n  \"delhiveryApiKey\": \"updated-api-key\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pickup-locations",
+              "host": ["{{base_url}}"],
+              "path": ["pickup-locations"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Credits",
+      "item": [
+        {
+          "name": "Get Credits",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/credits",
+              "host": ["{{base_url}}"],
+              "path": ["credits"]
+            }
+          }
+        },
+        {
+          "name": "Get Credit Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/credits/transactions?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["credits", "transactions"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000,\n  \"utrNumber\": \"UTR123456789\",\n  \"screenshot\": \"base64-encoded-image\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/credits/verify-payment",
+              "host": ["{{base_url}}"],
+              "path": ["credits", "verify-payment"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Track Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventType\": \"order_created\",\n  \"eventData\": {\n    \"orderId\": 123,\n    \"courierService\": \"DELHIVERY\",\n    \"packageValue\": 1000\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/analytics/track",
+              "host": ["{{base_url}}"],
+              "path": ["analytics", "track"]
+            }
+          }
+        },
+        {
+          "name": "Get Platform Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/analytics/platform",
+              "host": ["{{base_url}}"],
+              "path": ["analytics", "platform"]
+            }
+          }
+        },
+        {
+          "name": "Get Client Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/analytics/clients",
+              "host": ["{{base_url}}"],
+              "path": ["analytics", "clients"]
+            }
+          }
+        },
+        {
+          "name": "Get Client Analytics by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/analytics/clients/{{client_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["analytics", "clients", "{{client_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin APIs",
+      "item": [
+        {
+          "name": "Get All Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/clients",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "clients"]
+            }
+          }
+        },
+        {
+          "name": "Create Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Client Name\",\n  \"companyName\": \"Company Name\",\n  \"email\": \"client@example.com\",\n  \"phone\": \"+1234567890\",\n  \"address\": \"Client Address\",\n  \"city\": \"City\",\n  \"state\": \"State\",\n  \"country\": \"India\",\n  \"pincode\": \"123456\",\n  \"subscriptionPlan\": \"basic\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/clients",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "clients"]
+            }
+          }
+        },
+        {
+          "name": "Get Client by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/clients/{{client_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "clients", "{{client_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Client",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Client Name\",\n  \"companyName\": \"Updated Company Name\",\n  \"email\": \"updated@example.com\",\n  \"phone\": \"+1234567890\",\n  \"address\": \"Updated Address\",\n  \"city\": \"Updated City\",\n  \"state\": \"Updated State\",\n  \"country\": \"India\",\n  \"pincode\": \"123456\",\n  \"subscriptionPlan\": \"premium\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/clients/{{client_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "clients", "{{client_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Client",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/clients/{{client_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "clients", "{{client_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/users",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users"]
+            }
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"User Name\",\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"user\",\n  \"clientId\": \"{{client_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/users",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users"]
+            }
+          }
+        },
+        {
+          "name": "Get All Credits",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/credits",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "credits"]
+            }
+          }
+        },
+        {
+          "name": "Get Client Credits",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/credits/{{client_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "credits", "{{client_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Add Credits to Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000,\n  \"description\": \"Credit addition\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/credits/{{client_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "credits", "{{client_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Client Credits",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"balance\": 2000,\n  \"totalAdded\": 3000,\n  \"totalUsed\": 1000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/credits/{{client_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "credits", "{{client_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Client Credit Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/credits/{{client_id}}/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "credits", "{{client_id}}", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Get Client Credit Costs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/credits/{{client_id}}/costs",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "credits", "{{client_id}}", "costs"]
+            }
+          }
+        },
+        {
+          "name": "Set Client Credit Costs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature\": \"ORDER\",\n  \"cost\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/credits/{{client_id}}/costs",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "credits", "{{client_id}}", "costs"]
+            }
+          }
+        },
+        {
+          "name": "Update Client Credit Costs",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature\": \"ORDER\",\n  \"cost\": 15\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/credits/{{client_id}}/costs",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "credits", "{{client_id}}", "costs"]
+            }
+          }
+        },
+        {
+          "name": "Get System Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/system-config",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "system-config"]
+            }
+          }
+        },
+        {
+          "name": "Create System Config",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"config_key\",\n  \"value\": \"config_value\",\n  \"type\": \"string\",\n  \"category\": \"general\",\n  \"description\": \"Configuration description\",\n  \"isEncrypted\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/system-config",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "system-config"]
+            }
+          }
+        },
+        {
+          "name": "Update System Config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"config_key\",\n  \"value\": \"updated_config_value\",\n  \"type\": \"string\",\n  \"category\": \"general\",\n  \"description\": \"Updated configuration description\",\n  \"isEncrypted\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/system-config",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "system-config"]
+            }
+          }
+        },
+        {
+          "name": "Get Client Configurations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/client-configurations",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "client-configurations"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Utility APIs",
+      "item": [
+        {
+          "name": "Validate Pincode",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/validate-pincode?pincode=123456",
+              "host": ["{{base_url}}"],
+              "path": ["validate-pincode"],
+              "query": [
+                {
+                  "key": "pincode",
+                  "value": "123456"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Process Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"image\": \"base64-encoded-image\",\n  \"operation\": \"ocr\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/process-image",
+              "host": ["{{base_url}}"],
+              "path": ["process-image"]
+            }
+          }
+        },
+        {
+          "name": "Process Text",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Text to process\",\n  \"operation\": \"extract_address\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/process-text",
+              "host": ["{{base_url}}"],
+              "path": ["process-text"]
+            }
+          }
+        },
+        {
+          "name": "Format Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"Raw address string\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/format-address",
+              "host": ["{{base_url}}"],
+              "path": ["format-address"]
+            }
+          }
+        },
+        {
+          "name": "Format Address from Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"image\": \"base64-encoded-image\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/format-address-image",
+              "host": ["{{base_url}}"],
+              "path": ["format-address-image"]
+            }
+          }
+        },
+        {
+          "name": "Validate Payment Screenshot",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"image\": \"base64-encoded-image\",\n  \"expectedAmount\": 1000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/validate-payment-screenshot",
+              "host": ["{{base_url}}"],
+              "path": ["validate-payment-screenshot"]
+            }
+          }
+        },
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/profile",
+              "host": ["{{base_url}}"],
+              "path": ["users", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Client Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"setting_key\": \"setting_value\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/client-settings",
+              "host": ["{{base_url}}"],
+              "path": ["client-settings"]
+            }
+          }
+        },
+        {
+          "name": "Get Order Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/order-config",
+              "host": ["{{base_url}}"],
+              "path": ["order-config"]
+            }
+          }
+        },
+        {
+          "name": "Update Order Config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"defaultProductDescription\": \"ARTIFICAL JEWELLERY\",\n  \"defaultPackageValue\": 5000,\n  \"defaultWeight\": 100,\n  \"defaultTotalItems\": 1,\n  \"codEnabledByDefault\": false,\n  \"minPackageValue\": 100,\n  \"maxPackageValue\": 100000,\n  \"minWeight\": 1,\n  \"maxWeight\": 50000,\n  \"minTotalItems\": 1,\n  \"maxTotalItems\": 100,\n  \"requireProductDescription\": true,\n  \"requirePackageValue\": true,\n  \"requireWeight\": true,\n  \"requireTotalItems\": true,\n  \"enableResellerFallback\": true,\n  \"enableThermalPrint\": false,\n  \"enableReferencePrefix\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/order-config",
+              "host": ["{{base_url}}"],
+              "path": ["order-config"]
+            }
+          }
+        },
+        {
+          "name": "Get DTDC Slips",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/dtdc-slips",
+              "host": ["{{base_url}}"],
+              "path": ["dtdc-slips"]
+            }
+          }
+        },
+        {
+          "name": "Update DTDC Slips",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slip_data\": \"updated slip data\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/dtdc-slips",
+              "host": ["{{base_url}}"],
+              "path": ["dtdc-slips"]
+            }
+          }
+        },
+        {
+          "name": "Get PWA Manifest",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pwa/manifest",
+              "host": ["{{base_url}}"],
+              "path": ["pwa", "manifest"]
+            }
+          }
+        },
+        {
+          "name": "Environment Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/env-check",
+              "host": ["{{base_url}}"],
+              "path": ["env-check"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
