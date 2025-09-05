@@ -132,11 +132,24 @@ export async function POST(request: NextRequest) {
       // Determine creation pattern from request body
       const creationPattern = (orderData as any).creationPattern || 'manual';
       
+      // Track order creation analytics
       await AnalyticsService.trackOrderCreation({
         orderId: order.id,
         clientId: auth.user.clientId,
         userId: auth.user.id,
         creationPattern
+      });
+
+      // Track create_order event
+      await AnalyticsService.trackEvent({
+        eventType: 'create_order',
+        clientId: auth.user.clientId,
+        userId: auth.user.id,
+        eventData: {
+          orderId: order.id,
+          creationPattern,
+          courierService: orderData.courier_service
+        }
       });
       
       console.log('📊 [API_ORDERS_POST] Order analytics tracked:', {
