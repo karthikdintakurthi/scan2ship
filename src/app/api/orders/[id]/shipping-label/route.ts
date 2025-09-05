@@ -5,6 +5,8 @@
 /*
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { generateThermalLabelHTML, createThermalLabelData } from '@/lib/thermal-label-generator'
 
 const prisma = new PrismaClient()
@@ -171,6 +173,31 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
     const { id } = await params
     const orderId = parseInt(id)
     
@@ -210,8 +237,16 @@ export async function GET(
     // Generate shipping label URL - get JSON response for custom PDF generation
     const shippingLabelUrl = `${baseUrl}/api/p/packing_slip?wbns=${order.delhivery_waybill_number}&pdf=false`
 
-    console.log('🚀 Fetching packing slip data for waybill:', order.delhivery_waybill_number)
-    console.log('📋 API URL:', shippingLabelUrl)
+    console.log('🚀 [SHIPPING_LABEL] Fetching packing slip data for waybill:', order.delhivery_waybill_number)
+    console.log('📋 [SHIPPING_LABEL] API URL:', shippingLabelUrl)
+    console.log('🔑 [SHIPPING_LABEL] Using API key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT_FOUND')
+    console.log('📊 [SHIPPING_LABEL] Order details:', {
+      id: order.id,
+      waybill: order.delhivery_waybill_number,
+      courierService: order.courier_service,
+      pickupLocation: order.pickup_location,
+      apiStatus: order.delhivery_api_status
+    })
 
     try {
       // Fetch packing slip data from Delhivery
@@ -224,7 +259,14 @@ export async function GET(
       })
 
       if (!response.ok) {
-        throw new Error(`Delhivery API returned ${response.status}: ${response.statusText}`)
+        const errorText = await response.text();
+        console.error('❌ [SHIPPING_LABEL] Delhivery API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          response: errorText,
+          url: shippingLabelUrl
+        });
+        throw new Error(`Delhivery API returned ${response.status}: ${response.statusText}. Response: ${errorText}`)
       }
 
       // Get JSON response with packing slip details
@@ -233,7 +275,19 @@ export async function GET(
 
       // Check if we have package information
       if (!jsonResponse.packages || jsonResponse.packages.length === 0) {
-        throw new Error('No package information found in Delhivery response')
+        console.log('❌ [SHIPPING_LABEL] No packages found in Delhivery response:', {
+          waybillNumber: order.delhivery_waybill_number,
+          response: jsonResponse,
+          orderId: order.id,
+          courierService: order.courier_service
+        });
+        
+        // Provide more specific error message
+        const errorMessage = jsonResponse.packages_found === 0 
+          ? `Order ${order.id} with waybill ${order.delhivery_waybill_number} was not found in Delhivery system. The order may not have been properly created in Delhivery. Please use the "Retry Delhivery" option to recreate the order in Delhivery system.`
+          : 'No package information found in Delhivery response';
+          
+        throw new Error(errorMessage);
       }
 
       const packageInfo = jsonResponse.packages[0]

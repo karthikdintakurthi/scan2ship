@@ -29,7 +29,13 @@ async function testOpenAIAPIFix() {
     // Test JWT token generation
     console.log('\n🧪 Testing JWT Token Generation...');
     
-    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ JWT_SECRET environment variable is not set');
+      console.error('Please set JWT_SECRET in your .env.local file');
+      process.exit(1);
+    }
+    
+    const jwtSecret = process.env.JWT_SECRET;
     const token = jwt.sign({ userId: realUser.id }, jwtSecret);
     
     console.log('✅ JWT Token generated successfully');

@@ -1,64 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
 import { CreditService } from '@/lib/credit-service';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('🔐 [AUTH] No authorization header or invalid format');
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  console.log('🔐 [AUTH] Token extracted, length:', token.length);
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-    console.log('🔐 [AUTH] JWT decoded successfully, userId:', decoded.userId);
-    
-    // Get user and client data from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    console.log('🔐 [AUTH] User lookup result:', user ? 'Found' : 'Not found');
-    if (user) {
-      console.log('🔐 [AUTH] User active:', user.isActive, 'Client active:', user.clients?.isActive);
-    }
-
-    if (!user || !user.isActive || !user.clients.isActive) {
-      console.log('🔐 [AUTH] User validation failed:', { 
-        userExists: !!user, 
-        userActive: user?.isActive, 
-        clientActive: user?.clients?.isActive 
-      });
-      return null;
-    }
-
-    console.log('🔐 [AUTH] Authentication successful for user:', user.email, 'Client:', user.clients.companyName);
-    return {
-      user: user,
-      client: user.clients
-    };
-  } catch (error) {
-    console.log('🔐 [AUTH] JWT verification failed:', error);
-    return null;
-  }
-}
+// Authentication handled by centralized middleware
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user
-    const auth = await getAuthenticatedUser(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const auth = { user: authResult.user!, client: authResult.user!.client };
 
     const { client, user } = auth;
     const body = await request.json();

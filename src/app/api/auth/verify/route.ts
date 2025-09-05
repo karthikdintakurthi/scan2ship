@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
+import { jwtConfig } from '@/lib/jwt-config';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,10 +16,14 @@ export async function GET(request: NextRequest) {
 
     const token = authHeader.substring(7);
 
-    // Verify JWT token
+    // Verify JWT token with secure configuration
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+      decoded = jwt.verify(token, jwtConfig.secret, {
+        issuer: jwtConfig.options.issuer,
+        audience: jwtConfig.options.audience,
+        algorithms: [jwtConfig.options.algorithm]
+      }) as any;
     } catch (error) {
       return NextResponse.json(
         { error: 'Invalid token' },
@@ -52,7 +57,7 @@ export async function GET(request: NextRequest) {
         userId: user.id,
         clientId: user.clientId,
         token: token,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
+        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) // 8 hours from now
       }
     });
 

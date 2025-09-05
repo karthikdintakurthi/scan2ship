@@ -1,52 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 const prisma = new PrismaClient();
-
-// Helper function to get authenticated admin user
-async function getAuthenticatedAdmin(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-    
-    // Get user and client data from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    if (!user || !user.isActive || (user.role !== 'admin' && user.role !== 'master_admin')) {
-      return null;
-    }
-
-    return {
-      user: user,
-      client: user.clients
-    };
-  } catch (error) {
-    return null;
-  }
-}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const { id: clientId } = await params;
@@ -135,18 +121,46 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const { id: clientId } = await params;
     const updateData = await request.json();
 
-    console.log('📝 [API_ADMIN_CLIENT_PUT] Updating client details for ID:', clientId);
+    console.log('📝 [API_ADMIN_CLIENT_PUT] Updating client:', clientId);
 
-    // Update client
+    // Check if client exists
+    const existingClient = await prisma.clients.findUnique({
+      where: { id: clientId }
+    });
+
+    if (!existingClient) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    }
+
+    // Update the client
     const updatedClient = await prisma.clients.update({
       where: { id: clientId },
       data: {
@@ -188,49 +202,53 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.DELETE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const { id: clientId } = await params;
 
-    console.log('🗑️ [API_ADMIN_CLIENT_DELETE] Deleting client with ID:', clientId);
+    console.log('🗑️ [API_ADMIN_CLIENT_DELETE] Deleting client:', clientId);
 
     // Check if client exists
-    const client = await prisma.clients.findUnique({
-      where: { id: clientId },
-      include: {
-        _count: {
-          select: {
-            users: true,
-            orders: true
-          }
-        }
-      }
+    const existingClient = await prisma.clients.findUnique({
+      where: { id: clientId }
     });
 
-    if (!client) {
+    if (!existingClient) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });
     }
 
-    console.log(`🗑️ [API_ADMIN_CLIENT_DELETE] Found client: ${client.companyName} with ${client._count.users} users and ${client._count.orders} orders`);
-
-    // Delete client (this will cascade delete users, orders, and related data due to foreign key constraints)
+    // Delete the client
     await prisma.clients.delete({
       where: { id: clientId }
     });
 
-    console.log(`✅ [API_ADMIN_CLIENT_DELETE] Successfully deleted client: ${client.companyName}`);
+    console.log(`✅ [API_ADMIN_CLIENT_DELETE] Deleted client: ${existingClient.companyName}`);
 
     return NextResponse.json({
-      message: 'Client deleted successfully',
-      deletedClient: {
-        id: client.id,
-        companyName: client.companyName,
-        email: client.email
-      }
+      message: 'Client deleted successfully'
     });
 
   } catch (error) {

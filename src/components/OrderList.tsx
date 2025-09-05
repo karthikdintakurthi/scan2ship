@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getPickupLocations } from '@/lib/order-form-config'
 import { getActiveCourierServices } from '@/lib/courier-service-config'
-import * as XLSX from 'xlsx'
+import * as ExcelJS from 'exceljs'
 
 interface Order {
   id: number
@@ -675,83 +675,96 @@ export default function OrderList() {
 
       // Prepare data for export
       const exportData = ordersToExport.map(order => ({
-        'Order ID': order.id,
-        'Customer Name': order.name,
-        'Mobile': order.mobile,
-        'Address': order.address,
-        'City': order.city,
-        'State': order.state,
-        'Country': order.country,
-        'Pincode': order.pincode,
-        'Courier Service': order.courier_service,
-        'Pickup Location': order.pickup_location,
-        'Package Value': order.package_value,
-        'Weight (g)': order.weight,
-        'Total Items': order.total_items,
-        'Tracking ID': order.tracking_id || '',
-        'Reference Number': order.reference_number || '',
-        'Is COD': order.is_cod ? 'Yes' : 'No',
-        'COD Amount': order.cod_amount || '',
-        'Reseller Name': order.reseller_name || '',
-        'Reseller Mobile': order.reseller_mobile || '',
-        'Created Date': new Date(order.created_at).toLocaleDateString('en-IN'),
-        'Product Description': order.product_description || '',
-        'Delhivery Waybill': order.delhivery_waybill_number || '',
-        'Delhivery Order ID': order.delhivery_order_id || '',
-        'Delhivery Status': order.delhivery_api_status || '',
-        'Shipment Length': order.shipment_length || '',
-        'Shipment Breadth': order.shipment_breadth || '',
-        'Shipment Height': order.shipment_height || '',
-        'Return Address': order.return_address || '',
-        'Seller Name': order.seller_name || '',
-        'Seller GST': order.seller_gst || '',
-        'HSN Code': order.hsn_code || '',
-        'Category': order.category_of_goods || ''
+        orderId: order.id,
+        customerName: order.name,
+        mobile: order.mobile,
+        address: order.address,
+        city: order.city,
+        state: order.state,
+        country: order.country,
+        pincode: order.pincode,
+        courierService: order.courier_service,
+        pickupLocation: order.pickup_location,
+        packageValue: order.package_value,
+        weight: order.weight,
+        totalItems: order.total_items,
+        trackingId: order.tracking_id || '',
+        referenceNumber: order.reference_number || '',
+        isCod: order.is_cod ? 'Yes' : 'No',
+        codAmount: order.cod_amount || '',
+        resellerName: order.reseller_name || '',
+        resellerMobile: order.reseller_mobile || '',
+        createdDate: new Date(order.created_at).toLocaleDateString('en-IN'),
+        productDescription: order.product_description || '',
+        delhiveryWaybill: order.delhivery_waybill_number || '',
+        delhiveryOrderId: order.delhivery_order_id || '',
+        delhiveryStatus: order.delhivery_api_status || '',
+        shipmentLength: order.shipment_length || '',
+        shipmentBreadth: order.shipment_breadth || '',
+        shipmentHeight: order.shipment_height || '',
+        returnAddress: order.return_address || '',
+        sellerName: order.seller_name || '',
+        sellerGst: order.seller_gst || '',
+        hsnCode: order.hsn_code || '',
+        category: order.category_of_goods || ''
       }))
 
       // Create workbook and worksheet
-      const workbook = XLSX.utils.book_new()
-      const worksheet = XLSX.utils.json_to_sheet(exportData)
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('Orders')
 
-      // Auto-size columns
-      const columnWidths = [
-        { wch: 10 }, // Order ID
-        { wch: 20 }, // Customer Name
-        { wch: 15 }, // Mobile
-        { wch: 40 }, // Address
-        { wch: 15 }, // City
-        { wch: 15 }, // State
-        { wch: 15 }, // Country
-        { wch: 10 }, // Pincode
-        { wch: 15 }, // Courier Service
-        { wch: 20 }, // Pickup Location
-        { wch: 15 }, // Package Value
-        { wch: 12 }, // Weight
-        { wch: 12 }, // Total Items
-        { wch: 20 }, // Tracking ID
-        { wch: 20 }, // Reference Number
-        { wch: 8 },  // Is COD
-        { wch: 12 }, // COD Amount
-        { wch: 20 }, // Reseller Name
-        { wch: 15 }, // Reseller Mobile
-        { wch: 15 }, // Created Date
-        { wch: 25 }, // Product Description
-        { wch: 20 }, // Delhivery Waybill
-        { wch: 20 }, // Delhivery Order ID
-        { wch: 15 }, // Delhivery Status
-        { wch: 15 }, // Shipment Length
-        { wch: 15 }, // Shipment Breadth
-        { wch: 15 }, // Shipment Height
-        { wch: 40 }, // Return Address
-        { wch: 20 }, // Seller Name
-        { wch: 15 }, // Seller GST
-        { wch: 12 }, // HSN Code
-        { wch: 20 }  // Category
+      // Define columns with headers
+      const columns = [
+        { header: 'Order ID', key: 'orderId', width: 10 },
+        { header: 'Customer Name', key: 'customerName', width: 20 },
+        { header: 'Mobile', key: 'mobile', width: 15 },
+        { header: 'Address', key: 'address', width: 40 },
+        { header: 'Customer City', key: 'city', width: 15 },
+        { header: 'Customer State', key: 'state', width: 15 },
+        { header: 'Customer Country', key: 'country', width: 15 },
+        { header: 'Customer Pincode', key: 'pincode', width: 10 },
+        { header: 'Courier Service', key: 'courierService', width: 15 },
+        { header: 'Pickup Location', key: 'pickupLocation', width: 20 },
+        { header: 'Package Value', key: 'packageValue', width: 15 },
+        { header: 'Weight', key: 'weight', width: 12 },
+        { header: 'Total Items', key: 'totalItems', width: 12 },
+        { header: 'Tracking ID', key: 'trackingId', width: 20 },
+        { header: 'Reference Number', key: 'referenceNumber', width: 20 },
+        { header: 'Is COD', key: 'isCod', width: 8 },
+        { header: 'COD Amount', key: 'codAmount', width: 12 },
+        { header: 'Reseller Name', key: 'resellerName', width: 20 },
+        { header: 'Reseller Mobile', key: 'resellerMobile', width: 15 },
+        { header: 'Created Date', key: 'createdDate', width: 15 },
+        { header: 'Product Description', key: 'productDescription', width: 25 },
+        { header: 'Delhivery Waybill', key: 'delhiveryWaybill', width: 20 },
+        { header: 'Delhivery Order ID', key: 'delhiveryOrderId', width: 20 },
+        { header: 'Delhivery Status', key: 'delhiveryStatus', width: 15 },
+        { header: 'Shipment Length', key: 'shipmentLength', width: 15 },
+        { header: 'Shipment Breadth', key: 'shipmentBreadth', width: 15 },
+        { header: 'Shipment Height', key: 'shipmentHeight', width: 15 },
+        { header: 'Return Address', key: 'returnAddress', width: 40 },
+        { header: 'Seller Name', key: 'sellerName', width: 20 },
+        { header: 'Seller GST', key: 'sellerGst', width: 15 },
+        { header: 'HSN Code', key: 'hsnCode', width: 12 },
+        { header: 'Category', key: 'category', width: 20 }
       ]
-      worksheet['!cols'] = columnWidths
 
-      // Add worksheet to workbook
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Orders')
+      // Set column definitions
+      worksheet.columns = columns
+
+      // Add data rows
+      exportData.forEach(row => {
+        worksheet.addRow(row)
+      })
+
+      // Style the header row
+      const headerRow = worksheet.getRow(1)
+      headerRow.font = { bold: true }
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      }
 
       // Generate filename with current date and filter info
       const now = new Date()
@@ -785,8 +798,17 @@ export default function OrderList() {
       
       filename += '.xlsx'
 
-      // Save the file
-      XLSX.writeFile(workbook, filename)
+      // Save the file using ExcelJS
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
       
       console.log(`✅ Exported ${ordersToExport.length} orders to ${filename}`)
       
@@ -1368,17 +1390,7 @@ export default function OrderList() {
                           View Details
                         </button>
                         
-                        {order.courier_service.toLowerCase() === 'delhivery' && 
-                         order.delhivery_api_status === 'failed' && 
-                         (order.delhivery_retry_count || 0) < 3 && (
-                          <button
-                            onClick={() => retryDelhiveryOrder(order.id)}
-                            disabled={retrying === order.id}
-                            className="block w-full px-3 py-1 text-xs bg-orange-100 text-orange-800 rounded hover:bg-orange-200 disabled:opacity-50"
-                          >
-                            {retrying === order.id ? 'Retrying...' : 'Retry Delhivery'}
-                          </button>
-                        )}
+
                       </div>
                     </td>
                   </tr>
@@ -1555,21 +1567,7 @@ export default function OrderList() {
                     </div>
                   </div>
                   
-                  {selectedOrder.delhivery_api_status === 'failed' && 
-                   (selectedOrder.delhivery_retry_count || 0) < 3 && (
-                    <div className="mt-3">
-                      <button
-                        onClick={() => {
-                          retryDelhiveryOrder(selectedOrder.id)
-                          setSelectedOrder(null)
-                        }}
-                        disabled={retrying === selectedOrder.id}
-                        className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
-                      >
-                        {retrying === selectedOrder.id ? 'Retrying...' : 'Retry Delhivery API'}
-                      </button>
-                    </div>
-                  )}
+
                 </div>
               ) : (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg">

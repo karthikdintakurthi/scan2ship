@@ -1,35 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-
-// Helper function to authenticate master admin
-async function getAuthenticatedAdmin(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  
-  try {
-    const jwt = await import('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-    
-    // Get user from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId }
-    });
-
-    if (!user || user.role !== 'master_admin' || !user.isActive) {
-      return null;
-    }
-
-    return user;
-  } catch (error) {
-    return null;
-  }
-}
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 export async function PUT(
   request: NextRequest,
@@ -38,14 +11,32 @@ export async function PUT(
   try {
     console.log('🔐 [ADMIN_UPDATE_USER_PASSWORD] Starting request...');
     
-    // Authenticate master admin
-    const admin = await getAuthenticatedAdmin(request);
-    if (!admin) {
-      console.log('❌ [ADMIN_UPDATE_USER_PASSWORD] Admin authentication failed');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
 
-    console.log('✅ [ADMIN_UPDATE_USER_PASSWORD] Admin authenticated:', admin.email);
+    // Authorize master admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.SUPER_ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    console.log('✅ [ADMIN_UPDATE_USER_PASSWORD] Admin authenticated:', authResult.user!.email);
 
     const userId = params.id;
     const { newPassword } = await request.json();

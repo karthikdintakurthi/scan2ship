@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generatePWAManifest } from '@/lib/pwa-config';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
 
 // Helper function to get client from query parameter or token
 async function getClientFromRequest(request: NextRequest) {
@@ -27,6 +26,7 @@ async function getClientFromRequest(request: NextRequest) {
   return null;
 }
 
+// This endpoint is intentionally public - PWA manifests need to be accessible without authentication
 export async function GET(request: NextRequest) {
   try {
     const client = await getClientFromRequest(request);

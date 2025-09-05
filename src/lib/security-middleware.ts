@@ -113,12 +113,9 @@ export function cors(request: NextRequest): NextResponse | null {
     // For preflight, allow the requesting origin if it's valid
     if (origin && corsConfig.origin.includes(origin)) {
       response.headers.set('Access-Control-Allow-Origin', origin);
-    } else if (!origin && process.env.NODE_ENV === 'development') {
-      // Allow requests without origin header only in development
+    } else if (!origin) {
+      // Allow requests without origin header (e.g., local development, Postman)
       response.headers.set('Access-Control-Allow-Origin', '*');
-    } else if (!origin && process.env.NODE_ENV === 'production') {
-      // In production, default to QA environment for requests without origin
-      response.headers.set('Access-Control-Allow-Origin', 'https://qa.scan2ship.in');
     } else {
       // Block requests from unauthorized origins
       return NextResponse.json(
@@ -140,16 +137,8 @@ export function cors(request: NextRequest): NextResponse | null {
     return null; // Continue with request
   }
   
-  // In production, require origin header for security
-  if (process.env.NODE_ENV === 'production' && !origin) {
-    return NextResponse.json(
-      { error: 'Origin header required in production' },
-      { status: 403 }
-    );
-  }
-  
-  // Allow requests without origin header only in development
-  if (!origin && process.env.NODE_ENV === 'development') {
+  // Allow requests without origin header (e.g., local development, Postman)
+  if (!origin) {
     return null; // Continue with request
   }
   

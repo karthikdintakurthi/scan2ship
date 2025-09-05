@@ -11,9 +11,15 @@ async function generateTestToken() {
     role: 'master_admin'
   };
 
+  if (!process.env.JWT_SECRET) {
+    console.error('❌ JWT_SECRET environment variable is not set');
+    console.error('Please set JWT_SECRET in your .env.local file');
+    process.exit(1);
+  }
+
   const token = jwt.sign(
     payload,
-    process.env.JWT_SECRET || 'fallback-secret',
+    process.env.JWT_SECRET,
     { expiresIn: '24h' }
   );
 
@@ -31,7 +37,7 @@ async function generateTestToken() {
   // Test the token
   console.log('\n🧪 Testing token...');
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('✅ Token is valid!');
     console.log('Decoded payload:', decoded);
   } catch (error) {
