@@ -227,12 +227,8 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
         </div>
         ` : ''}
         
-        <div class="reference">
-            <strong>Reference Number:</strong> ${order.reference_number || 'N/A'}
-        </div>
-        
-        <div class="reference">
-            <strong>Quantity:</strong> ${order.total_items || 1} item${(order.total_items || 1) > 1 ? 's' : ''}
+        <div class="reference" style="text-align: left; font-size: 20px; font-weight: 900;">
+            <strong>Ref. No:</strong> ${order.reference_number || 'N/A'}
         </div>
         
         <div class="footer">

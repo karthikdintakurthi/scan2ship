@@ -221,7 +221,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         <!-- Reference -->
         ${data.referenceNumber ? `
         <div class="reference-section">
-            <div class="text-bold">Reference: ${data.referenceNumber}</div>
+            <div class="text-bold">Ref. No: ${data.referenceNumber}</div>
         </div>
         ` : ''}
         
