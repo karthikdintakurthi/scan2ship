@@ -22,7 +22,7 @@ async function authenticateRequest(request: NextRequest, requiredPermission?: st
   // Fallback to JWT authentication
   const authResult = await authorizeUser(request, {
     requiredRole: UserRole.USER,
-    requiredPermissions: requiredPermission ? [requiredPermission as any] : [PermissionLevel.READ],
+    requiredPermissions: [PermissionLevel.READ], // JWT uses role-based auth, not granular permissions
     requireActiveUser: true,
     requireActiveClient: true
   });
@@ -69,8 +69,14 @@ export async function GET(request: NextRequest) {
 
     // Get courier services for the current client
     const courierServices = await prisma.courier_services.findMany({
-      where: { clientId: auth.clientId },
-      orderBy: { name: 'asc' }
+      where: { 
+        clientId: auth.clientId,
+        isActive: true  // Only get active services
+      },
+      orderBy: [
+        { isDefault: 'desc' },
+        { name: 'asc' }
+      ]
     });
 
     console.log(`🔍 [API_COURIER_SERVICES_GET] Raw courier services from DB:`, courierServices);

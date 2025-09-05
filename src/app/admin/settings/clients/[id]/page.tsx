@@ -40,6 +40,14 @@ interface CourierService {
   code: string;
   isActive: boolean;
   isDefault: boolean;
+  // Rate calculation fields
+  baseRate?: number | null;
+  ratePerKg?: number | null;
+  minWeight?: number | null;
+  maxWeight?: number | null;
+  codCharges?: number | null;
+  freeShippingThreshold?: number | null;
+  estimatedDays?: number | null;
 }
 
 interface ClientConfig {
@@ -129,7 +137,15 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
     name: '',
     code: '',
     isActive: true,
-    isDefault: false
+    isDefault: false,
+    // Rate calculation fields
+    baseRate: '',
+    ratePerKg: '',
+    minWeight: '',
+    maxWeight: '',
+    codCharges: '',
+    freeShippingThreshold: '',
+    estimatedDays: ''
   });
 
   // Data for editing courier service
@@ -137,7 +153,15 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
     name: '',
     code: '',
     isActive: true,
-    isDefault: false
+    isDefault: false,
+    // Rate calculation fields
+    baseRate: '',
+    ratePerKg: '',
+    minWeight: '',
+    maxWeight: '',
+    codCharges: '',
+    freeShippingThreshold: '',
+    estimatedDays: ''
   });
 
   // Data for editing pickup location
@@ -402,7 +426,15 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
       name: newCourierService.name,
       code: newCourierService.code,
       isActive: newCourierService.isActive,
-      isDefault: newCourierService.isDefault
+      isDefault: newCourierService.isDefault,
+      // Rate calculation fields
+      baseRate: newCourierService.baseRate ? parseFloat(newCourierService.baseRate) : null,
+      ratePerKg: newCourierService.ratePerKg ? parseFloat(newCourierService.ratePerKg) : null,
+      minWeight: newCourierService.minWeight ? parseFloat(newCourierService.minWeight) : null,
+      maxWeight: newCourierService.maxWeight ? parseFloat(newCourierService.maxWeight) : null,
+      codCharges: newCourierService.codCharges ? parseFloat(newCourierService.codCharges) : null,
+      freeShippingThreshold: newCourierService.freeShippingThreshold ? parseFloat(newCourierService.freeShippingThreshold) : null,
+      estimatedDays: newCourierService.estimatedDays ? parseInt(newCourierService.estimatedDays) : null
     };
 
     // If setting this as default, uncheck all existing services
@@ -445,7 +477,20 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
       setError('Error saving courier service');
     }
 
-    setNewCourierService({ name: '', code: '', isActive: true, isDefault: false });
+    setNewCourierService({ 
+      name: '', 
+      code: '', 
+      isActive: true, 
+      isDefault: false,
+      // Rate calculation fields
+      baseRate: '',
+      ratePerKg: '',
+      minWeight: '',
+      maxWeight: '',
+      codCharges: '',
+      freeShippingThreshold: '',
+      estimatedDays: ''
+    });
   };
 
   const handleRemoveCourierService = (serviceId: string) => {
@@ -724,7 +769,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
             
             <div className="space-y-3">
               {config.courierServices.map((service) => (
-                <div key={service.id} className="border border-gray-200 rounded-lg p-4">
+                <div key={service.id} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
                   {editingCourierService === service.id ? (
                     // Edit mode
                     <div className="space-y-3">
@@ -739,7 +784,15 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                                 name: editingCourierServiceData.name,
                                 code: editingCourierServiceData.code,
                                 isActive: editingCourierServiceData.isActive,
-                                isDefault: editingCourierServiceData.isDefault
+                                isDefault: editingCourierServiceData.isDefault,
+                                // Rate calculation fields
+                                baseRate: editingCourierServiceData.baseRate ? parseFloat(editingCourierServiceData.baseRate) : null,
+                                ratePerKg: editingCourierServiceData.ratePerKg ? parseFloat(editingCourierServiceData.ratePerKg) : null,
+                                minWeight: editingCourierServiceData.minWeight ? parseFloat(editingCourierServiceData.minWeight) : null,
+                                maxWeight: editingCourierServiceData.maxWeight ? parseFloat(editingCourierServiceData.maxWeight) : null,
+                                codCharges: editingCourierServiceData.codCharges ? parseFloat(editingCourierServiceData.codCharges) : null,
+                                freeShippingThreshold: editingCourierServiceData.freeShippingThreshold ? parseFloat(editingCourierServiceData.freeShippingThreshold) : null,
+                                estimatedDays: editingCourierServiceData.estimatedDays ? parseInt(editingCourierServiceData.estimatedDays) : null
                               };
                               
                               // If setting this as default, uncheck all others
@@ -760,7 +813,20 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                               }
                               
                               setEditingCourierService(null);
-                              setEditingCourierServiceData({ name: '', code: '', isActive: true, isDefault: false });
+                              setEditingCourierServiceData({ 
+                                name: '', 
+                                code: '', 
+                                isActive: true, 
+                                isDefault: false,
+                                // Rate calculation fields
+                                baseRate: '',
+                                ratePerKg: '',
+                                minWeight: '',
+                                maxWeight: '',
+                                codCharges: '',
+                                freeShippingThreshold: '',
+                                estimatedDays: ''
+                              });
                             }}
                             className="text-green-600 hover:text-green-800 text-sm font-medium"
                           >
@@ -769,7 +835,20 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                           <button
                             onClick={() => {
                               setEditingCourierService(null);
-                              setEditingCourierServiceData({ name: '', code: '', isActive: true, isDefault: false });
+                              setEditingCourierServiceData({ 
+                                name: '', 
+                                code: '', 
+                                isActive: true, 
+                                isDefault: false,
+                                // Rate calculation fields
+                                baseRate: '',
+                                ratePerKg: '',
+                                minWeight: '',
+                                maxWeight: '',
+                                codCharges: '',
+                                freeShippingThreshold: '',
+                                estimatedDays: ''
+                              });
                             }}
                             className="text-gray-600 hover:text-gray-800 text-sm"
                           >
@@ -811,50 +890,199 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                           <span className="ml-2 text-sm text-gray-900">Default</span>
                         </label>
                       </div>
+                      
+                      {/* Rate Calculation Settings */}
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-gray-700">Rate Calculation Settings</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-2">Base Rate (INR)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g., 50.00"
+                              value={editingCourierServiceData.baseRate}
+                              onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, baseRate: e.target.value})}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-2">Rate Per Kg (INR)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g., 10.00"
+                              value={editingCourierServiceData.ratePerKg}
+                              onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, ratePerKg: e.target.value})}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-2">Min Weight (grams)</label>
+                            <input
+                              type="number"
+                              placeholder="e.g., 500"
+                              value={editingCourierServiceData.minWeight}
+                              onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, minWeight: e.target.value})}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-2">Max Weight (grams)</label>
+                            <input
+                              type="number"
+                              placeholder="e.g., 50000"
+                              value={editingCourierServiceData.maxWeight}
+                              onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, maxWeight: e.target.value})}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-2">COD Charges (INR)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g., 20.00"
+                              value={editingCourierServiceData.codCharges}
+                              onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, codCharges: e.target.value})}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-2">Free Shipping Threshold (INR)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g., 1000.00"
+                              value={editingCourierServiceData.freeShippingThreshold}
+                              onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, freeShippingThreshold: e.target.value})}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-2">Estimated Delivery Days</label>
+                            <input
+                              type="number"
+                              placeholder="e.g., 3"
+                              value={editingCourierServiceData.estimatedDays}
+                              onChange={(e) => setEditingCourierServiceData({...editingCourierServiceData, estimatedDays: e.target.value})}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     // View mode
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h3 className="font-medium text-gray-900">{service.name}</h3>
-                        <p className="text-sm text-gray-600">Code: {service.code}</p>
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900">{service.name}</h3>
+                          <p className="text-sm text-gray-600">Code: {service.code}</p>
+                        </div>
+                        <div className="flex items-center space-x-2 ml-4">
+                          <button
+                            onClick={() => {
+                              setEditingCourierService(service.id);
+                              setEditingCourierServiceData({
+                                name: service.name,
+                                code: service.code,
+                                isActive: service.isActive,
+                                isDefault: service.isDefault,
+                                // Rate calculation fields
+                                baseRate: service.baseRate ? service.baseRate.toString() : '',
+                                ratePerKg: service.ratePerKg ? service.ratePerKg.toString() : '',
+                                minWeight: service.minWeight ? service.minWeight.toString() : '',
+                                maxWeight: service.maxWeight ? service.maxWeight.toString() : '',
+                                codCharges: service.codCharges ? service.codCharges.toString() : '',
+                                freeShippingThreshold: service.freeShippingThreshold ? service.freeShippingThreshold.toString() : '',
+                                estimatedDays: service.estimatedDays ? service.estimatedDays.toString() : ''
+                              });
+                            }}
+                            className="px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleRemoveCourierService(service.id)}
+                            className="px-3 py-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {service.isDefault && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Default
-                          </span>
-                        )}
-                        <button
-                          onClick={() => {
-                            setEditingCourierService(service.id);
-                            setEditingCourierServiceData({
-                              name: service.name,
-                              code: service.code,
-                              isActive: service.isActive,
-                              isDefault: service.isDefault
-                            });
-                          }}
-                          className="text-blue-600 hover:text-blue-800 text-sm"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleRemoveCourierService(service.id)}
-                          className="text-red-600 hover:text-red-800 text-sm"
-                        >
-                          Remove
-                        </button>
-                      </div>
+                      
+                      {/* Rate Calculation Information */}
+                      {(service.baseRate || service.ratePerKg || service.minWeight || service.maxWeight || service.codCharges || service.freeShippingThreshold || service.estimatedDays) && (
+                        <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+                          <div className="flex items-center mb-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                            <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Rate Configuration</span>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            {service.baseRate && (
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-600 font-medium">Base Rate</span>
+                                <span className="text-sm font-bold text-green-600">₹{service.baseRate}</span>
+                              </div>
+                            )}
+                            {service.ratePerKg && (
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-600 font-medium">Per Kg</span>
+                                <span className="text-sm font-bold text-green-600">₹{service.ratePerKg}</span>
+                              </div>
+                            )}
+                            {service.minWeight && (
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-600 font-medium">Min Weight</span>
+                                <span className="text-sm font-bold text-blue-600">{service.minWeight}g</span>
+                              </div>
+                            )}
+                            {service.maxWeight && (
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-600 font-medium">Max Weight</span>
+                                <span className="text-sm font-bold text-blue-600">{service.maxWeight}g</span>
+                              </div>
+                            )}
+                            {service.codCharges && (
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-600 font-medium">COD Charges</span>
+                                <span className="text-sm font-bold text-orange-600">₹{service.codCharges}</span>
+                              </div>
+                            )}
+                            {service.freeShippingThreshold && (
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-600 font-medium">Free Shipping</span>
+                                <span className="text-sm font-bold text-purple-600">₹{service.freeShippingThreshold}+</span>
+                              </div>
+                            )}
+                            {service.estimatedDays && (
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-600 font-medium">Delivery Time</span>
+                                <span className="text-sm font-bold text-indigo-600">{service.estimatedDays} days</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {editingCourierService !== service.id && (
-                    <div className="mt-2">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    <div className="mt-3 flex items-center space-x-2">
+                      {service.isDefault && (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1.5"></div>
+                          Default
+                        </span>
+                      )}
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${
                         service.isActive 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
+                          ? 'bg-green-100 text-green-800 border-green-200' 
+                          : 'bg-red-100 text-red-800 border-red-200'
                       }`}>
+                        <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                          service.isActive ? 'bg-green-500' : 'bg-red-500'
+                        }`}></div>
                         {service.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </div>
@@ -869,57 +1097,157 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
               )}
 
               {/* Add new courier service */}
-              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <h3 className="font-medium text-gray-900 mb-3">Add New Courier Service</h3>
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Service Name"
-                    value={newCourierService.name}
-                    onChange={(e) => setNewCourierService({...newCourierService, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Service Code"
-                    value={newCourierService.code}
-                    onChange={(e) => setNewCourierService({...newCourierService, code: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <div className="flex items-center space-x-4">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={newCourierService.isActive}
-                        onChange={(e) => setNewCourierService({...newCourierService, isActive: e.target.checked})}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-900">Active</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={newCourierService.isDefault}
-                        onChange={(e) => {
-                          // If setting this as default, uncheck all others
-                          if (e.target.checked) {
-                            setConfig({
-                              ...config,
-                              courierServices: config.courierServices.map(s => ({ ...s, isDefault: false }))
-                            });
-                          }
-                          setNewCourierService({...newCourierService, isDefault: e.target.checked});
-                        }}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-900">Default</span>
-                    </label>
+              <div className="border border-gray-200 rounded-lg p-6 bg-gradient-to-br from-gray-50 to-blue-50 shadow-sm">
+                <div className="flex items-center mb-4">
+                  <div className="w-2 h-8 bg-blue-500 rounded-full mr-3"></div>
+                  <h3 className="text-lg font-semibold text-gray-900">Add New Courier Service</h3>
+                </div>
+                <div className="space-y-4">
+                  {/* Basic Information */}
+                  <div className="space-y-4">
+                    <div className="flex items-center">
+                      <div className="w-1 h-6 bg-green-500 rounded-full mr-3"></div>
+                      <h4 className="text-sm font-semibold text-gray-800">Basic Information</h4>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Service Name"
+                      value={newCourierService.name}
+                      onChange={(e) => setNewCourierService({...newCourierService, name: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Service Code"
+                      value={newCourierService.code}
+                      onChange={(e) => setNewCourierService({...newCourierService, code: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <div className="flex items-center space-x-4">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={newCourierService.isActive}
+                          onChange={(e) => setNewCourierService({...newCourierService, isActive: e.target.checked})}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 text-sm text-gray-900">Active</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={newCourierService.isDefault}
+                          onChange={(e) => {
+                            // If setting this as default, uncheck all others
+                            if (e.target.checked) {
+                              setConfig({
+                                ...config,
+                                courierServices: config.courierServices.map(s => ({ ...s, isDefault: false }))
+                              });
+                            }
+                            setNewCourierService({...newCourierService, isDefault: e.target.checked});
+                          }}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 text-sm text-gray-900">Default</span>
+                      </label>
+                    </div>
                   </div>
+
+                  {/* Rate Calculation Settings */}
+                  <div className="space-y-4">
+                    <div className="flex items-center">
+                      <div className="w-1 h-6 bg-blue-500 rounded-full mr-3"></div>
+                      <h4 className="text-sm font-semibold text-gray-800">Rate Calculation Settings</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">Base Rate (INR)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., 50.00"
+                          value={newCourierService.baseRate}
+                          onChange={(e) => setNewCourierService({...newCourierService, baseRate: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">Rate Per Kg (INR)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., 10.00"
+                          value={newCourierService.ratePerKg}
+                          onChange={(e) => setNewCourierService({...newCourierService, ratePerKg: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">Min Weight (grams)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g., 500"
+                          value={newCourierService.minWeight}
+                          onChange={(e) => setNewCourierService({...newCourierService, minWeight: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">Max Weight (grams)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g., 50000"
+                          value={newCourierService.maxWeight}
+                          onChange={(e) => setNewCourierService({...newCourierService, maxWeight: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">COD Charges (INR)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., 20.00"
+                          value={newCourierService.codCharges}
+                          onChange={(e) => setNewCourierService({...newCourierService, codCharges: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">Free Shipping Threshold (INR)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., 1000.00"
+                          value={newCourierService.freeShippingThreshold}
+                          onChange={(e) => setNewCourierService({...newCourierService, freeShippingThreshold: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">Estimated Delivery Days</label>
+                        <input
+                          type="number"
+                          placeholder="e.g., 3"
+                          value={newCourierService.estimatedDays}
+                          onChange={(e) => setNewCourierService({...newCourierService, estimatedDays: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <button
                     onClick={handleAddCourierService}
-                    className="w-full bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700 transition-colors"
+                    className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-3 rounded-lg text-sm font-semibold hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-sm hover:shadow-md"
                   >
-                    Add Service
+                    <div className="flex items-center justify-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Add Courier Service
+                    </div>
                   </button>
                 </div>
               </div>
@@ -1213,7 +1541,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                           type="number"
                           value={config.clientOrderConfig?.defaultCodAmount || ''}
                           onChange={(e) => updateClientOrderConfig('defaultCodAmount', e.target.value ? parseFloat(e.target.value) : undefined)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                         />
                       </div>
                     )}

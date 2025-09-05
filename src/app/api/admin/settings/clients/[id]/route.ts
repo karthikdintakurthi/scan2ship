@@ -164,7 +164,15 @@ export async function GET(
           name: service.name,
           code: service.code,
           isActive: service.isActive,
-          isDefault: service.isDefault
+          isDefault: service.isDefault,
+          // Rate calculation fields
+          baseRate: service.baseRate,
+          ratePerKg: service.ratePerKg,
+          minWeight: service.minWeight,
+          maxWeight: service.maxWeight,
+          codCharges: service.codCharges,
+          freeShippingThreshold: service.freeShippingThreshold,
+          estimatedDays: service.estimatedDays
         })),
         clientOrderConfig: client.client_order_configs ? {
           id: client.client_order_configs.id,
@@ -412,7 +420,15 @@ export async function PUT(
               code: service.code,
               name: service.name,
               isActive: service.isActive,
-              isDefault: service.isDefault
+              isDefault: service.isDefault,
+              // Rate calculation fields
+              baseRate: service.baseRate ? parseFloat(service.baseRate) : null,
+              ratePerKg: service.ratePerKg ? parseFloat(service.ratePerKg) : null,
+              minWeight: service.minWeight ? parseFloat(service.minWeight) : null,
+              maxWeight: service.maxWeight ? parseFloat(service.maxWeight) : null,
+              codCharges: service.codCharges ? parseFloat(service.codCharges) : null,
+              freeShippingThreshold: service.freeShippingThreshold ? parseFloat(service.freeShippingThreshold) : null,
+              estimatedDays: service.estimatedDays ? parseInt(service.estimatedDays) : null
             }))
           });
           console.log(`✅ [API_ADMIN_CLIENT_CONFIG_PUT] Successfully created ${updateData.courierServices.length} courier services`);

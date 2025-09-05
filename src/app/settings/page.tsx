@@ -128,7 +128,15 @@ export default function ClientSettingsPage() {
   const [newCourierService, setNewCourierService] = useState({
     name: '',
     code: '',
-    isActive: true
+    isActive: true,
+    // Rate calculation fields
+    baseRate: '',
+    ratePerKg: '',
+    minWeight: '',
+    maxWeight: '',
+    codCharges: '',
+    freeShippingThreshold: '',
+    estimatedDays: ''
   });
 
   // Check authentication and redirect if needed
@@ -1079,25 +1087,85 @@ export default function ClientSettingsPage() {
             <div className="px-6 py-4">
               <div className="space-y-4">
                 {config.courierServices.map((service) => (
-                  <div key={service.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex-1">
-                      <h3 className="text-sm font-medium text-gray-900">{service.name}</h3>
-                      <p className="text-sm text-gray-500">Code: {service.code}</p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {service.isDefault && (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          Default
+                  <div key={service.id} className="p-4 border border-gray-200 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium text-gray-900">{service.name}</h3>
+                        <p className="text-sm text-gray-500">Code: {service.code}</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {service.isDefault && (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1.5"></div>
+                            Default
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${
+                          service.isActive 
+                            ? 'bg-green-100 text-green-800 border-green-200' 
+                            : 'bg-red-100 text-red-800 border-red-200'
+                        }`}>
+                          <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                            service.isActive ? 'bg-green-500' : 'bg-red-500'
+                          }`}></div>
+                          {service.isActive ? 'Active' : 'Inactive'}
                         </span>
-                      )}
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        service.isActive 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {service.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                      </div>
                     </div>
+                    
+                    {/* Rate Calculation Information */}
+                    {(service.baseRate || service.ratePerKg || service.minWeight || service.maxWeight || service.codCharges || service.freeShippingThreshold || service.estimatedDays) && (
+                      <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+                        <div className="flex items-center mb-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                          <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Rate Configuration</span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {service.baseRate && (
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-600 font-medium">Base Rate</span>
+                              <span className="text-sm font-bold text-green-600">₹{service.baseRate}</span>
+                            </div>
+                          )}
+                          {service.ratePerKg && (
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-600 font-medium">Per Kg</span>
+                              <span className="text-sm font-bold text-green-600">₹{service.ratePerKg}</span>
+                            </div>
+                          )}
+                          {service.minWeight && (
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-600 font-medium">Min Weight</span>
+                              <span className="text-sm font-bold text-blue-600">{service.minWeight}g</span>
+                            </div>
+                          )}
+                          {service.maxWeight && (
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-600 font-medium">Max Weight</span>
+                              <span className="text-sm font-bold text-blue-600">{service.maxWeight}g</span>
+                            </div>
+                          )}
+                          {service.codCharges && (
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-600 font-medium">COD Charges</span>
+                              <span className="text-sm font-bold text-orange-600">₹{service.codCharges}</span>
+                            </div>
+                          )}
+                          {service.freeShippingThreshold && (
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-600 font-medium">Free Shipping</span>
+                              <span className="text-sm font-bold text-purple-600">₹{service.freeShippingThreshold}+</span>
+                            </div>
+                          )}
+                          {service.estimatedDays && (
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-600 font-medium">Delivery Time</span>
+                              <span className="text-sm font-bold text-indigo-600">{service.estimatedDays} days</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
