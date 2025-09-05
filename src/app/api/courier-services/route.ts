@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Authenticate using hybrid method (API key or JWT)
-    const auth = await authenticateRequest(request, 'orders:read');
+    const auth = await authenticateRequest(request, 'courier:read');
     
     if ('error' in auth) {
       const response = NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Authenticate using hybrid method (API key or JWT)
-    const auth = await authenticateRequest(request, 'orders:write');
+    const auth = await authenticateRequest(request, 'courier:write');
     
     if ('error' in auth) {
       const response = NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -237,7 +237,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Authenticate using hybrid method (API key or JWT)
-    const auth = await authenticateRequest(request, 'orders:write');
+    const auth = await authenticateRequest(request, 'courier:write');
     
     if ('error' in auth) {
       const response = NextResponse.json({ error: auth.error }, { status: auth.status });
