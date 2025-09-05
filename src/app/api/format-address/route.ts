@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import { prisma } from '@/lib/prisma'
 import { CreditService } from '@/lib/credit-service'
+import AnalyticsService from '@/lib/analytics-service'
 
 // Helper function to get authenticated user and client
 async function getAuthenticatedUser(request: NextRequest) {
@@ -242,6 +243,22 @@ Examples of special character cleanup:
       console.log('💳 [API_FORMAT_ADDRESS] Credits deducted for text processing: 1 credit');
     } catch (creditError) {
       console.error('❌ [API_FORMAT_ADDRESS] Failed to deduct credits for text processing:', creditError);
+    }
+
+    // Track analytics event
+    try {
+      await AnalyticsService.trackEvent({
+        eventType: 'openai_address',
+        clientId: client.id,
+        userId: user.id,
+        eventData: {
+          textLength: addressText.length,
+          success: true
+        }
+      });
+      console.log('📊 [API_FORMAT_ADDRESS] Analytics tracked for address processing');
+    } catch (analyticsError) {
+      console.error('❌ [API_FORMAT_ADDRESS] Failed to track analytics:', analyticsError);
     }
     
     return NextResponse.json({ 
