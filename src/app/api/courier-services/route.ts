@@ -2,6 +2,41 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { authenticateApiKey, hasPermission } from '@/lib/api-key-auth';
+
+// Hybrid authentication function that supports both JWT and API key
+async function authenticateRequest(request: NextRequest, requiredPermission?: string) {
+  // First try API key authentication
+  const apiKey = await authenticateApiKey(request);
+  if (apiKey) {
+    if (requiredPermission && !hasPermission(apiKey, requiredPermission)) {
+      return { error: 'Insufficient permissions', status: 403 };
+    }
+    return { 
+      type: 'api_key', 
+      clientId: apiKey.clientId,
+      permissions: apiKey.permissions 
+    };
+  }
+
+  // Fallback to JWT authentication
+  const authResult = await authorizeUser(request, {
+    requiredRole: UserRole.USER,
+    requiredPermissions: requiredPermission ? [requiredPermission as any] : [PermissionLevel.READ],
+    requireActiveUser: true,
+    requireActiveClient: true
+  });
+
+  if (authResult.response) {
+    return { error: 'Authentication failed', status: 401, response: authResult.response };
+  }
+
+  return { 
+    type: 'jwt', 
+    clientId: authResult.user!.clientId,
+    user: authResult.user! 
+  };
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,26 +52,24 @@ export async function GET(request: NextRequest) {
       return securityResponse;
     }
 
-    // Authorize user
-    const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
-      requiredPermissions: [PermissionLevel.READ],
-      requireActiveUser: true,
-      requireActiveClient: true
-    });
-
-    if (authResult.response) {
-      securityHeaders(authResult.response);
-      return authResult.response;
+    // Authenticate using hybrid method (API key or JWT)
+    const auth = await authenticateRequest(request, 'orders:read');
+    
+    if ('error' in auth) {
+      const response = NextResponse.json({ error: auth.error }, { status: auth.status });
+      if (auth.response) {
+        securityHeaders(auth.response);
+        return auth.response;
+      }
+      securityHeaders(response);
+      return response;
     }
 
-    const user = authResult.user!;
-
-    console.log(`📊 [API_COURIER_SERVICES_GET] Fetching courier services for client: ${user.client.companyName || user.client.id} (ID: ${user.clientId})`);
+    console.log(`📊 [API_COURIER_SERVICES_GET] Fetching courier services for client: ${auth.clientId} (Auth: ${auth.type})`);
 
     // Get courier services for the current client
     const courierServices = await prisma.courier_services.findMany({
-      where: { clientId: user.clientId },
+      where: { clientId: auth.clientId },
       orderBy: { name: 'asc' }
     });
 
@@ -59,13 +92,19 @@ export async function GET(request: NextRequest) {
       estimatedDays: service.estimatedDays
     }));
 
-    console.log(`✅ [API_COURIER_SERVICES_GET] Found ${formattedServices.length} courier services for client ${user.client.companyName || user.client.id}`);
+    console.log(`✅ [API_COURIER_SERVICES_GET] Found ${formattedServices.length} courier services for client ${auth.clientId}`);
     console.log(`📋 [API_COURIER_SERVICES_GET] Formatted services:`, formattedServices);
+
+    // Get client name for response
+    const client = await prisma.clients.findUnique({
+      where: { id: auth.clientId },
+      select: { companyName: true }
+    });
 
     const response = NextResponse.json({
       courierServices: formattedServices,
-      clientId: user.clientId,
-      clientName: user.client.companyName || user.client.id
+      clientId: auth.clientId,
+      clientName: client?.companyName || auth.clientId
     });
 
     // Apply security headers
@@ -97,20 +136,18 @@ export async function POST(request: NextRequest) {
       return securityResponse;
     }
 
-    // Authorize user
-    const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
-      requiredPermissions: [PermissionLevel.WRITE],
-      requireActiveUser: true,
-      requireActiveClient: true
-    });
-
-    if (authResult.response) {
-      securityHeaders(authResult.response);
-      return authResult.response;
+    // Authenticate using hybrid method (API key or JWT)
+    const auth = await authenticateRequest(request, 'orders:write');
+    
+    if ('error' in auth) {
+      const response = NextResponse.json({ error: auth.error }, { status: auth.status });
+      if (auth.response) {
+        securityHeaders(auth.response);
+        return auth.response;
+      }
+      securityHeaders(response);
+      return response;
     }
-
-    const user = authResult.user!;
     const body = await request.json();
     const { 
       name, 
@@ -129,16 +166,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name and code are required' }, { status: 400 });
     }
 
-    console.log(`📝 [API_COURIER_SERVICES_POST] Creating courier service for client: ${user.client.companyName}`);
+    console.log(`📝 [API_COURIER_SERVICES_POST] Creating courier service for client: ${auth.clientId} (Auth: ${auth.type})`);
 
     // Create new courier service with rate configuration
     const newService = await prisma.courier_services.create({
       data: {
+        id: `courier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: name,
         code: code,
         isActive: isActive !== false,
         isDefault: false,
-        clientId: user.clientId,
+        clientId: auth.clientId,
         // Rate calculation fields
         baseRate: baseRate ? parseFloat(baseRate) : null,
         ratePerKg: ratePerKg ? parseFloat(ratePerKg) : null,
@@ -198,20 +236,18 @@ export async function PUT(request: NextRequest) {
       return securityResponse;
     }
 
-    // Authorize user
-    const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
-      requiredPermissions: [PermissionLevel.WRITE],
-      requireActiveUser: true,
-      requireActiveClient: true
-    });
-
-    if (authResult.response) {
-      securityHeaders(authResult.response);
-      return authResult.response;
+    // Authenticate using hybrid method (API key or JWT)
+    const auth = await authenticateRequest(request, 'orders:write');
+    
+    if ('error' in auth) {
+      const response = NextResponse.json({ error: auth.error }, { status: auth.status });
+      if (auth.response) {
+        securityHeaders(auth.response);
+        return auth.response;
+      }
+      securityHeaders(response);
+      return response;
     }
-
-    const user = authResult.user!;
     const body = await request.json();
     const { services } = body;
 
@@ -219,7 +255,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Services array is required' }, { status: 400 });
     }
 
-    console.log(`📝 [API_COURIER_SERVICES_PUT] Updating courier services for client: ${user.client.companyName}`);
+    console.log(`📝 [API_COURIER_SERVICES_PUT] Updating courier services for client: ${auth.clientId} (Auth: ${auth.type})`);
 
     // Update courier services with rate configuration
     const updatePromises = services.map(async (service: any) => {
