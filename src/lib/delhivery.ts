@@ -198,10 +198,10 @@ export class DelhiveryService {
         seller_phone: sanitizeText(orderData.reseller_mobile),
         quantity: orderData.total_items?.toString() || '',
         waybill: orderData.tracking_id || '', // Empty for new orders
-        shipment_length: orderData.shipment_length?.toString() || '100',
-        shipment_width: orderData.shipment_breadth?.toString() || '100',
-        shipment_height: orderData.shipment_height?.toString() || '100',
-        weight: orderData.weight?.toString() || '', // Weight in grams
+        shipment_length: orderData.shipment_length?.toString() || '10',
+        shipment_width: orderData.shipment_breadth?.toString() || '10',
+        shipment_height: orderData.shipment_height?.toString() || '10',
+        weight: orderData.weight?.toString() || '100', // Weight in grams
         shipping_mode: 'Surface', // Default to Surface
         address_type: '' // Match the curl example format
       };
