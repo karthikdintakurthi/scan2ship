@@ -124,7 +124,15 @@ model courier_services {
   isDefault Boolean @default(false)
   code      String
   name      String
-  clients   clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // Rate calculation fields
+  baseRate      Float?  // Base shipping rate in INR
+  ratePerKg     Float?  // Additional rate per kg in INR
+  minWeight     Float?  // Minimum weight for base rate (in grams)
+  maxWeight     Float?  // Maximum weight supported (in grams)
+  codCharges    Float?  // COD charges in INR
+  freeShippingThreshold Float? // Free shipping above this value (in INR)
+  estimatedDays Int?    // Estimated delivery days
+  clients       clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([code, clientId])
 }

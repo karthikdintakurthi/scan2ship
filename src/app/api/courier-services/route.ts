@@ -48,7 +48,15 @@ export async function GET(request: NextRequest) {
       value: service.code,
       label: service.name,
       isActive: service.isActive,
-      isDefault: service.isDefault
+      isDefault: service.isDefault,
+      // Rate calculation fields
+      baseRate: service.baseRate,
+      ratePerKg: service.ratePerKg,
+      minWeight: service.minWeight,
+      maxWeight: service.maxWeight,
+      codCharges: service.codCharges,
+      freeShippingThreshold: service.freeShippingThreshold,
+      estimatedDays: service.estimatedDays
     }));
 
     console.log(`✅ [API_COURIER_SERVICES_GET] Found ${formattedServices.length} courier services for client ${user.client.companyName || user.client.id}`);
@@ -77,62 +85,133 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
 
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
     const body = await request.json();
-    const { name, code, isActive } = body;
+    const { 
+      name, 
+      code, 
+      isActive,
+      baseRate,
+      ratePerKg,
+      minWeight,
+      maxWeight,
+      codCharges,
+      freeShippingThreshold,
+      estimatedDays
+    } = body;
 
     if (!name || !code) {
       return NextResponse.json({ error: 'Name and code are required' }, { status: 400 });
     }
 
-    console.log(`📝 [API_COURIER_SERVICES_POST] Creating courier service for client: ${user.clients.companyName}`);
+    console.log(`📝 [API_COURIER_SERVICES_POST] Creating courier service for client: ${user.client.companyName}`);
 
-    // Create new courier service
+    // Create new courier service with rate configuration
     const newService = await prisma.courier_services.create({
       data: {
         name: name,
         code: code,
         isActive: isActive !== false,
         isDefault: false,
-        clientId: user.clients.id
+        clientId: user.clientId,
+        // Rate calculation fields
+        baseRate: baseRate ? parseFloat(baseRate) : null,
+        ratePerKg: ratePerKg ? parseFloat(ratePerKg) : null,
+        minWeight: minWeight ? parseFloat(minWeight) : null,
+        maxWeight: maxWeight ? parseFloat(maxWeight) : null,
+        codCharges: codCharges ? parseFloat(codCharges) : null,
+        freeShippingThreshold: freeShippingThreshold ? parseFloat(freeShippingThreshold) : null,
+        estimatedDays: estimatedDays ? parseInt(estimatedDays) : null
       }
     });
 
     console.log(`✅ [API_COURIER_SERVICES_POST] Created courier service: ${newService.name}`);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       service: {
         id: newService.id,
         value: newService.code,
         label: newService.name,
         isActive: newService.isActive,
-        isDefault: newService.isDefault
+        isDefault: newService.isDefault,
+        baseRate: newService.baseRate,
+        ratePerKg: newService.ratePerKg,
+        minWeight: newService.minWeight,
+        maxWeight: newService.maxWeight,
+        codCharges: newService.codCharges,
+        freeShippingThreshold: newService.freeShippingThreshold,
+        estimatedDays: newService.estimatedDays
       }
     });
 
+    securityHeaders(response);
+    return response;
+
   } catch (error) {
     console.error('❌ [API_COURIER_SERVICES_POST] Error creating courier service:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to create courier service' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    // Authenticate user
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
 
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
     const body = await request.json();
     const { services } = body;
 
@@ -140,9 +219,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Services array is required' }, { status: 400 });
     }
 
-    console.log(`📝 [API_COURIER_SERVICES_PUT] Updating courier services for client: ${user.clients.companyName}`);
+    console.log(`📝 [API_COURIER_SERVICES_PUT] Updating courier services for client: ${user.client.companyName}`);
 
-    // Update courier services
+    // Update courier services with rate configuration
     const updatePromises = services.map(async (service: any) => {
       if (service.id) {
         return prisma.courier_services.update({
@@ -151,7 +230,15 @@ export async function PUT(request: NextRequest) {
             name: service.label,
             code: service.value,
             isActive: service.isActive !== false,
-            isDefault: service.isDefault || false
+            isDefault: service.isDefault || false,
+            // Rate calculation fields
+            baseRate: service.baseRate ? parseFloat(service.baseRate) : null,
+            ratePerKg: service.ratePerKg ? parseFloat(service.ratePerKg) : null,
+            minWeight: service.minWeight ? parseFloat(service.minWeight) : null,
+            maxWeight: service.maxWeight ? parseFloat(service.maxWeight) : null,
+            codCharges: service.codCharges ? parseFloat(service.codCharges) : null,
+            freeShippingThreshold: service.freeShippingThreshold ? parseFloat(service.freeShippingThreshold) : null,
+            estimatedDays: service.estimatedDays ? parseInt(service.estimatedDays) : null
           }
         });
       }
@@ -161,16 +248,21 @@ export async function PUT(request: NextRequest) {
 
     console.log(`✅ [API_COURIER_SERVICES_PUT] Updated ${services.length} courier services`);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: 'Courier services updated successfully'
     });
 
+    securityHeaders(response);
+    return response;
+
   } catch (error) {
     console.error('❌ [API_COURIER_SERVICES_PUT] Error updating courier services:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to update courier services' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }

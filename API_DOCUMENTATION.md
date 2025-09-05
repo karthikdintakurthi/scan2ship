@@ -358,7 +358,14 @@ All API endpoints require JWT-based authentication using Bearer tokens.
       "value": "DELHIVERY",
       "label": "Delhivery",
       "isActive": true,
-      "isDefault": true
+      "isDefault": true,
+      "baseRate": 50.0,
+      "ratePerKg": 25.0,
+      "minWeight": 500,
+      "maxWeight": 50000,
+      "codCharges": 15.0,
+      "freeShippingThreshold": 1000.0,
+      "estimatedDays": 3
     }
   ],
   "clientId": "client-id",
@@ -376,7 +383,14 @@ All API endpoints require JWT-based authentication using Bearer tokens.
 {
   "name": "Service Name",
   "code": "SERVICE_CODE",
-  "isActive": true
+  "isActive": true,
+  "baseRate": 50.0,
+  "ratePerKg": 25.0,
+  "minWeight": 500,
+  "maxWeight": 50000,
+  "codCharges": 15.0,
+  "freeShippingThreshold": 1000.0,
+  "estimatedDays": 3
 }
 ```
 
@@ -389,7 +403,14 @@ All API endpoints require JWT-based authentication using Bearer tokens.
     "value": "SERVICE_CODE",
     "label": "Service Name",
     "isActive": true,
-    "isDefault": false
+    "isDefault": false,
+    "baseRate": 50.0,
+    "ratePerKg": 25.0,
+    "minWeight": 500,
+    "maxWeight": 50000,
+    "codCharges": 15.0,
+    "freeShippingThreshold": 1000.0,
+    "estimatedDays": 3
   }
 }
 ```
@@ -770,6 +791,98 @@ All API endpoints require JWT-based authentication using Bearer tokens.
 **Description**: Get all client configurations (Admin only)
 
 **Headers**: `Authorization: Bearer <token>`
+
+---
+
+### Carrier Rates APIs (Shopify Integration)
+
+#### POST /api/carrier/rates
+**Description**: Calculate shipping rates for Shopify integration
+
+**Headers**: `Authorization: Bearer <api-key>`
+
+**Request Body**:
+```json
+{
+  "origin": {
+    "country": "IN",
+    "postal_code": "560001",
+    "province": "Karnataka",
+    "city": "Bangalore"
+  },
+  "destination": {
+    "country": "IN",
+    "postal_code": "110001",
+    "province": "Delhi",
+    "city": "New Delhi"
+  },
+  "items": [
+    {
+      "name": "Product Name",
+      "sku": "SKU-001",
+      "quantity": 1,
+      "grams": 1000,
+      "price": 500.00,
+      "requires_shipping": true,
+      "taxable": true
+    }
+  ],
+  "currency": "INR"
+}
+```
+
+**Response**:
+```json
+{
+  "rates": [
+    {
+      "service_name": "Delhivery Standard",
+      "service_code": "DELHIVERY_STD",
+      "total_price": "62.50",
+      "description": "Shipping via Delhivery Standard (3 days)",
+      "currency": "INR",
+      "min_delivery_date": "2025-09-07",
+      "max_delivery_date": "2025-09-10"
+    },
+    {
+      "service_name": "Delhivery Express",
+      "service_code": "DELHIVERY_EXP",
+      "total_price": "97.50",
+      "description": "Shipping via Delhivery Express (1 days)",
+      "currency": "INR",
+      "min_delivery_date": "2025-09-06",
+      "max_delivery_date": "2025-09-08"
+    }
+  ]
+}
+```
+
+#### GET /api/carrier/rates
+**Description**: Get courier services with rate configuration
+
+**Headers**: `Authorization: Bearer <api-key>`
+
+**Response**:
+```json
+{
+  "message": "Carrier rates API is working",
+  "clientId": "client-id",
+  "courierServices": [
+    {
+      "id": "courier-id",
+      "name": "Delhivery Standard",
+      "code": "DELHIVERY_STD",
+      "baseRate": 50.0,
+      "ratePerKg": 25.0,
+      "minWeight": 500,
+      "maxWeight": 50000,
+      "codCharges": 15.0,
+      "freeShippingThreshold": 1000.0,
+      "estimatedDays": 3
+    }
+  ]
+}
+```
 
 ---
 
