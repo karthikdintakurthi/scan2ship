@@ -257,8 +257,6 @@ model users {
   password               String?
   role                   String                     @default("user")
   isActive               Boolean                    @default(true)
-  aiImageProcessingEnabled Boolean                  @default(true)
-  aiTextProcessingEnabled  Boolean                  @default(true)
   createdAt              DateTime                   @default(now())
   updatedAt              DateTime
   clientId               String
