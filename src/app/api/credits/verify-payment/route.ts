@@ -14,7 +14,7 @@ async function getAuthenticatedUser(request: NextRequest) {
   const token = authHeader.substring(7);
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
     
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },

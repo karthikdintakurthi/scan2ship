@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import WhatsAppConfig from '@/components/WhatsAppConfig';
 
 interface Client {
   id: string;
@@ -1671,10 +1670,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
             )}
           </div>
 
-          {/* WhatsApp Configuration */}
-          <div className="mt-8">
-            <WhatsAppConfig />
-          </div>
+          {/* WhatsApp functionality has been removed */}
 
         </div>
       </div>

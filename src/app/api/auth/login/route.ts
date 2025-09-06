@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { generateToken } from '@/lib/jwt-utils';
 import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
@@ -61,16 +61,12 @@ export async function POST(request: NextRequest) {
         id: crypto.randomUUID(), // Generate unique ID for session
         userId: user.id,
         clientId: user.clientId,
-        token: jwt.sign(
-          { 
-            userId: user.id, 
-            clientId: user.clientId,
-            email: user.email,
-            role: user.role 
-          },
-          process.env.JWT_SECRET || 'fallback-secret',
-          { expiresIn: '24h' }
-        ),
+        token: generateToken({
+          userId: user.id, 
+          clientId: user.clientId,
+          email: user.email,
+          role: user.role 
+        }, '24h'),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
       }
     });

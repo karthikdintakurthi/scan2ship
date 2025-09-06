@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 export interface ClientCreditCost {
   id: string;
   clientId: string;
-  feature: 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING';
+  feature: 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING';
   cost: number;
   isActive: boolean;
   createdAt: Date;
@@ -12,7 +12,7 @@ export interface ClientCreditCost {
 
 export interface CreateClientCreditCostInput {
   clientId: string;
-  feature: 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING';
+  feature: 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING';
   cost: number;
 }
 
@@ -39,7 +39,7 @@ export class ClientCreditCostsService {
 
       return costs.map(cost => ({
         ...cost,
-        feature: cost.feature as 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'
+        feature: cost.feature as 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'
       }));
     } catch (error) {
       console.error('Error getting client credit costs:', error);
@@ -52,7 +52,7 @@ export class ClientCreditCostsService {
    */
   static async getClientCreditCost(
     clientId: string, 
-    feature: 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'
+    feature: 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'
   ): Promise<number> {
     try {
       const costRecord = await prisma.client_credit_costs.findUnique({
@@ -79,7 +79,7 @@ export class ClientCreditCostsService {
    */
   static async upsertClientCreditCost(
     clientId: string,
-    feature: 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING',
+    feature: 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING',
     cost: number
   ): Promise<ClientCreditCost> {
     try {
@@ -108,7 +108,7 @@ export class ClientCreditCostsService {
 
               return {
           ...result,
-          feature: result.feature as 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'
+          feature: result.feature as 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'
         };
       } catch (error) {
         console.error('Error upserting client credit cost:', error);
@@ -138,7 +138,7 @@ export class ClientCreditCostsService {
 
               return {
           ...result,
-          feature: result.feature as 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'
+          feature: result.feature as 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'
         };
       } catch (error) {
         console.error('Error updating client credit cost:', error);
@@ -171,7 +171,6 @@ export class ClientCreditCostsService {
     try {
       const defaultCosts = [
         { feature: 'ORDER' as const, cost: 1.0 },
-        { feature: 'WHATSAPP' as const, cost: 1.0 },
         { feature: 'IMAGE_PROCESSING' as const, cost: 2.0 },
         { feature: 'TEXT_PROCESSING' as const, cost: 1.0 }
       ];
@@ -193,7 +192,7 @@ export class ClientCreditCostsService {
 
       return createdCosts.map(cost => ({
         ...cost,
-        feature: cost.feature as 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'
+        feature: cost.feature as 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'
       }));
     } catch (error) {
       console.error('Error creating default credit costs:', error);
@@ -204,10 +203,9 @@ export class ClientCreditCostsService {
   /**
    * Get default cost for a feature
    */
-  private static getDefaultCost(feature: 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'): number {
+  private static getDefaultCost(feature: 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'): number {
     const defaultCosts = {
       ORDER: 1.0,
-      WHATSAPP: 1.0,
       IMAGE_PROCESSING: 2.0,
       TEXT_PROCESSING: 1.0
     };
@@ -220,7 +218,7 @@ export class ClientCreditCostsService {
    */
   static async bulkUpdateClientCreditCosts(
     clientId: string,
-    costs: Array<{ feature: 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'; cost: number }>
+    costs: Array<{ feature: 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING'; cost: number }>
   ): Promise<ClientCreditCost[]> {
     try {
       // Validate all costs

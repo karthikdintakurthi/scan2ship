@@ -18,7 +18,7 @@ async function getAuthenticatedAdmin(request: NextRequest) {
     // Verify JWT token directly instead of calling verify endpoint
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+      decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
     } catch (error) {
       console.log('❌ [ADMIN_AUTH] Invalid JWT token');
       return null;

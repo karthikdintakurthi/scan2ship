@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
 import { DelhiveryService } from '@/lib/delhivery';
-import whatsappService, { initializeWhatsAppService } from '@/lib/whatsapp-service';
 import { generateReferenceNumber, formatReferenceNumber } from '@/lib/reference-number';
 import AnalyticsService from '@/lib/analytics-service';
 
@@ -19,7 +18,7 @@ async function getAuthenticatedUser(request: NextRequest) {
   const token = authHeader.substring(7);
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
     
     // For now, let's use a simpler approach without session validation
     // We'll implement proper session management later
@@ -171,50 +170,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch updated order data' }, { status: 500 });
     }
 
-    // Initialize WhatsApp service with database configuration
-    await initializeWhatsAppService();
-
-    // Send WhatsApp notifications with updated tracking number
-    try {
-      const whatsappData = {
-        customerName: updatedOrder.name,
-        customerPhone: updatedOrder.mobile,
-        orderNumber: `ORDER-${updatedOrder.id}`,
-        courierService: updatedOrder.courier_service,
-        trackingNumber: updatedOrder.tracking_id || 'Will be assigned',
-        clientCompanyName: client.companyName || 'Scan2Ship',
-        resellerName: updatedOrder.reseller_name || undefined,
-        resellerPhone: updatedOrder.reseller_mobile || undefined,
-        packageValue: updatedOrder.package_value,
-        weight: updatedOrder.weight,
-        totalItems: updatedOrder.total_items,
-        pickupLocation: updatedOrder.pickup_location,
-        address: updatedOrder.address,
-        city: updatedOrder.city,
-        state: updatedOrder.state,
-        pincode: updatedOrder.pincode
-      };
-
-      // Send customer WhatsApp message
-      const customerWhatsAppResult = await whatsappService.sendCustomerOrderWhatsApp(whatsappData);
-      if (customerWhatsAppResult.success) {
-        console.log('📱 [API_ORDERS_POST] Customer WhatsApp message sent for order:', updatedOrder.id);
-      } else {
-        console.warn('⚠️ [API_ORDERS_POST] Customer WhatsApp message failed for order:', updatedOrder.id, customerWhatsAppResult.error);
-      }
-
-      // Send reseller WhatsApp message if reseller details are provided
-      if (updatedOrder.reseller_name && updatedOrder.reseller_mobile) {
-        const resellerWhatsAppResult = await whatsappService.sendResellerOrderWhatsApp(whatsappData);
-        if (resellerWhatsAppResult.success) {
-          console.log('📱 [API_ORDERS_POST] Reseller WhatsApp message sent for order:', updatedOrder.id);
-        } else {
-          console.warn('⚠️ [API_ORDERS_POST] Reseller WhatsApp message failed for order:', updatedOrder.id, resellerWhatsAppResult.error);
-        }
-      }
-    } catch (whatsappError) {
-      console.error('❌ [API_ORDERS_POST] WhatsApp sending failed:', whatsappError);
-    }
+    // WhatsApp functionality has been removed
 
     return NextResponse.json({
       success: true,

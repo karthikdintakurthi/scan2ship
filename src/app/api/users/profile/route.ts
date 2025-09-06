@@ -1,43 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
-
-const prisma = new PrismaClient();
-
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-    
-    // Get user and client data from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    if (!user || !user.isActive) {
-      return null;
-    }
-
-    return {
-      userId: user.id,
-      user: user,
-      client: user.clients
-    };
-  } catch (error) {
-    return null;
-  }
-}
+import { prisma } from '@/lib/prisma';
+import { getAuthenticatedUser } from '@/lib/auth-utils';
 
 export async function GET(request: NextRequest) {
   try {

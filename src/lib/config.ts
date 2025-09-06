@@ -4,7 +4,7 @@ export const config = {
     url: process.env.DATABASE_URL,
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'fallback-secret',
+    secret: process.env.JWT_SECRET,
   },
   app: {
     name: process.env.NEXT_PUBLIC_APP_NAME || 'Vanitha Logistics',

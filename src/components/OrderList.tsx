@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { getPickupLocations } from '@/lib/order-form-config'
 import { getActiveCourierServices } from '@/lib/courier-service-config'
-import * as XLSX from 'xlsx'
+// Dynamic import for xlsx to avoid build issues
+import { createSecureWorkbook, createSecureWorksheet, writeSecureWorkbook } from '@/lib/excel-security'
 
 interface Order {
   id: number
@@ -709,48 +710,12 @@ export default function OrderList() {
         'Category': order.category_of_goods || ''
       }))
 
-      // Create workbook and worksheet
-      const workbook = XLSX.utils.book_new()
-      const worksheet = XLSX.utils.json_to_sheet(exportData)
+      // Create secure workbook and worksheet
+      const workbook = createSecureWorkbook()
+      const worksheet = createSecureWorksheet(exportData, 'Orders')
 
-      // Auto-size columns
-      const columnWidths = [
-        { wch: 10 }, // Order ID
-        { wch: 20 }, // Customer Name
-        { wch: 15 }, // Mobile
-        { wch: 40 }, // Address
-        { wch: 15 }, // City
-        { wch: 15 }, // State
-        { wch: 15 }, // Country
-        { wch: 10 }, // Pincode
-        { wch: 15 }, // Courier Service
-        { wch: 20 }, // Pickup Location
-        { wch: 15 }, // Package Value
-        { wch: 12 }, // Weight
-        { wch: 12 }, // Total Items
-        { wch: 20 }, // Tracking ID
-        { wch: 20 }, // Reference Number
-        { wch: 8 },  // Is COD
-        { wch: 12 }, // COD Amount
-        { wch: 20 }, // Reseller Name
-        { wch: 15 }, // Reseller Mobile
-        { wch: 15 }, // Created Date
-        { wch: 25 }, // Product Description
-        { wch: 20 }, // Delhivery Waybill
-        { wch: 20 }, // Delhivery Order ID
-        { wch: 15 }, // Delhivery Status
-        { wch: 15 }, // Shipment Length
-        { wch: 15 }, // Shipment Breadth
-        { wch: 15 }, // Shipment Height
-        { wch: 40 }, // Return Address
-        { wch: 20 }, // Seller Name
-        { wch: 15 }, // Seller GST
-        { wch: 12 }, // HSN Code
-        { wch: 20 }  // Category
-      ]
-      worksheet['!cols'] = columnWidths
-
-      // Add worksheet to workbook
+      // Add worksheet to workbook (secure function handles column widths)
+      const XLSX = await import('xlsx')
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Orders')
 
       // Generate filename with current date and filter info
@@ -785,8 +750,8 @@ export default function OrderList() {
       
       filename += '.xlsx'
 
-      // Save the file
-      XLSX.writeFile(workbook, filename)
+      // Save the file securely
+      writeSecureWorkbook(workbook, filename)
       
       console.log(`✅ Exported ${ordersToExport.length} orders to ${filename}`)
       
