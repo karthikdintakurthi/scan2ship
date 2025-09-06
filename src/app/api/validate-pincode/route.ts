@@ -1,9 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { delhiveryService } from '@/lib/delhivery'
 import { validatePincodeFallback } from '@/lib/pincode-fallback'
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
     const { searchParams } = new URL(request.url)
     const pincode = searchParams.get('pincode')
 

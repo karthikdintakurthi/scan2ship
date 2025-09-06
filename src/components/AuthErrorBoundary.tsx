@@ -10,8 +10,11 @@ interface Props {
 export default function AuthErrorBoundary({ children, fallback }: Props) {
   const [hasError, setHasError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
+    
     const handleError = (event: ErrorEvent) => {
       console.error('AuthErrorBoundary caught an error:', event.error);
       setError(event.error);
@@ -24,15 +27,22 @@ export default function AuthErrorBoundary({ children, fallback }: Props) {
       setHasError(true);
     };
 
-    // Add global error handlers
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    // Add global error handlers only on client side
+    if (typeof window !== 'undefined') {
+      window.addEventListener('error', handleError);
+      window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
-    return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
+      return () => {
+        window.removeEventListener('error', handleError);
+        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      };
+    }
   }, []);
+
+  // Don't render error boundary during SSR
+  if (!isClient) {
+    return <>{children}</>;
+  }
 
   if (hasError) {
     // Custom fallback UI

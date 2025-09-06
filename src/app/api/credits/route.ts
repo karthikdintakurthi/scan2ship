@@ -1,47 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { CreditService } from '@/lib/credit-service';
-import jwt from 'jsonwebtoken';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: { clients: true }
-    });
-    return user;
-  } catch (error) {
-    return null;
-  }
-}
-
-// GET /api/credits - Get client credits
 export async function GET(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
 
-    const credits = await CreditService.getClientCredits(user.clientId);
-    
-    return NextResponse.json({
-      success: true,
-      data: credits
+    // Authorize user with subscription check
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true,
+      requireValidSubscription: false  // Temporarily disabled
     });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
+
+    try {
+      const credits = await CreditService.getClientCredits(user.clientId);
+      
+      if (!credits) {
+        const response = NextResponse.json({ error: 'No credits found for this client' }, { status: 404 });
+        securityHeaders(response);
+        return response;
+      }
+
+      const response = NextResponse.json({
+        success: true,
+        data: credits
+      });
+
+      // Apply security headers
+      securityHeaders(response);
+      return response;
+
+    } catch (error) {
+      console.error('Error getting credits:', error);
+      const response = NextResponse.json({ error: 'Failed to get client credits' }, { status: 500 });
+      securityHeaders(response);
+      return response;
+    }
+
   } catch (error) {
-    console.error('Error getting credits:', error);
-    return NextResponse.json(
-      { error: 'Failed to get credits' },
-      { status: 500 }
-    );
+    console.error('Credits API error:', error);
+    const response = NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    securityHeaders(response);
+    return response;
   }
 }

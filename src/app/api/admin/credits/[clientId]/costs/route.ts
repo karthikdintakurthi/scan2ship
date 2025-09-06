@@ -1,46 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ClientCreditCostsService } from '@/lib/client-credit-costs-service';
 import { prisma } from '@/lib/prisma';
-
-// Helper function to get authenticated admin user
-async function getAuthenticatedAdminUser(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return null;
-    }
-
-    const token = authHeader.substring(7);
-    
-    // Verify JWT token and get user
-    const session = await prisma.sessions.findUnique({
-      where: { token },
-      include: {
-        users: {
-          include: {
-            clients: true
-          }
-        }
-      }
-    });
-
-    if (!session || !session.users || session.expiresAt < new Date()) {
-      return null;
-    }
-
-    const user = session.users;
-    
-    // Check if user is master admin
-    if (user.role !== 'master_admin') {
-      return null;
-    }
-
-    return user;
-  } catch (error) {
-    console.error('Error authenticating admin user:', error);
-    return null;
-  }
-}
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 // GET /api/admin/credits/[clientId]/costs - Get client credit costs
 export async function GET(
@@ -48,9 +10,29 @@ export async function GET(
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
-    const user = await getAuthenticatedAdminUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const { clientId } = await params;
@@ -85,9 +67,29 @@ export async function POST(
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
-    const user = await getAuthenticatedAdminUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const { clientId } = await params;
@@ -149,9 +151,29 @@ export async function PUT(
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
-    const user = await getAuthenticatedAdminUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const { clientId } = await params;

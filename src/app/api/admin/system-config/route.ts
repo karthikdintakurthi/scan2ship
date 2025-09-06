@@ -1,67 +1,109 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import crypto from 'crypto';
 
-// Encryption key for sensitive data (in production, use a proper key management system)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'vanitha-logistics-encryption-key-2024';
+// Encryption key for sensitive data (SECURITY: No fallback key for security)
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
-// Helper function to encrypt sensitive data
+if (!ENCRYPTION_KEY) {
+  throw new Error('ENCRYPTION_KEY environment variable is required for security');
+}
+
+// Helper function to encrypt sensitive data with proper IV
 function encrypt(text: string): string {
-  const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
+  // Generate a random IV for each encryption
+  const iv = crypto.randomBytes(16);
+  
+  // Create cipher with IV
+  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+  
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  return encrypted;
-}
-
-// Helper function to decrypt sensitive data
-function decrypt(encryptedText: string): string {
-  const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
-}
-
-// Helper function to get authenticated admin user
-async function getAuthenticatedAdmin(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
   
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
+  // Prepend IV to encrypted data
+  return iv.toString('hex') + ':' + encrypted;
+}
 
-  const token = authHeader.substring(7);
-
+// Helper function to decrypt sensitive data with proper IV
+function decrypt(encryptedText: string): string {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-    
-    // Get user from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    if (!user || !user.isActive || (user.role !== 'admin' && user.role !== 'master_admin')) {
-      return null;
+    // Split IV and encrypted data
+    const parts = encryptedText.split(':');
+    if (parts.length !== 2) {
+      throw new Error('Invalid encrypted data format');
     }
-
-    return {
-      user: user,
-      client: user.client
-    };
+    
+    const iv = Buffer.from(parts[0], 'hex');
+    const encrypted = parts[1];
+    
+    // Create decipher with IV
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+    
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
   } catch (error) {
-    return null;
+    console.error('❌ Error decrypting value:', error);
+    throw new Error('Failed to decrypt sensitive data - encryption key may be invalid');
   }
+}
+
+// Helper function to mask sensitive values
+function maskSensitiveValue(value: string, type: string, isEncrypted: boolean): string {
+  if (!value) return '';
+  
+  if (isEncrypted) {
+    return '••••••••••••••••';
+  }
+  
+  // Mask sensitive keys based on their names
+  const sensitiveKeys = [
+    'API_KEY', 'SECRET', 'PASSWORD', 'TOKEN', 'KEY', 'CREDENTIAL'
+  ];
+  
+  const isSensitive = sensitiveKeys.some(key => 
+    value.toUpperCase().includes(key)
+  );
+  
+  if (isSensitive) {
+    if (type === 'password') {
+      return '••••••••••••••••';
+    } else {
+      return `${value.substring(0, 4)}••••••••••••••••${value.substring(value.length - 4)}`;
+    }
+  }
+  
+  return value;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
+      requireActiveUser: true,
+      requireActiveClient: false  // System config should be accessible regardless of client status
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     console.log('📊 [API_ADMIN_SYSTEM_CONFIG_GET] Fetching system configuration from database');
@@ -74,28 +116,24 @@ export async function GET(request: NextRequest) {
       ]
     });
 
-    // Process configurations and decrypt sensitive data
+    // Process configurations and mask sensitive data
     const processedConfigs = configs.map(config => {
-      let displayValue = config.value;
-      
-      // For encrypted fields, show masked value
-      if (config.isEncrypted && config.value) {
-        if (config.type === 'password') {
-          displayValue = '••••••••••••••••';
-        } else {
-          displayValue = '***ENCRYPTED***';
-        }
-      }
+      const displayValue = maskSensitiveValue(config.value, config.type, config.isEncrypted);
       
       return {
         id: config.id,
         key: config.key,
-        value: config.value, // Keep original value for editing
+        // NEVER expose actual values to the client
+        value: null, // Remove actual values for security
         displayValue: displayValue, // Masked value for display
         type: config.type,
         category: config.category,
         description: config.description,
-        isEncrypted: config.isEncrypted
+        isEncrypted: config.isEncrypted,
+        // Add security metadata
+        isSensitive: config.isEncrypted || config.key.toUpperCase().includes('API_KEY') || 
+                    config.key.toUpperCase().includes('SECRET') || 
+                    config.key.toUpperCase().includes('PASSWORD')
       };
     });
 
@@ -108,35 +146,67 @@ export async function GET(request: NextRequest) {
       return acc;
     }, {} as Record<string, any[]>);
 
-    console.log('✅ [API_ADMIN_SYSTEM_CONFIG_GET] System configuration retrieved from database');
+    console.log('✅ [API_ADMIN_SYSTEM_CONFIG_GET] System configuration retrieved from database (sensitive data masked)');
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       configs: processedConfigs,
       configByCategory,
-      total: configs.length
+      total: configs.length,
+      security: {
+        sensitiveDataMasked: true,
+        actualValuesNotExposed: true,
+        timestamp: new Date().toISOString()
+      }
     });
+    
+    securityHeaders(response);
+    return response;
 
   } catch (error) {
     console.error('❌ [API_ADMIN_SYSTEM_CONFIG_GET] Error fetching system config:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to fetch system configuration' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.log('🚀 [API_ADMIN_SYSTEM_CONFIG_POST] Starting request...');
+    
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
+      requireActiveUser: true,
+      requireActiveClient: false  // System config should be accessible regardless of client status
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const createData = await request.json();
     const { configs } = createData;
 
     console.log('📝 [API_ADMIN_SYSTEM_CONFIG_POST] Creating/updating system configuration in database');
+    console.log('📝 [API_ADMIN_SYSTEM_CONFIG_POST] Received data:', JSON.stringify(createData, null, 2));
 
     // Create or update each configuration
     const upsertPromises = configs.map(async (config: any) => {
@@ -186,10 +256,31 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // Authenticate admin user
-    const auth = await getAuthenticatedAdmin(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.log('🚀 [API_ADMIN_SYSTEM_CONFIG_PUT] Starting request...');
+    
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize admin user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
+      requireActiveUser: true,
+      requireActiveClient: false  // System config should be accessible regardless of client status
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
     const updateData = await request.json();

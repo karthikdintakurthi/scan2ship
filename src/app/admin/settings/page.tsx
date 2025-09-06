@@ -98,9 +98,21 @@ export default function SystemSettingsPage() {
   // Update system config
   const updateSystemConfig = async (key: string, value: string) => {
     try {
+      // Find the existing config to get all required fields
+      const existingConfig = configs.find(config => config.key === key);
+      if (!existingConfig) {
+        setError('Configuration not found');
+        return;
+      }
+
       const response = await authenticatedPost('/api/admin/system-config', {
-        key,
-        value
+        configs: [{
+          key: existingConfig.key,
+          value: value,
+          category: existingConfig.category,
+          type: existingConfig.type,
+          description: existingConfig.description
+        }]
       });
 
       if (response.ok) {
@@ -138,9 +150,21 @@ export default function SystemSettingsPage() {
 
       const token = localStorage.getItem('authToken');
       
+      // Find the existing config to get all required fields
+      const existingConfig = configs.find(config => config.id === configId);
+      if (!existingConfig) {
+        setError('Configuration not found');
+        return;
+      }
+
       const response = await authenticatedPost('/api/admin/system-config', {
-        key: configId,
-        value: editValue
+        configs: [{
+          key: existingConfig.key,
+          value: editValue,
+          category: existingConfig.category,
+          type: existingConfig.type,
+          description: existingConfig.description
+        }]
       });
 
       if (response.ok) {
@@ -267,8 +291,10 @@ export default function SystemSettingsPage() {
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">System Configuration</h2>
               
+              
               <div className="space-y-6">
-                {Object.entries(configByCategory).map(([category, configs]) => (
+                {Object.entries(configByCategory)
+                  .map(([category, configs]) => (
                   <div key={category} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex items-center mb-4">
                       {getCategoryIcon(category)}

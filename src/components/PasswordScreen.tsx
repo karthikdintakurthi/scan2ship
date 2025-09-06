@@ -13,7 +13,8 @@ export default function PasswordScreen({ onPasswordCorrect }: PasswordScreenProp
   const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const correctPassword = 'scan2ship';
+  // SECURITY: Password moved to environment variable for security
+  const correctPassword = process.env.NEXT_PUBLIC_APP_PASSWORD || 'default_secure_password_change_me';
 
   // Ensure component is mounted on client side
   useEffect(() => {

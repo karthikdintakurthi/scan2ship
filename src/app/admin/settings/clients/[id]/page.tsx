@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import WhatsAppConfig from '@/components/WhatsAppConfig';
 
 interface Client {
   id: string;
@@ -98,6 +97,19 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
   const [config, setConfig] = useState<ClientConfigData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Helper function to update client order config efficiently
+  const updateClientOrderConfig = (field: string, value: any) => {
+    if (!config) return;
+    
+    setConfig({
+      ...config,
+      clientOrderConfig: {
+        ...config.clientOrderConfig,
+        [field]: value
+      }
+    });
+  };
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [clientId, setClientId] = useState<string>('');
@@ -1130,28 +1142,8 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       </label>
                       <input
                         type="text"
-                        value={config.clientOrderConfig.defaultProductDescription}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: config.clientOrderConfig?.defaultPackageValue || 0,
-                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        value={config.clientOrderConfig?.defaultProductDescription || ''}
+                        onChange={(e) => updateClientOrderConfig('defaultProductDescription', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -1163,27 +1155,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <input
                         type="number"
                         value={config.clientOrderConfig?.defaultPackageValue || 0}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: parseFloat(e.target.value) || 0,
-                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('defaultPackageValue', parseFloat(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -1195,27 +1167,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <input
                         type="number"
                         value={config.clientOrderConfig?.defaultWeight || 0}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: parseFloat(e.target.value) || 0,
-                            defaultWeight: parseFloat(e.target.value) || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('defaultWeight', parseFloat(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -1227,27 +1179,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <input
                         type="number"
                         value={config.clientOrderConfig?.defaultTotalItems || 0}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: parseFloat(e.target.value) || 0,
-                            defaultWeight: parseFloat(e.target.value) || 0,
-                            defaultTotalItems: parseInt(e.target.value) || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('defaultTotalItems', parseInt(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -1263,27 +1195,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                         type="checkbox"
                         id="codEnabled"
                         checked={config.clientOrderConfig?.codEnabledByDefault || false}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: config.clientOrderConfig?.defaultPackageValue || 0,
-                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: e.target.checked,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('codEnabledByDefault', e.target.checked)}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                       <label htmlFor="codEnabled" className="ml-2 block text-sm text-gray-900">
@@ -1299,28 +1211,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                         <input
                           type="number"
                           value={config.clientOrderConfig?.defaultCodAmount || ''}
-                          onChange={(e) => setConfig({
-                            ...config,
-                            clientOrderConfig: {
-                              ...config.clientOrderConfig,
-                              defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                              defaultPackageValue: config.clientOrderConfig?.defaultPackageValue || 0,
-                              defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
-                              defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                              codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                              defaultCodAmount: e.target.value ? parseFloat(e.target.value) : undefined,
-                              minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                              maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                              minWeight: config.clientOrderConfig?.minWeight || 0,
-                              maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                              minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                              maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                              requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                              requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                              requireWeight: config.clientOrderConfig?.requireWeight || false,
-                              requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                            }
-                          })}
+                          onChange={(e) => updateClientOrderConfig('defaultCodAmount', e.target.value ? parseFloat(e.target.value) : undefined)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                       </div>
@@ -1339,27 +1230,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <input
                         type="number"
                         value={config.clientOrderConfig?.minPackageValue || 0}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: parseFloat(e.target.value) || 0,
-                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: parseFloat(e.target.value) || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('minPackageValue', parseFloat(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -1371,27 +1242,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <input
                         type="number"
                         value={config.clientOrderConfig?.maxPackageValue || 0}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: parseFloat(e.target.value) || 0,
-                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: parseFloat(e.target.value) || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('maxPackageValue', parseFloat(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -1403,27 +1254,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <input
                         type="number"
                         value={config.clientOrderConfig?.minWeight || 0}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: parseFloat(e.target.value) || 0,
-                            defaultWeight: parseFloat(e.target.value) || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: parseFloat(e.target.value) || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('minWeight', parseFloat(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -1435,27 +1266,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <input
                         type="number"
                         value={config.clientOrderConfig?.maxWeight || 0}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: parseFloat(e.target.value) || 0,
-                            defaultWeight: parseFloat(e.target.value) || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: parseFloat(e.target.value) || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('maxWeight', parseFloat(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -1467,27 +1278,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <input
                         type="number"
                         value={config.clientOrderConfig?.minTotalItems || 0}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: parseFloat(e.target.value) || 0,
-                            defaultWeight: parseFloat(e.target.value) || 0,
-                            defaultTotalItems: parseInt(e.target.value) || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: parseInt(e.target.value) || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('minTotalItems', parseInt(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -1499,27 +1290,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <input
                         type="number"
                         value={config.clientOrderConfig?.maxTotalItems || 0}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: parseFloat(e.target.value) || 0,
-                            defaultWeight: parseFloat(e.target.value) || 0,
-                            defaultTotalItems: parseInt(e.target.value) || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: parseInt(e.target.value) || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('maxTotalItems', parseInt(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -1535,27 +1306,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                   type="checkbox"
                         id="requireProductDescription"
                         checked={config.clientOrderConfig?.requireProductDescription || false}
-                  onChange={(e) => setConfig({
-                    ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: config.clientOrderConfig?.defaultPackageValue || 0,
-                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: e.target.checked,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                  })}
+                  onChange={(e) => updateClientOrderConfig('requireProductDescription', e.target.checked)}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
                       <label htmlFor="requireProductDescription" className="ml-2 block text-sm text-gray-900">
@@ -1568,27 +1319,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                   type="checkbox"
                         id="requirePackageValue"
                         checked={config.clientOrderConfig?.requirePackageValue || false}
-                  onChange={(e) => setConfig({
-                    ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: config.clientOrderConfig?.defaultPackageValue || 0,
-                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: e.target.checked,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                  })}
+                  onChange={(e) => updateClientOrderConfig('requirePackageValue', e.target.checked)}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
                       <label htmlFor="requirePackageValue" className="ml-2 block text-sm text-gray-900">
@@ -1601,27 +1332,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                         type="checkbox"
                         id="requireWeight"
                         checked={config.clientOrderConfig?.requireWeight || false}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: config.clientOrderConfig?.defaultPackageValue || 0,
-                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
-                            defaultTotalItems: config.clientOrderConfig?.defaultTotalItems || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: config.clientOrderConfig?.minTotalItems || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: e.target.checked,
-                            requireTotalItems: config.clientOrderConfig?.requireTotalItems || false
-                          }
-                        })}
+                        onChange={(e) => updateClientOrderConfig('requireWeight', e.target.checked)}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                       <label htmlFor="requireWeight" className="ml-2 block text-sm text-gray-900">
@@ -1634,27 +1345,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                         type="checkbox"
                         id="requireTotalItems"
                         checked={config.clientOrderConfig?.requireTotalItems || false}
-                  onChange={(e) => setConfig({
-                    ...config,
-                          clientOrderConfig: {
-                            ...config.clientOrderConfig,
-                            defaultProductDescription: config.clientOrderConfig?.defaultProductDescription || '',
-                            defaultPackageValue: config.clientOrderConfig?.defaultPackageValue || 0,
-                            defaultWeight: config.clientOrderConfig?.defaultWeight || 0,
-                            defaultTotalItems: parseInt(e.target.value) || 0,
-                            codEnabledByDefault: config.clientOrderConfig?.codEnabledByDefault || false,
-                            minPackageValue: config.clientOrderConfig?.minPackageValue || 0,
-                            maxPackageValue: config.clientOrderConfig?.maxPackageValue || 0,
-                            minWeight: config.clientOrderConfig?.minWeight || 0,
-                            maxWeight: config.clientOrderConfig?.maxWeight || 0,
-                            minTotalItems: parseInt(e.target.value) || 0,
-                            maxTotalItems: config.clientOrderConfig?.maxTotalItems || 0,
-                            requireProductDescription: config.clientOrderConfig?.requireProductDescription || false,
-                            requirePackageValue: config.clientOrderConfig?.requirePackageValue || false,
-                            requireWeight: config.clientOrderConfig?.requireWeight || false,
-                            requireTotalItems: e.target.checked
-                          }
-                        })}
+                  onChange={(e) => updateClientOrderConfig('requireTotalItems', e.target.checked)}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                       <label htmlFor="requireTotalItems" className="ml-2 block text-sm text-gray-900">
@@ -1671,10 +1362,6 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
             )}
           </div>
 
-          {/* WhatsApp Configuration */}
-          <div className="mt-8">
-            <WhatsAppConfig />
-          </div>
 
         </div>
       </div>

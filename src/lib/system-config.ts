@@ -3,31 +3,68 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-// Encryption key for sensitive data
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'vanitha-logistics-encryption-key-2024';
+// Encryption key for sensitive data - must be set in environment
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+
+// Validate encryption key is present
+if (!ENCRYPTION_KEY) {
+  throw new Error('ENCRYPTION_KEY environment variable is required for secure operation');
+}
+
+// Validate encryption key length (minimum 32 characters for AES-256)
+if (ENCRYPTION_KEY.length < 32) {
+  throw new Error('ENCRYPTION_KEY must be at least 32 characters long for AES-256 encryption');
+}
 
 // Cache for system configurations
 let configCache: Map<string, { value: string; timestamp: number }> = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Helper function to encrypt sensitive data
+// Helper function to encrypt sensitive data with proper IV
 function encrypt(text: string): string {
-  const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
+  if (!ENCRYPTION_KEY) {
+    throw new Error('Encryption key not available');
+  }
+  
+  // Generate a random IV for each encryption
+  const iv = crypto.randomBytes(16);
+  
+  // Create cipher with IV
+  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+  
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  return encrypted;
+  
+  // Prepend IV to encrypted data
+  return iv.toString('hex') + ':' + encrypted;
 }
 
-// Helper function to decrypt sensitive data
+// Helper function to decrypt sensitive data with proper IV
 function decrypt(encryptedText: string): string {
+  if (!ENCRYPTION_KEY) {
+    throw new Error('Encryption key not available');
+  }
+  
   try {
-    const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+    // Split IV and encrypted data
+    const parts = encryptedText.split(':');
+    if (parts.length !== 2) {
+      throw new Error('Invalid encrypted data format');
+    }
+    
+    const iv = Buffer.from(parts[0], 'hex');
+    const encrypted = parts[1];
+    
+    // Create decipher with IV
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+    
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
+    
     return decrypted;
   } catch (error) {
     console.error('❌ Error decrypting value:', error);
-    return encryptedText; // Return original if decryption fails
+    throw new Error('Failed to decrypt sensitive data - encryption key may be invalid');
   }
 }
 

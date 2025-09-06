@@ -1,70 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
 import { DelhiveryService } from '@/lib/delhivery';
-import whatsappService, { initializeWhatsAppService } from '@/lib/whatsapp-service';
 import { generateReferenceNumber, formatReferenceNumber, generateReferenceNumberWithPrefix, formatReferenceNumberWithPrefix } from '@/lib/reference-number';
 import AnalyticsService from '@/lib/analytics-service';
 import { CreditService } from '@/lib/credit-service';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { WebhookService } from '@/lib/webhook-service';
 
 const delhiveryService = new DelhiveryService();
 
-// Helper function to get authenticated user and client
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('🔐 [AUTH] No authorization header or invalid format');
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  console.log('🔐 [AUTH] Token extracted, length:', token.length);
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-    console.log('🔐 [AUTH] JWT decoded successfully, userId:', decoded.userId);
-    
-    // Get user and client data from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    console.log('🔐 [AUTH] User lookup result:', user ? 'Found' : 'Not found');
-    if (user) {
-      console.log('🔐 [AUTH] User active:', user.isActive, 'Client active:', user.clients?.isActive);
-    }
-
-    if (!user || !user.isActive || !user.clients.isActive) {
-      console.log('🔐 [AUTH] User validation failed:', { 
-        userExists: !!user, 
-        userActive: user?.isActive, 
-        clientActive: user?.clients?.isActive 
-      });
-      return null;
-    }
-
-    console.log('🔐 [AUTH] Authentication successful for user:', user.email, 'Client:', user.clients.companyName);
-    return {
-      user: user,
-      client: user.clients
-    };
-  } catch (error) {
-    console.log('🔐 [AUTH] JWT verification failed:', error);
-    return null;
-  }
-}
+// Authentication handled by centralized middleware
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user
-    const auth = await getAuthenticatedUser(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const auth = { user: authResult.user!, client: authResult.user!.client };
 
     const { client, user } = auth;
     const orderData = await request.json();
@@ -294,65 +269,57 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch updated order data' }, { status: 500 });
     }
 
-    // Initialize WhatsApp service with database configuration
-    await initializeWhatsAppService(client.id);
 
-    // Send WhatsApp notifications with updated tracking number
+    // Trigger webhooks for order creation
     try {
-      const whatsappData = {
-        customerName: updatedOrder.name,
-        customerPhone: updatedOrder.mobile,
-        orderNumber: `ORDER-${updatedOrder.id}`,
-        courierService: updatedOrder.courier_service,
-        trackingNumber: updatedOrder.tracking_id || 'Will be assigned',
-        clientCompanyName: client.companyName || 'Scan2Ship',
-        resellerName: updatedOrder.reseller_name || undefined,
-        resellerPhone: updatedOrder.reseller_mobile || undefined,
-        packageValue: updatedOrder.package_value,
-        weight: updatedOrder.weight,
-        totalItems: updatedOrder.total_items,
-        pickupLocation: updatedOrder.pickup_location,
-        address: updatedOrder.address,
-        city: updatedOrder.city,
-        state: updatedOrder.state,
-        pincode: updatedOrder.pincode
+      console.log('🔗 [API_ORDERS_POST] Triggering webhooks for order creation');
+      
+      const webhookData = {
+        order: {
+          id: updatedOrder.id,
+          orderNumber: `ORDER-${updatedOrder.id}`,
+          referenceNumber: updatedOrder.reference_number,
+          trackingId: updatedOrder.tracking_id,
+          name: updatedOrder.name,
+          mobile: updatedOrder.mobile,
+          address: updatedOrder.address,
+          city: updatedOrder.city,
+          state: updatedOrder.state,
+          country: updatedOrder.country,
+          pincode: updatedOrder.pincode,
+          courierService: updatedOrder.courier_service,
+          pickupLocation: updatedOrder.pickup_location,
+          packageValue: updatedOrder.package_value,
+          weight: updatedOrder.weight,
+          totalItems: updatedOrder.total_items,
+          isCod: updatedOrder.is_cod,
+          codAmount: updatedOrder.cod_amount,
+          resellerName: updatedOrder.reseller_name,
+          resellerMobile: updatedOrder.reseller_mobile,
+          createdAt: updatedOrder.created_at,
+          updatedAt: updatedOrder.updated_at,
+          delhiveryWaybillNumber: updatedOrder.delhivery_waybill_number,
+          delhiveryOrderId: updatedOrder.delhivery_order_id,
+          delhiveryApiStatus: updatedOrder.delhivery_api_status
+        },
+        client: {
+          id: client.id,
+          companyName: client.companyName,
+          name: client.name,
+          email: client.email
+        }
       };
 
-      // Send customer WhatsApp message
-      const customerWhatsAppResult = await whatsappService.sendCustomerOrderWhatsApp(whatsappData);
-      if (customerWhatsAppResult.success) {
-        console.log('📱 [API_ORDERS_POST] Customer WhatsApp message sent for order:', updatedOrder.id);
-        
-        // Deduct credits for successful WhatsApp message
-        try {
-          await CreditService.deductWhatsAppCredits(client.id, user.id, updatedOrder.id);
-          console.log('💳 [API_ORDERS_POST] Credits deducted for customer WhatsApp message: 1 credit');
-        } catch (creditError) {
-          console.error('❌ [API_ORDERS_POST] Failed to deduct credits for customer WhatsApp:', creditError);
-        }
-      } else {
-        console.warn('⚠️ [API_ORDERS_POST] Customer WhatsApp message failed for order:', updatedOrder.id, customerWhatsAppResult.error);
-      }
-
-      // Send reseller WhatsApp message if reseller details are provided
-      if (updatedOrder.reseller_name && updatedOrder.reseller_mobile) {
-        const resellerWhatsAppResult = await whatsappService.sendResellerOrderWhatsApp(whatsappData);
-        if (resellerWhatsAppResult.success) {
-          console.log('📱 [API_ORDERS_POST] Reseller WhatsApp message sent for order:', updatedOrder.id);
-          
-          // Deduct credits for successful reseller WhatsApp message
-          try {
-            await CreditService.deductWhatsAppCredits(client.id, user.id, updatedOrder.id);
-            console.log('💳 [API_ORDERS_POST] Credits deducted for reseller WhatsApp message: 1 credit');
-          } catch (creditError) {
-            console.error('❌ [API_ORDERS_POST] Failed to deduct credits for reseller WhatsApp:', creditError);
-          }
-        } else {
-          console.warn('⚠️ [API_ORDERS_POST] Reseller WhatsApp message failed for order:', updatedOrder.id, resellerWhatsAppResult.error);
-        }
-      }
-    } catch (whatsappError) {
-      console.error('❌ [API_ORDERS_POST] WhatsApp sending failed:', whatsappError);
+      // Trigger webhook asynchronously to not block the response
+      WebhookService.triggerWebhooks('order.created', webhookData, client.id, updatedOrder.id)
+        .then(() => {
+          console.log('✅ [API_ORDERS_POST] Webhooks triggered successfully');
+        })
+        .catch((webhookError) => {
+          console.error('❌ [API_ORDERS_POST] Webhook trigger failed:', webhookError);
+        });
+    } catch (webhookError) {
+      console.error('❌ [API_ORDERS_POST] Webhook setup failed:', webhookError);
     }
 
     return NextResponse.json({
@@ -377,11 +344,32 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate user
-    const auth = await getAuthenticatedUser(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const auth = { user: authResult.user!, client: authResult.user!.client };
 
     const { client } = auth;
     const { searchParams } = new URL(request.url);
@@ -474,23 +462,32 @@ export async function DELETE(request: NextRequest) {
   try {
     console.log('🔐 [API_ORDERS_DELETE] Starting authentication...');
     
-    // Check if authorization header exists
-    const authHeader = request.headers.get('authorization');
-    console.log('🔐 [API_ORDERS_DELETE] Auth header:', authHeader ? 'Present' : 'Missing');
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ [API_ORDERS_DELETE] Invalid or missing authorization header');
-      return NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 });
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
-    
-    // Authenticate user
-    const auth = await getAuthenticatedUser(request);
-    console.log('🔐 [API_ORDERS_DELETE] Authentication result:', auth ? 'Success' : 'Failed');
-    
-    if (!auth) {
-      console.log('❌ [API_ORDERS_DELETE] Authentication failed - user not found or inactive');
-      return NextResponse.json({ error: 'Unauthorized - Authentication failed' }, { status: 401 });
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.DELETE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
+
+    const auth = { user: authResult.user!, client: authResult.user!.client };
 
     const { client } = auth;
     const { orderIds } = await request.json();

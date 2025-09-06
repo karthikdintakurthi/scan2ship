@@ -101,6 +101,7 @@ model clients {
   createdAt             DateTime              @default(now())
   updatedAt             DateTime
   analytics_events      analytics_events[]
+  api_keys              api_keys[]
   client_config         client_config[]
   client_credit_costs   client_credit_costs[]
   client_credits        client_credits?
@@ -111,7 +112,10 @@ model clients {
   orders                orders[]
   pickup_locations      pickup_locations[]
   sessions              sessions[]
+  shopify_integrations  shopify_integrations[]
+  shopify_orders        shopify_orders[]
   users                 users[]
+  webhooks              webhooks[]
 }
 
 model courier_services {
@@ -121,7 +125,15 @@ model courier_services {
   isDefault Boolean @default(false)
   code      String
   name      String
-  clients   clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // Rate calculation fields
+  baseRate      Float?  // Base shipping rate in INR
+  ratePerKg     Float?  // Additional rate per kg in INR
+  minWeight     Float?  // Minimum weight for base rate (in grams)
+  maxWeight     Float?  // Maximum weight supported (in grams)
+  codCharges    Float?  // COD charges in INR
+  freeShippingThreshold Float? // Free shipping above this value (in INR)
+  estimatedDays Int?    // Estimated delivery days
+  clients       clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([code, clientId])
 }
@@ -189,6 +201,15 @@ model orders {
   delhivery_api_error      String?
   delhivery_retry_count    Int                   @default(0)
   last_delhivery_attempt   DateTime?
+  
+  // Shopify integration fields
+  shopify_status           String?               // pending, synced, fulfilled, error
+  shopify_tracking_number  String?
+  shopify_fulfillment_id   String?
+  shopify_api_status       String?               // pending, success, failed
+  shopify_api_error        String?
+  last_shopify_attempt     DateTime?
+  
   shipment_length          Float?
   shipment_breadth         Float?
   shipment_height          Float?
@@ -227,14 +248,29 @@ model pickup_locations {
 }
 
 model sessions {
-  id        String   @id
-  userId    String
-  clientId  String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  clients   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String    @id
+  userId       String
+  clientId     String
+  sessionToken String    @unique
+  refreshToken String    @unique
+  ipAddress    String
+  userAgent    String
+  location     String?
+  role         String
+  permissions  String    // JSON string
+  createdAt    DateTime  @default(now())
+  lastActivity DateTime  @default(now())
+  expiresAt    DateTime
+  isActive     Boolean   @default(true)
+  revokedAt    DateTime?
+  clients      clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users        users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([refreshToken])
+  @@index([isActive])
+  @@index([expiresAt])
 }
 
 model system_config {
@@ -266,4 +302,162 @@ model users {
   clients             clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([email, clientId])
+}
+
+model api_keys {
+  id          String   @id
+  name        String
+  key         String   @unique
+  secret      String?  // For HMAC validation
+  clientId    String
+  isActive    Boolean  @default(true)
+  permissions String[] // Array of permissions like ["orders:read", "orders:write"]
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([key])
+  @@index([clientId])
+}
+
+model shopify_integrations {
+  id                String   @id
+  clientId          String
+  shopDomain        String   // e.g., "mystore.myshopify.com"
+  accessToken       String   // Shopify access token
+  webhookSecret     String?  // For webhook validation
+  isActive          Boolean  @default(true)
+  lastSyncAt        DateTime?
+  syncStatus        String   @default("pending") // pending, active, error
+  errorMessage      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  clients           clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([shopDomain, clientId])
+  @@index([clientId])
+  @@index([shopDomain])
+}
+
+model shopify_orders {
+  id                String   @id
+  clientId          String
+  shopifyOrderId    String   // Shopify order ID
+  shopifyOrderName  String   // e.g., "#1001"
+  scan2shipOrderId  Int?     // Reference to orders table
+  status            String   @default("pending") // pending, synced, error
+  syncData          Json?    // Store Shopify order data
+  errorMessage      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  clients           clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([shopifyOrderId, clientId])
+  @@index([clientId])
+  @@index([shopifyOrderId])
+}
+
+model webhooks {
+  id          String   @id
+  clientId    String
+  name        String
+  url         String
+  events      String[] // Array of events like ["order.created", "order.updated"]
+  secret      String?  // For webhook signature validation
+  isActive    Boolean  @default(true)
+  retryCount  Int      @default(3)
+  timeout     Int      @default(30000) // Timeout in milliseconds
+  headers     Json?    // Custom headers to send with webhook
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  webhook_logs webhook_logs[]
+
+  @@index([clientId])
+  @@index([isActive])
+}
+
+model webhook_logs {
+  id          String   @id
+  webhookId   String
+  eventType   String
+  orderId     Int?
+  status      String   // success, failed, pending
+  responseCode Int?
+  responseBody String?
+  errorMessage String?
+  attemptCount Int     @default(1)
+  createdAt   DateTime @default(now())
+  webhooks    webhooks @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model rate_limits {
+  id          String   @id
+  key         String   @unique
+  count       Int      @default(0)
+  windowStart DateTime
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([expiresAt])
+  @@index([key])
+}
+
+
+model audit_logs {
+  id        String   @id
+  eventType String
+  severity  String
+  userId    String?
+  clientId  String?
+  sessionId String?
+  ipAddress String
+  userAgent String
+  resource  String?
+  action    String?
+  details   String   // JSON string
+  metadata  String   // JSON string
+  riskScore Int
+  tags      String[] // Array of strings
+  createdAt DateTime @default(now())
+
+  @@index([eventType])
+  @@index([severity])
+  @@index([userId])
+  @@index([clientId])
+  @@index([ipAddress])
+  @@index([createdAt])
+  @@index([tags])
+}
+
+model csrf_tokens {
+  id        String    @id
+  token     String    @unique
+  userId    String?
+  sessionId String?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([expiresAt])
+}
+
+model blocked_ips {
+  id        String   @id
+  ipAddress String   @unique
+  reason    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([ipAddress])
+  @@index([expiresAt])
 }

@@ -4,52 +4,29 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit as persistentRateLimit } from './persistent-rate-limiter';
+import { sanitizeString, sanitizeEmail, sanitizeSearchQuery } from './input-sanitizer';
 
-// Simple in-memory rate limiting
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
-
-// Rate limiting configuration
+// Rate limiting configuration (for reference)
 const rateLimitConfig = {
   auth: { windowMs: 15 * 60 * 1000, maxRequests: 5 },
   api: { windowMs: 15 * 60 * 1000, maxRequests: 100 },
-  upload: { windowMs: 15 * 60 * 1000, maxRequests: 10 }
+  upload: { windowMs: 15 * 60 * 1000, maxRequests: 10 },
+  webhook: { windowMs: 60 * 1000, maxRequests: 20 }
 };
 
 /**
- * Simple rate limiting
+ * Rate limiting using persistent storage
  */
-export function rateLimit(
+export async function rateLimit(
   request: NextRequest,
   type: keyof typeof rateLimitConfig = 'api'
-): { allowed: boolean; message?: string } {
-  const config = rateLimitConfig[type];
-  const now = Date.now();
-  
-  // Get client identifier
-  const clientId = getClientIdentifier(request);
-  const key = `${type}:${clientId}`;
-  
-  const current = rateLimitStore.get(key);
-  
-  if (!current || now > current.resetTime) {
-    // Reset or create new entry
-    rateLimitStore.set(key, {
-      count: 1,
-      resetTime: now + config.windowMs
-    });
-    return { allowed: true };
-  }
-  
-  if (current.count >= config.maxRequests) {
-    return {
-      allowed: false,
-      message: `Too many requests. Please try again in ${Math.ceil((current.resetTime - now) / 1000)} seconds.`
-    };
-  }
-  
-  // Increment count
-  current.count++;
-  return { allowed: true };
+): Promise<{ allowed: boolean; message?: string }> {
+  const result = await persistentRateLimit(request, type);
+  return {
+    allowed: result.allowed,
+    message: result.message
+  };
 }
 
 /**
@@ -85,18 +62,38 @@ export const corsConfig = {
   origin: process.env.ALLOWED_ORIGINS?.split(',') || [
     'http://localhost:3000',
     'http://localhost:3001',
-    'https://qa.scan2ship.in'
+    'https://qa.scan2ship.in',
+    'https://scan2ship.vercel.app',
+    'https://www.scan2ship.com',
+    'https://scan2ship.com'
   ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
     'Content-Type',
     'Authorization',
     'X-Requested-With',
     'Accept',
-    'Origin'
+    'Origin',
+    'X-API-Key',
+    'X-Webhook-Signature',
+    'X-Shopify-Hmac-Sha256',
+    'X-Shopify-Shop-Domain',
+    'X-Shopify-Topic',
+    'X-Shopify-Webhook-Id',
+    'X-Shopify-Webhook-Attempt',
+    'X-Forwarded-For',
+    'X-Real-IP',
+    'X-CSRF-Token'
+  ],
+  exposedHeaders: [
+    'X-Rate-Limit-Limit',
+    'X-Rate-Limit-Remaining',
+    'X-Rate-Limit-Reset',
+    'X-Request-ID'
   ],
   credentials: true,
-  maxAge: 86400
+  maxAge: 86400,
+  optionsSuccessStatus: 200
 };
 
 /**
@@ -108,31 +105,41 @@ export function cors(request: NextRequest): NextResponse | null {
   
   // Handle preflight requests
   if (method === 'OPTIONS') {
-    const response = new NextResponse(null, { status: 200 });
+    const response = new NextResponse(null, { status: corsConfig.optionsSuccessStatus });
     
     // For preflight, allow the requesting origin if it's valid
     if (origin && corsConfig.origin.includes(origin)) {
       response.headers.set('Access-Control-Allow-Origin', origin);
-    } else if (!origin && process.env.NODE_ENV === 'development') {
-      // Allow requests without origin header only in development
+      response.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+      response.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+      response.headers.set('Access-Control-Expose-Headers', corsConfig.exposedHeaders.join(', '));
+      response.headers.set('Access-Control-Allow-Credentials', 'true');
+      response.headers.set('Access-Control-Max-Age', corsConfig.maxAge.toString());
+      response.headers.set('Vary', 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+    } else if (!origin) {
+      // Allow requests without origin header (e.g., local development, Postman)
       response.headers.set('Access-Control-Allow-Origin', '*');
-    } else if (!origin && process.env.NODE_ENV === 'production') {
-      // In production, default to QA environment for requests without origin
-      response.headers.set('Access-Control-Allow-Origin', 'https://qa.scan2ship.in');
+      response.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+      response.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+      response.headers.set('Access-Control-Expose-Headers', corsConfig.exposedHeaders.join(', '));
+      response.headers.set('Access-Control-Max-Age', corsConfig.maxAge.toString());
     } else {
       // Block requests from unauthorized origins
       return NextResponse.json(
-        { error: 'Origin not allowed' },
+        { error: 'CORS policy violation: Origin not allowed' },
         { status: 403 }
       );
     }
     
-    response.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
-    response.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
-    response.headers.set('Access-Control-Allow-Credentials', 'true');
-    response.headers.set('Access-Control-Max-Age', corsConfig.maxAge.toString());
-    
     return response;
+  }
+  
+  // Validate method for actual requests
+  if (!corsConfig.methods.includes(method)) {
+    return NextResponse.json(
+      { error: 'CORS policy violation: Method not allowed' },
+      { status: 405 }
+    );
   }
   
   // Handle actual requests
@@ -140,22 +147,14 @@ export function cors(request: NextRequest): NextResponse | null {
     return null; // Continue with request
   }
   
-  // In production, require origin header for security
-  if (process.env.NODE_ENV === 'production' && !origin) {
-    return NextResponse.json(
-      { error: 'Origin header required in production' },
-      { status: 403 }
-    );
-  }
-  
-  // Allow requests without origin header only in development
-  if (!origin && process.env.NODE_ENV === 'development') {
+  // Allow requests without origin header (e.g., local development, Postman)
+  if (!origin) {
     return null; // Continue with request
   }
   
   // Block requests from unauthorized origins
   return NextResponse.json(
-    { error: 'Origin not allowed' },
+    { error: 'CORS policy violation: Origin not allowed' },
     { status: 403 }
   );
 }
@@ -298,12 +297,61 @@ export class FileUploadValidator {
 }
 
 /**
- * Security headers
+ * Enhanced security headers
  */
 export function securityHeaders(response: NextResponse): NextResponse {
+  // Prevent MIME type sniffing
   response.headers.set('X-Content-Type-Options', 'nosniff');
+  
+  // Prevent clickjacking
   response.headers.set('X-Frame-Options', 'DENY');
+  
+  // XSS Protection
   response.headers.set('X-XSS-Protection', '1; mode=block');
+  
+  // Referrer Policy
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // Permissions Policy
+  response.headers.set('Permissions-Policy', 
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()'
+  );
+  
+  // Content Security Policy
+  response.headers.set('Content-Security-Policy', 
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: https:; " +
+    "font-src 'self' data:; " +
+    "connect-src 'self' https:; " +
+    "frame-ancestors 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'"
+  );
+  
+  // Strict Transport Security (HTTPS only)
+  if (process.env.NODE_ENV === 'production') {
+    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  
+  // Cross-Origin Embedder Policy
+  response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+  
+  // Cross-Origin Opener Policy
+  response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  
+  // Cross-Origin Resource Policy
+  response.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+  
+  // Remove server information
+  response.headers.delete('X-Powered-By');
+  response.headers.delete('Server');
+  
+  // Cache control for sensitive endpoints
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.headers.set('Pragma', 'no-cache');
+  response.headers.set('Expires', '0');
   
   return response;
 }
@@ -311,7 +359,7 @@ export function securityHeaders(response: NextResponse): NextResponse {
 /**
  * Apply security middleware
  */
-export function applySecurityMiddleware(
+export async function applySecurityMiddleware(
   request: NextRequest,
   response: NextResponse,
   options: {
@@ -319,7 +367,7 @@ export function applySecurityMiddleware(
     cors?: boolean;
     securityHeaders?: boolean;
   } = {}
-): NextResponse | null {
+): Promise<NextResponse | null> {
   const { rateLimit: rateLimitType = 'api', cors: enableCors = true, securityHeaders: enableSecurityHeaders = true } = options;
   
   // Apply CORS
@@ -330,13 +378,21 @@ export function applySecurityMiddleware(
     }
   }
   
-  // Apply rate limiting
-  const rateLimitResult = rateLimit(request, rateLimitType);
-  if (!rateLimitResult.allowed) {
-    return NextResponse.json(
-      { error: rateLimitResult.message },
-      { status: 429 }
-    );
+  // Skip rate limiting in development/testing mode
+  const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+  const disableRateLimit = process.env.DISABLE_RATE_LIMIT === 'true';
+  
+  if (!isDevelopment && !disableRateLimit) {
+    // Apply rate limiting only in production
+    const rateLimitResult = await rateLimit(request, rateLimitType);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: rateLimitResult.message },
+        { status: 429 }
+      );
+    }
+  } else {
+    console.log('🚫 [RATE_LIMIT] Rate limiting disabled for testing/development');
   }
   
   // Apply security headers

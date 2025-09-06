@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getPickupLocations } from '@/lib/order-form-config'
 import { getActiveCourierServices } from '@/lib/courier-service-config'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 interface Order {
   id: number
@@ -34,6 +34,14 @@ interface Order {
   delhivery_api_error?: string
   delhivery_retry_count?: number
   last_delhivery_attempt?: string
+  
+  // Shopify integration fields
+  shopify_status?: string
+  shopify_tracking_number?: string
+  shopify_fulfillment_id?: string
+  shopify_api_status?: string
+  shopify_api_error?: string
+  last_shopify_attempt?: string
   
   // Additional Delhivery fields
   shipment_length?: number
@@ -67,6 +75,7 @@ export default function OrderList() {
   const [error, setError] = useState<string | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [retrying, setRetrying] = useState<number | null>(null)
+  const [isFulfilling, setIsFulfilling] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPickupLocation, setSelectedPickupLocation] = useState('')
   const [selectedCourierService, setSelectedCourierService] = useState('')
@@ -348,6 +357,51 @@ export default function OrderList() {
       console.error('Error retrying order:', error)
     } finally {
       setRetrying(null)
+    }
+  }
+
+  const handleFulfillOrder = async (orderId: number) => {
+    setIsFulfilling(true)
+    try {
+      // Get auth token from localStorage
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+
+      const response = await fetch(`/api/orders/${orderId}/fulfill`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        alert(`Order fulfilled successfully! Tracking ID: ${result.trackingId}`)
+        
+        // Refresh the orders list
+        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+        
+        // Update the selected order if it's the same one
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder({
+            ...selectedOrder,
+            tracking_id: result.trackingId,
+            delhivery_waybill_number: result.waybillNumber,
+            delhivery_api_status: 'success'
+          })
+        }
+      } else {
+        const error = await response.json()
+        alert(`Failed to fulfill order: ${error.error || error.message}`)
+      }
+    } catch (error) {
+      alert('Error fulfilling order')
+      console.error('Error fulfilling order:', error)
+    } finally {
+      setIsFulfilling(false)
     }
   }
 
@@ -675,83 +729,96 @@ export default function OrderList() {
 
       // Prepare data for export
       const exportData = ordersToExport.map(order => ({
-        'Order ID': order.id,
-        'Customer Name': order.name,
-        'Mobile': order.mobile,
-        'Address': order.address,
-        'City': order.city,
-        'State': order.state,
-        'Country': order.country,
-        'Pincode': order.pincode,
-        'Courier Service': order.courier_service,
-        'Pickup Location': order.pickup_location,
-        'Package Value': order.package_value,
-        'Weight (g)': order.weight,
-        'Total Items': order.total_items,
-        'Tracking ID': order.tracking_id || '',
-        'Reference Number': order.reference_number || '',
-        'Is COD': order.is_cod ? 'Yes' : 'No',
-        'COD Amount': order.cod_amount || '',
-        'Reseller Name': order.reseller_name || '',
-        'Reseller Mobile': order.reseller_mobile || '',
-        'Created Date': new Date(order.created_at).toLocaleDateString('en-IN'),
-        'Product Description': order.product_description || '',
-        'Delhivery Waybill': order.delhivery_waybill_number || '',
-        'Delhivery Order ID': order.delhivery_order_id || '',
-        'Delhivery Status': order.delhivery_api_status || '',
-        'Shipment Length': order.shipment_length || '',
-        'Shipment Breadth': order.shipment_breadth || '',
-        'Shipment Height': order.shipment_height || '',
-        'Return Address': order.return_address || '',
-        'Seller Name': order.seller_name || '',
-        'Seller GST': order.seller_gst || '',
-        'HSN Code': order.hsn_code || '',
-        'Category': order.category_of_goods || ''
+        orderId: order.id,
+        customerName: order.name,
+        mobile: order.mobile,
+        address: order.address,
+        city: order.city,
+        state: order.state,
+        country: order.country,
+        pincode: order.pincode,
+        courierService: order.courier_service,
+        pickupLocation: order.pickup_location,
+        packageValue: order.package_value,
+        weight: order.weight,
+        totalItems: order.total_items,
+        trackingId: order.tracking_id || '',
+        referenceNumber: order.reference_number || '',
+        isCod: order.is_cod ? 'Yes' : 'No',
+        codAmount: order.cod_amount || '',
+        resellerName: order.reseller_name || '',
+        resellerMobile: order.reseller_mobile || '',
+        createdDate: new Date(order.created_at).toLocaleDateString('en-IN'),
+        productDescription: order.product_description || '',
+        delhiveryWaybill: order.delhivery_waybill_number || '',
+        delhiveryOrderId: order.delhivery_order_id || '',
+        delhiveryStatus: order.delhivery_api_status || '',
+        shipmentLength: order.shipment_length || '',
+        shipmentBreadth: order.shipment_breadth || '',
+        shipmentHeight: order.shipment_height || '',
+        returnAddress: order.return_address || '',
+        sellerName: order.seller_name || '',
+        sellerGst: order.seller_gst || '',
+        hsnCode: order.hsn_code || '',
+        category: order.category_of_goods || ''
       }))
 
       // Create workbook and worksheet
-      const workbook = XLSX.utils.book_new()
-      const worksheet = XLSX.utils.json_to_sheet(exportData)
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('Orders')
 
-      // Auto-size columns
-      const columnWidths = [
-        { wch: 10 }, // Order ID
-        { wch: 20 }, // Customer Name
-        { wch: 15 }, // Mobile
-        { wch: 40 }, // Address
-        { wch: 15 }, // City
-        { wch: 15 }, // State
-        { wch: 15 }, // Country
-        { wch: 10 }, // Pincode
-        { wch: 15 }, // Courier Service
-        { wch: 20 }, // Pickup Location
-        { wch: 15 }, // Package Value
-        { wch: 12 }, // Weight
-        { wch: 12 }, // Total Items
-        { wch: 20 }, // Tracking ID
-        { wch: 20 }, // Reference Number
-        { wch: 8 },  // Is COD
-        { wch: 12 }, // COD Amount
-        { wch: 20 }, // Reseller Name
-        { wch: 15 }, // Reseller Mobile
-        { wch: 15 }, // Created Date
-        { wch: 25 }, // Product Description
-        { wch: 20 }, // Delhivery Waybill
-        { wch: 20 }, // Delhivery Order ID
-        { wch: 15 }, // Delhivery Status
-        { wch: 15 }, // Shipment Length
-        { wch: 15 }, // Shipment Breadth
-        { wch: 15 }, // Shipment Height
-        { wch: 40 }, // Return Address
-        { wch: 20 }, // Seller Name
-        { wch: 15 }, // Seller GST
-        { wch: 12 }, // HSN Code
-        { wch: 20 }  // Category
+      // Define columns with headers
+      const columns = [
+        { header: 'Order ID', key: 'orderId', width: 10 },
+        { header: 'Customer Name', key: 'customerName', width: 20 },
+        { header: 'Mobile', key: 'mobile', width: 15 },
+        { header: 'Address', key: 'address', width: 40 },
+        { header: 'Customer City', key: 'city', width: 15 },
+        { header: 'Customer State', key: 'state', width: 15 },
+        { header: 'Customer Country', key: 'country', width: 15 },
+        { header: 'Customer Pincode', key: 'pincode', width: 10 },
+        { header: 'Courier Service', key: 'courierService', width: 15 },
+        { header: 'Pickup Location', key: 'pickupLocation', width: 20 },
+        { header: 'Package Value', key: 'packageValue', width: 15 },
+        { header: 'Weight', key: 'weight', width: 12 },
+        { header: 'Total Items', key: 'totalItems', width: 12 },
+        { header: 'Tracking ID', key: 'trackingId', width: 20 },
+        { header: 'Reference Number', key: 'referenceNumber', width: 20 },
+        { header: 'Is COD', key: 'isCod', width: 8 },
+        { header: 'COD Amount', key: 'codAmount', width: 12 },
+        { header: 'Reseller Name', key: 'resellerName', width: 20 },
+        { header: 'Reseller Mobile', key: 'resellerMobile', width: 15 },
+        { header: 'Created Date', key: 'createdDate', width: 15 },
+        { header: 'Product Description', key: 'productDescription', width: 25 },
+        { header: 'Delhivery Waybill', key: 'delhiveryWaybill', width: 20 },
+        { header: 'Delhivery Order ID', key: 'delhiveryOrderId', width: 20 },
+        { header: 'Delhivery Status', key: 'delhiveryStatus', width: 15 },
+        { header: 'Shipment Length', key: 'shipmentLength', width: 15 },
+        { header: 'Shipment Breadth', key: 'shipmentBreadth', width: 15 },
+        { header: 'Shipment Height', key: 'shipmentHeight', width: 15 },
+        { header: 'Return Address', key: 'returnAddress', width: 40 },
+        { header: 'Seller Name', key: 'sellerName', width: 20 },
+        { header: 'Seller GST', key: 'sellerGst', width: 15 },
+        { header: 'HSN Code', key: 'hsnCode', width: 12 },
+        { header: 'Category', key: 'category', width: 20 }
       ]
-      worksheet['!cols'] = columnWidths
 
-      // Add worksheet to workbook
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Orders')
+      // Set column definitions
+      worksheet.columns = columns
+
+      // Add data rows
+      exportData.forEach(row => {
+        worksheet.addRow(row)
+      })
+
+      // Style the header row
+      const headerRow = worksheet.getRow(1)
+      headerRow.font = { bold: true }
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      }
 
       // Generate filename with current date and filter info
       const now = new Date()
@@ -785,8 +852,17 @@ export default function OrderList() {
       
       filename += '.xlsx'
 
-      // Save the file
-      XLSX.writeFile(workbook, filename)
+      // Save the file using ExcelJS
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
       
       console.log(`✅ Exported ${ordersToExport.length} orders to ${filename}`)
       
@@ -837,6 +913,21 @@ export default function OrderList() {
         return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">ℹ️ Not Applicable</span>
       default:
         return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">Unknown</span>
+    }
+  }
+
+  const getShopifyStatusBadge = (order: Order) => {
+    switch (order.shopify_status) {
+      case 'fulfilled':
+        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Fulfilled</span>
+      case 'error':
+        return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">✗ Error</span>
+      case 'pending':
+        return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">⏳ Pending</span>
+      case 'synced':
+        return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">🔄 Synced</span>
+      default:
+        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">❓ Not Connected</span>
     }
   }
 
@@ -1368,17 +1459,7 @@ export default function OrderList() {
                           View Details
                         </button>
                         
-                        {order.courier_service.toLowerCase() === 'delhivery' && 
-                         order.delhivery_api_status === 'failed' && 
-                         (order.delhivery_retry_count || 0) < 3 && (
-                          <button
-                            onClick={() => retryDelhiveryOrder(order.id)}
-                            disabled={retrying === order.id}
-                            className="block w-full px-3 py-1 text-xs bg-orange-100 text-orange-800 rounded hover:bg-orange-200 disabled:opacity-50"
-                          >
-                            {retrying === order.id ? 'Retrying...' : 'Retry Delhivery'}
-                          </button>
-                        )}
+
                       </div>
                     </td>
                   </tr>
@@ -1555,23 +1636,62 @@ export default function OrderList() {
                     </div>
                   </div>
                   
-                  {selectedOrder.delhivery_api_status === 'failed' && 
-                   (selectedOrder.delhivery_retry_count || 0) < 3 && (
-                    <div className="mt-3">
+                  {/* Fulfill Button */}
+                  {(!selectedOrder.tracking_id || selectedOrder.delhivery_api_status !== 'success') && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
                       <button
-                        onClick={() => {
-                          retryDelhiveryOrder(selectedOrder.id)
-                          setSelectedOrder(null)
-                        }}
-                        disabled={retrying === selectedOrder.id}
-                        className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
+                        onClick={() => handleFulfillOrder(selectedOrder.id)}
+                        disabled={isFulfilling}
+                        className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
-                        {retrying === selectedOrder.id ? 'Retrying...' : 'Retry Delhivery API'}
+                        {isFulfilling ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Fulfilling...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Fulfill Order
+                          </>
+                        )}
                       </button>
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        Click to create waybill and update tracking information
+                      </p>
                     </div>
                   )}
+
                 </div>
-              ) : (
+              ) : null}
+
+              {/* Shopify Integration Status */}
+              <div className="mt-6 p-4 bg-purple-50 rounded-lg">
+                <h4 className="font-medium text-gray-900 mb-3">Shopify Integration Status</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-900">
+                  <div>
+                    <div><span className="font-medium">Status:</span> {getShopifyStatusBadge(selectedOrder)}</div>
+                    <div><span className="font-medium">Tracking Number:</span> {selectedOrder.shopify_tracking_number || 'Not assigned'}</div>
+                    <div><span className="font-medium">Fulfillment ID:</span> {selectedOrder.shopify_fulfillment_id || 'Not assigned'}</div>
+                  </div>
+                  <div>
+                    <div><span className="font-medium">API Status:</span> {selectedOrder.shopify_api_status || 'N/A'}</div>
+                    {selectedOrder.last_shopify_attempt && (
+                      <div><span className="font-medium">Last Attempt:</span> {formatDate(selectedOrder.last_shopify_attempt)}</div>
+                    )}
+                    {selectedOrder.shopify_api_error && (
+                      <div><span className="font-medium text-red-600">Error:</span> {selectedOrder.shopify_api_error}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {selectedOrder.courier_service.toLowerCase() !== 'delhivery' ? (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                   <h4 className="font-medium text-gray-900 mb-3">{getCourierServiceName(selectedOrder.courier_service)} Tracking</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-900">
@@ -1585,7 +1705,7 @@ export default function OrderList() {
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
 
 

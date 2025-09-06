@@ -47,13 +47,27 @@ export default function ClientAnalyticsPage({ params }: { params: Promise<{ id: 
   useEffect(() => {
     const fetchClientAnalytics = async () => {
       try {
-        const response = await authenticatedFetch(`/api/analytics/clients/${resolvedParams.id}`);
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          console.error('No authentication token found');
+          return;
+        }
+
+        const response = await fetch(`/api/analytics/clients/${params.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         if (response.ok) {
           const data = await response.json();
           setAnalytics(data.analytics);
           
           // Fetch client details
-          const clientResponse = await authenticatedFetch(`/api/admin/clients/${resolvedParams.id}`);
+          const clientResponse = await fetch(`/api/admin/clients/${params.id}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
           if (clientResponse.ok) {
             const clientData = await clientResponse.json();
             setClient(clientData.client);
