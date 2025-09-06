@@ -121,9 +121,24 @@ export default function TrackingPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <img 
+              src="/images/scan2ship.png" 
+              alt="Scan2Ship Logo" 
+              className="h-16 w-auto"
+            />
+            <div className="text-left">
+              <h1 className="text-4xl font-bold text-gray-900 mb-1">
+                Scan2Ship
+              </h1>
+              <p className="text-sm text-gray-500 font-medium">
+                SaaS Logistics Platform
+              </p>
+            </div>
+          </div>
+          <h2 className="text-2xl font-semibold text-gray-800 mb-2">
             Track Your Orders
-          </h1>
+          </h2>
           <p className="text-gray-600">
             Enter your mobile number to view all your orders across different merchants
           </p>
