@@ -40,8 +40,26 @@ export async function GET(
 
     const clientId = params.id;
 
+    // Check if user has access to this client's analytics
+    // Admin and master_admin can access any client's analytics
+    // Regular users can only access their own client's analytics
+    if (auth.user.role !== 'admin' && auth.user.role !== 'master_admin') {
+      if (auth.user.clientId !== clientId) {
+        return NextResponse.json({ error: 'Forbidden - Access denied to this client\'s analytics' }, { status: 403 });
+      }
+    }
+
+    console.log(`📊 [API_ANALYTICS_CLIENT] Fetching analytics for client: ${clientId} by user: ${auth.user.email} (${auth.user.role})`);
+
     // Get client analytics
     const analytics = await AnalyticsService.getClientAnalytics(clientId);
+
+    console.log(`📊 [API_ANALYTICS_CLIENT] Analytics retrieved:`, {
+      openaiImageCount: analytics.openaiImageCount,
+      openaiAddressCount: analytics.openaiAddressCount,
+      createOrderCount: analytics.createOrderCount,
+      orderPatterns: analytics.orderPatterns
+    });
 
     return NextResponse.json({
       success: true,

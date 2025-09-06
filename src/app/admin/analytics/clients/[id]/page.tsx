@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { authenticatedFetch } from '@/lib/api-client';
 
 interface ClientAnalytics {
   openaiImageCount: number;
@@ -25,12 +26,15 @@ interface Client {
   };
 }
 
-export default function ClientAnalyticsPage({ params }: { params: { id: string } }) {
+export default function ClientAnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
   const { currentUser } = useAuth();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(null);
   const [analytics, setAnalytics] = useState<ClientAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Unwrap the params Promise
+  const resolvedParams = use(params);
 
   // Check if user is admin or master admin
   useEffect(() => {
@@ -79,7 +83,7 @@ export default function ClientAnalyticsPage({ params }: { params: { id: string }
     if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'master_admin')) {
       fetchClientAnalytics();
     }
-  }, [currentUser, params.id]);
+  }, [currentUser, resolvedParams.id]);
 
   // Show loading if checking authentication
   if (!currentUser) {

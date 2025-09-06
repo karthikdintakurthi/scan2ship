@@ -18,6 +18,7 @@ export interface ThermalLabelData {
   paymentType: string
   referenceNumber?: string
   packageValue?: number
+  quantity?: number
   date?: string
 }
 
@@ -220,11 +221,16 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         <!-- Reference -->
         ${data.referenceNumber ? `
         <div class="reference-section">
-            <div class="text-bold">Reference: ${data.referenceNumber}</div>
+            <div class="text-bold">Ref. No: ${data.referenceNumber}</div>
         </div>
         ` : ''}
         
-
+        <!-- Package Details -->
+        ${data.quantity ? `
+        <div class="reference-section">
+            <div class="text-bold">Quantity: ${data.quantity} item${data.quantity > 1 ? 's' : ''}</div>
+        </div>
+        ` : ''}
         
         <!-- Date -->
         ${data.date ? `
@@ -270,6 +276,7 @@ export function createThermalLabelData(order: any, packageInfo: any): ThermalLab
     paymentType: packageInfo.pt || 'Pre-paid',
     referenceNumber: packageInfo.oid || order.reference_number,
     packageValue: order.package_value,
+    quantity: order.total_items,
     date: new Date().toLocaleDateString('en-IN', {
       year: 'numeric',
       month: '2-digit',

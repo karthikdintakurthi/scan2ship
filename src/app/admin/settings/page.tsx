@@ -48,6 +48,9 @@ export default function SystemSettingsPage() {
   // Editing state
   const [editingConfig, setEditingConfig] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  
+  // Client display state
+  const [showAllClients, setShowAllClients] = useState(false);
 
   // Check if user is admin or master admin
   useEffect(() => {
@@ -406,7 +409,7 @@ export default function SystemSettingsPage() {
 
                 {clients.length > 0 ? (
                   <div className="space-y-3">
-                    {clients.slice(0, 5).map((client) => (
+                    {(showAllClients ? clients : clients.slice(0, 5)).map((client) => (
                       <div key={client.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -437,12 +440,15 @@ export default function SystemSettingsPage() {
                     
                     {clients.length > 5 && (
                       <div className="text-center pt-2">
-                        <Link
-                          href="/admin/clients"
+                        <button
+                          onClick={() => setShowAllClients(!showAllClients)}
                           className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                         >
-                          View {clients.length - 5} more clients →
-                        </Link>
+                          {showAllClients 
+                            ? 'Show Less' 
+                            : `View ${clients.length - 5} more clients`
+                          } {showAllClients ? '↑' : '↓'}
+                        </button>
                       </div>
                     )}
                   </div>

@@ -234,6 +234,23 @@ Examples of tracking number extraction:
         } catch (creditError) {
           console.error('❌ [API_FORMAT_ADDRESS_IMAGE] Failed to deduct credits for image processing:', creditError);
         }
+
+        // Track analytics event
+        try {
+          await AnalyticsService.trackEvent({
+            eventType: 'openai_image',
+            clientId: client.id,
+            userId: user.id,
+            eventData: {
+              imageSize: imageFile.size,
+              imageType: imageFile.type,
+              success: true
+            }
+          });
+          console.log('📊 [API_FORMAT_ADDRESS_IMAGE] Analytics tracked for image processing');
+        } catch (analyticsError) {
+          console.error('❌ [API_FORMAT_ADDRESS_IMAGE] Failed to track analytics:', analyticsError);
+        }
         
         return NextResponse.json({ 
           success: true, 

@@ -250,6 +250,22 @@ Examples of special character cleanup:
     } catch (creditError) {
       console.error('❌ [API_FORMAT_ADDRESS] Failed to deduct credits for text processing:', creditError);
     }
+
+    // Track analytics event
+    try {
+      await AnalyticsService.trackEvent({
+        eventType: 'openai_address',
+        clientId: client.id,
+        userId: user.id,
+        eventData: {
+          textLength: addressText.length,
+          success: true
+        }
+      });
+      console.log('📊 [API_FORMAT_ADDRESS] Analytics tracked for address processing');
+    } catch (analyticsError) {
+      console.error('❌ [API_FORMAT_ADDRESS] Failed to track analytics:', analyticsError);
+    }
     
     return NextResponse.json({ 
       success: true, 
