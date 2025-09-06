@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
-import { authenticateApiKey } from '@/lib/api-key-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,10 +17,7 @@ export async function GET(request: NextRequest) {
       return securityResponse;
     }
 
-    let clientId: string;
-    let clientName: string;
-
-    // Try JWT authentication first
+    // Authorize user
     const authResult = await authorizeUser(request, {
       requiredRole: UserRole.USER,
       requiredPermissions: [PermissionLevel.READ],
@@ -29,35 +25,18 @@ export async function GET(request: NextRequest) {
       requireActiveClient: true
     });
 
-    if (authResult.user) {
-      // JWT authentication successful
-      clientId = authResult.user.clientId;
-      console.log(`🔐 [API_COURIER_SERVICES_GET] JWT authentication successful for client: ${clientId}`);
-    } else {
-      // Try API key authentication
-      const apiKey = await authenticateApiKey(request);
-      
-      if (apiKey) {
-        // API key authentication successful
-        clientId = apiKey.clientId;
-        console.log(`🔑 [API_COURIER_SERVICES_GET] API key authentication successful for client: ${clientId}`);
-      } else {
-        // Both authentication methods failed
-        console.log(`❌ [API_COURIER_SERVICES_GET] Both JWT and API key authentication failed`);
-        const response = NextResponse.json(
-          { error: 'Authentication required' },
-          { status: 401 }
-        );
-        securityHeaders(response);
-        return response;
-      }
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
-    console.log(`📊 [API_COURIER_SERVICES_GET] Fetching courier services for client: ${clientId}`);
+    const user = authResult.user!;
+
+    console.log(`📊 [API_COURIER_SERVICES_GET] Fetching courier services for client: ${user.clientId}`);
 
     // Get courier services for the current client
     const courierServices = await prisma.courier_services.findMany({
-      where: { clientId: clientId },
+      where: { clientId: user.clientId },
       orderBy: { name: 'asc' }
     });
 
@@ -80,19 +59,19 @@ export async function GET(request: NextRequest) {
       estimatedDays: service.estimatedDays
     }));
 
-    console.log(`✅ [API_COURIER_SERVICES_GET] Found ${formattedServices.length} courier services for client ${clientId}`);
+    console.log(`✅ [API_COURIER_SERVICES_GET] Found ${formattedServices.length} courier services for client ${user.clientId}`);
     console.log(`📋 [API_COURIER_SERVICES_GET] Formatted services:`, formattedServices);
 
     // Get client name for response
     const client = await prisma.clients.findUnique({
-      where: { id: clientId },
+      where: { id: user.clientId },
       select: { companyName: true }
     });
 
     const response = NextResponse.json({
       courierServices: formattedServices,
-      clientId: clientId,
-      clientName: client?.companyName || clientId
+      clientId: user.clientId,
+      clientName: client?.companyName || user.clientId
     });
 
     // Apply security headers
@@ -124,9 +103,7 @@ export async function POST(request: NextRequest) {
       return securityResponse;
     }
 
-    let clientId: string;
-
-    // Try JWT authentication first
+    // Authorize user
     const authResult = await authorizeUser(request, {
       requiredRole: UserRole.USER,
       requiredPermissions: [PermissionLevel.WRITE],
@@ -134,30 +111,12 @@ export async function POST(request: NextRequest) {
       requireActiveClient: true
     });
 
-    if (authResult.user) {
-      // JWT authentication successful
-      clientId = authResult.user.clientId;
-      console.log(`🔐 [API_COURIER_SERVICES_POST] JWT authentication successful for client: ${clientId}`);
-    } else {
-      // Try API key authentication
-      const apiKey = await authenticateApiKey(request);
-      
-      if (apiKey) {
-        // API key authentication successful
-        clientId = apiKey.clientId;
-        console.log(`🔑 [API_COURIER_SERVICES_POST] API key authentication successful for client: ${clientId}`);
-      } else {
-        // Both authentication methods failed
-        console.log(`❌ [API_COURIER_SERVICES_POST] Both JWT and API key authentication failed`);
-        const response = NextResponse.json(
-          { error: 'Authentication required' },
-          { status: 401 }
-        );
-        securityHeaders(response);
-        return response;
-      }
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
+    const user = authResult.user!;
     const body = await request.json();
     const { 
       name, 
@@ -176,7 +135,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name and code are required' }, { status: 400 });
     }
 
-    console.log(`📝 [API_COURIER_SERVICES_POST] Creating courier service for client: ${clientId}`);
+    console.log(`📝 [API_COURIER_SERVICES_POST] Creating courier service for client: ${user.clientId}`);
 
     // Create new courier service with rate configuration
     const newService = await prisma.courier_services.create({
@@ -186,7 +145,7 @@ export async function POST(request: NextRequest) {
         code: code,
         isActive: isActive !== false,
         isDefault: false,
-        clientId: clientId,
+        clientId: user.clientId,
         // Rate calculation fields
         baseRate: baseRate ? parseFloat(baseRate) : null,
         ratePerKg: ratePerKg ? parseFloat(ratePerKg) : null,
@@ -246,9 +205,7 @@ export async function PUT(request: NextRequest) {
       return securityResponse;
     }
 
-    let clientId: string;
-
-    // Try JWT authentication first
+    // Authorize user
     const authResult = await authorizeUser(request, {
       requiredRole: UserRole.USER,
       requiredPermissions: [PermissionLevel.WRITE],
@@ -256,30 +213,12 @@ export async function PUT(request: NextRequest) {
       requireActiveClient: true
     });
 
-    if (authResult.user) {
-      // JWT authentication successful
-      clientId = authResult.user.clientId;
-      console.log(`🔐 [API_COURIER_SERVICES_PUT] JWT authentication successful for client: ${clientId}`);
-    } else {
-      // Try API key authentication
-      const apiKey = await authenticateApiKey(request);
-      
-      if (apiKey) {
-        // API key authentication successful
-        clientId = apiKey.clientId;
-        console.log(`🔑 [API_COURIER_SERVICES_PUT] API key authentication successful for client: ${clientId}`);
-      } else {
-        // Both authentication methods failed
-        console.log(`❌ [API_COURIER_SERVICES_PUT] Both JWT and API key authentication failed`);
-        const response = NextResponse.json(
-          { error: 'Authentication required' },
-          { status: 401 }
-        );
-        securityHeaders(response);
-        return response;
-      }
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
     }
 
+    const user = authResult.user!;
     const body = await request.json();
     const { services } = body;
 
@@ -287,7 +226,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Services array is required' }, { status: 400 });
     }
 
-    console.log(`📝 [API_COURIER_SERVICES_PUT] Updating courier services for client: ${clientId}`);
+    console.log(`📝 [API_COURIER_SERVICES_PUT] Updating courier services for client: ${user.clientId}`);
 
     // Update courier services with rate configuration
     const updatePromises = services.map(async (service: any) => {
