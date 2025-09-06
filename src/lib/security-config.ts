@@ -13,33 +13,33 @@ export const securityConfig = {
     refreshThreshold: 15 * 60 * 1000, // 15 minutes before expiry
   },
   
-  // Enhanced Password Policy
+  // Enhanced Password Policy (Temporarily Relaxed)
   password: {
-    minLength: 16,
-    requireUppercase: true,
+    minLength: 8, // Temporarily reduced from 16
+    requireUppercase: false, // Temporarily disabled
     requireLowercase: true,
-    requireNumbers: true,
-    requireSpecialChars: true,
+    requireNumbers: false, // Temporarily disabled
+    requireSpecialChars: false, // Temporarily disabled
     maxLength: 128,
     maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
     historyCount: 8,
     lockoutAttempts: 3,
     lockoutDuration: 30 * 60 * 1000, // 30 minutes
-    requireMfa: true,
-    // Additional security requirements
-    preventCommonPasswords: true,
-    preventUserInfo: true,
-    preventSequentialChars: true,
-    preventRepeatedChars: true,
-    maxConsecutiveChars: 2,
-    preventKeyboardPatterns: true,
-    preventDictionaryWords: true,
-    minUniqueChars: 12,
-    preventLeakedPasswords: true,
-    requireComplexity: true,
-    minEntropy: 80,
-    preventSimilarPasswords: true,
-    maxSimilarityThreshold: 0.7
+    requireMfa: false, // Temporarily disabled
+    // Additional security requirements (temporarily relaxed)
+    preventCommonPasswords: false, // Temporarily disabled
+    preventUserInfo: false, // Temporarily disabled
+    preventSequentialChars: false, // Temporarily disabled
+    preventRepeatedChars: false, // Temporarily disabled
+    maxConsecutiveChars: 10, // Increased from 2
+    preventKeyboardPatterns: false, // Temporarily disabled
+    preventDictionaryWords: false, // Temporarily disabled
+    minUniqueChars: 4, // Reduced from 12
+    preventLeakedPasswords: false, // Temporarily disabled
+    requireComplexity: false, // Temporarily disabled
+    minEntropy: 20, // Reduced from 80
+    preventSimilarPasswords: false, // Temporarily disabled
+    maxSimilarityThreshold: 0.9 // Increased from 0.7
   },
   
   // Rate Limiting
