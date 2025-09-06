@@ -79,3 +79,7 @@ node_modules/
 .env.qa
 
 scripts/
+backups/
+env*
+env-*
+env-template.env
