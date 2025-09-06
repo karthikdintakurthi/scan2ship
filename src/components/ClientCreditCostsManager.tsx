@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 interface ClientCreditCost {
   id: string;
   clientId: string;
-  feature: 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING';
+  feature: 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING';
   cost: number;
   isActive: boolean;
   createdAt: string;
@@ -136,7 +136,6 @@ export function ClientCreditCostsManager({ clientId, clientName }: ClientCreditC
   const getFeatureDisplayName = (feature: string) => {
     const displayNames = {
       ORDER: 'Order Creation',
-      WHATSAPP: 'WhatsApp Message',
       IMAGE_PROCESSING: 'Image Processing',
       TEXT_PROCESSING: 'Text Processing'
     };

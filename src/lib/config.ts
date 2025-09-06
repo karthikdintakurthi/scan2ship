@@ -31,10 +31,6 @@ const serverConfig = {
     apiKey: process.env.OPENAI_API_KEY,
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   },
-  whatsapp: {
-    apiKey: process.env.FAST2SMS_WHATSAPP_API_KEY,
-    messageId: process.env.FAST2SMS_WHATSAPP_MESSAGE_ID,
-  },
 };
 
 // Client-safe configuration (only NEXT_PUBLIC_ variables)

@@ -20,7 +20,6 @@ UNWANTED_FILES=(
     "SHOPIFY_INTEGRATION.md"
     "SPLUNK_INTEGRATION.md"
     "SYSTEM_SETTINGS_TESTING_SUMMARY.md"
-    "WHATSAPP_SETUP_GUIDE.md"
     "eng.traineddata"
     "test-thermal-label.html"
     "qa_backup_2025-09-03T20-45-37-363Z.sql"

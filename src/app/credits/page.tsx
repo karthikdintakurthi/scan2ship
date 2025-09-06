@@ -12,7 +12,7 @@ interface CreditTransaction {
   amount: number;
   balance: number;
   description: string;
-  feature?: 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING' | 'MANUAL';
+  feature?: 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING' | 'MANUAL';
   orderId?: number;
   createdAt: Date;
   users?: {
@@ -267,10 +267,6 @@ export default function CreditsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <span className="text-sm font-medium text-gray-700">Order Creation</span>
-                <span className="text-sm font-bold text-blue-600">1 Credit</span>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <span className="text-sm font-medium text-gray-700">WhatsApp Message</span>
                 <span className="text-sm font-bold text-blue-600">1 Credit</span>
               </div>
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">

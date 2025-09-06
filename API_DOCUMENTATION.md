@@ -1011,8 +1011,7 @@ All API endpoints require JWT-based authentication using Bearer tokens.
   "environment": "development",
   "database": "connected",
   "services": {
-    "delhivery": "configured",
-    "whatsapp": "configured"
+    "delhivery": "configured"
   }
 }
 ```

@@ -9,7 +9,7 @@ export interface CreditTransaction {
   amount: number;
   balance: number;
   description: string;
-  feature?: 'ORDER' | 'WHATSAPP' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING' | 'MANUAL';
+  feature?: 'ORDER' | 'IMAGE_PROCESSING' | 'TEXT_PROCESSING' | 'MANUAL';
   orderId?: number;
   createdAt: Date;
 }
@@ -27,7 +27,6 @@ export interface ClientCredits {
 // Credit costs for different features
 export const CREDIT_COSTS = {
   ORDER: 1,
-  WHATSAPP: 1,
   IMAGE_PROCESSING: 2,
   TEXT_PROCESSING: 1,
 } as const;
@@ -474,24 +473,6 @@ export class CreditService {
     );
   }
 
-  /**
-   * Deduct credits for WhatsApp message
-   */
-  static async deductWhatsAppCredits(
-    clientId: string,
-    userId?: string,
-    orderId?: number
-  ): Promise<void> {
-    const cost = this.getCreditCost('WHATSAPP');
-    await this.deductCredits(
-      clientId,
-      cost,
-      'WhatsApp message sent',
-      'WHATSAPP',
-      userId,
-      orderId
-    );
-  }
 
   /**
    * Deduct credits for image processing

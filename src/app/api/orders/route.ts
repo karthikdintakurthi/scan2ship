@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { DelhiveryService } from '@/lib/delhivery';
-import whatsappService, { initializeWhatsAppService } from '@/lib/whatsapp-service';
 import { generateReferenceNumber, formatReferenceNumber, generateReferenceNumberWithPrefix, formatReferenceNumberWithPrefix } from '@/lib/reference-number';
 import AnalyticsService from '@/lib/analytics-service';
 import { CreditService } from '@/lib/credit-service';
@@ -270,66 +269,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch updated order data' }, { status: 500 });
     }
 
-    // Initialize WhatsApp service with database configuration
-    await initializeWhatsAppService(client.id);
-
-    // Send WhatsApp notifications with updated tracking number
-    try {
-      const whatsappData = {
-        customerName: updatedOrder.name,
-        customerPhone: updatedOrder.mobile,
-        orderNumber: `ORDER-${updatedOrder.id}`,
-        courierService: updatedOrder.courier_service,
-        trackingNumber: updatedOrder.tracking_id || 'Will be assigned',
-        clientCompanyName: client.companyName || 'Scan2Ship',
-        resellerName: updatedOrder.reseller_name || undefined,
-        resellerPhone: updatedOrder.reseller_mobile || undefined,
-        packageValue: updatedOrder.package_value,
-        weight: updatedOrder.weight,
-        totalItems: updatedOrder.total_items,
-        pickupLocation: updatedOrder.pickup_location,
-        address: updatedOrder.address,
-        city: updatedOrder.city,
-        state: updatedOrder.state,
-        pincode: updatedOrder.pincode
-      };
-
-      // Send customer WhatsApp message
-      const customerWhatsAppResult = await whatsappService.sendCustomerOrderWhatsApp(whatsappData);
-      if (customerWhatsAppResult.success) {
-        console.log('📱 [API_ORDERS_POST] Customer WhatsApp message sent for order:', updatedOrder.id);
-        
-        // Deduct credits for successful WhatsApp message
-        try {
-          await CreditService.deductWhatsAppCredits(client.id, user.id, updatedOrder.id);
-          console.log('💳 [API_ORDERS_POST] Credits deducted for customer WhatsApp message: 1 credit');
-        } catch (creditError) {
-          console.error('❌ [API_ORDERS_POST] Failed to deduct credits for customer WhatsApp:', creditError);
-        }
-      } else {
-        console.warn('⚠️ [API_ORDERS_POST] Customer WhatsApp message failed for order:', updatedOrder.id, customerWhatsAppResult.error);
-      }
-
-      // Send reseller WhatsApp message if reseller details are provided
-      if (updatedOrder.reseller_name && updatedOrder.reseller_mobile) {
-        const resellerWhatsAppResult = await whatsappService.sendResellerOrderWhatsApp(whatsappData);
-        if (resellerWhatsAppResult.success) {
-          console.log('📱 [API_ORDERS_POST] Reseller WhatsApp message sent for order:', updatedOrder.id);
-          
-          // Deduct credits for successful reseller WhatsApp message
-          try {
-            await CreditService.deductWhatsAppCredits(client.id, user.id, updatedOrder.id);
-            console.log('💳 [API_ORDERS_POST] Credits deducted for reseller WhatsApp message: 1 credit');
-          } catch (creditError) {
-            console.error('❌ [API_ORDERS_POST] Failed to deduct credits for reseller WhatsApp:', creditError);
-          }
-        } else {
-          console.warn('⚠️ [API_ORDERS_POST] Reseller WhatsApp message failed for order:', updatedOrder.id, resellerWhatsAppResult.error);
-        }
-      }
-    } catch (whatsappError) {
-      console.error('❌ [API_ORDERS_POST] WhatsApp sending failed:', whatsappError);
-    }
 
     // Trigger webhooks for order creation
     try {
