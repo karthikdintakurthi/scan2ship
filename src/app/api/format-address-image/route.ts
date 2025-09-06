@@ -3,6 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { CreditService } from '@/lib/credit-service'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { 
+  callOpenAIWithRetry, 
+  extractJSONFromResponse, 
+  cleanOpenAIResponse, 
+  getEnhancedPrompt,
+  OpenAIError 
+} from '@/lib/openai-utils';
 
 // Authentication handled by centralized middleware
 
@@ -138,18 +145,20 @@ Examples of tracking number extraction:
 - Barcode "ABCD123456789" → tracking_number: "ABCD123456789"
 - No barcode visible → tracking_number: null`
 
-    console.log('🚀 Sending request to OpenAI Vision API...')
-    console.log('📋 Model:', 'gpt-4o')
+    // Use enhanced prompt with special character handling
+    const enhancedPrompt = getEnhancedPrompt(prompt);
+
+    console.log('🚀 [API_FORMAT_ADDRESS_IMAGE] Sending request to OpenAI Vision API...')
     console.log('📋 Image size:', imageFile.size, 'bytes')
     console.log('📋 Image type:', mimeType)
     
     // Try gpt-4o first, fallback to gpt-4-vision-preview if needed
     const models = ['gpt-4o', 'gpt-4-vision-preview']
-    let lastError = null
+    let lastError: OpenAIError | null = null
     
     for (const model of models) {
       try {
-        console.log(`🔄 Trying model: ${model}`)
+        console.log(`🔄 [API_FORMAT_ADDRESS_IMAGE] Trying model: ${model}`)
         
         const requestBody = {
           model: model,
@@ -159,7 +168,7 @@ Examples of tracking number extraction:
               content: [
                 {
                   type: 'text',
-                  text: prompt
+                  text: enhancedPrompt
                 },
                 {
                   type: 'image_url',
@@ -174,57 +183,25 @@ Examples of tracking number extraction:
           temperature: 0.1
         }
         
-        console.log('📋 Request body structure:', JSON.stringify(requestBody, null, 2))
+        console.log('📋 [API_FORMAT_ADDRESS_IMAGE] Request body structure:', JSON.stringify(requestBody, null, 2))
         
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody)
-        })
+        const data = await callOpenAIWithRetry(openaiApiKey, requestBody);
+        const content = data.choices[0]?.message?.content;
 
-        console.log('📋 OpenAI API Response Status:', response.status, response.statusText)
-        
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`❌ OpenAI API Error Response for ${model}:`, errorText)
-          lastError = `OpenAI API error: ${response.status} - ${errorText}`
-          continue // Try next model
-        }
-        
-        // If we get here, the request was successful
-        const data = await response.json()
-        const content = data.choices[0]?.message?.content
-
-        console.log('🔍 OpenAI Vision API Response:')
-        console.log('📋 Full Response Data:', JSON.stringify(data, null, 2))
+        console.log('🔍 [API_FORMAT_ADDRESS_IMAGE] OpenAI Vision API Response:')
         console.log('💬 Content:', content)
+        console.log('📊 Usage:', data.usage)
 
         if (!content) {
           throw new Error('No content received from OpenAI')
         }
 
-        // Try to parse the JSON response
-        let parsedAddress
-        try {
-          // Extract JSON from the response (in case there's extra text)
-          const jsonMatch = content.match(/\{[\s\S]*\}/)
-          if (jsonMatch) {
-            parsedAddress = JSON.parse(jsonMatch[0])
-            console.log('✅ JSON extracted using regex match')
-          } else {
-            parsedAddress = JSON.parse(content)
-            console.log('✅ JSON parsed directly from content')
-          }
-          
-          console.log('📊 Parsed Address Data:', JSON.stringify(parsedAddress, null, 2))
-        } catch (parseError) {
-          console.error('❌ Failed to parse OpenAI response:', content)
-          console.error('🔍 Parse Error Details:', parseError)
-          throw new Error('Invalid response format from OpenAI')
-        }
+        // Clean and extract JSON from the response
+        const cleanedContent = cleanOpenAIResponse(content);
+        const parsedAddress = extractJSONFromResponse(cleanedContent);
+        
+        console.log('✅ [API_FORMAT_ADDRESS_IMAGE] Successfully parsed address data')
+        console.log('📊 Parsed Address Data:', JSON.stringify(parsedAddress, null, 2))
 
         // Validate the parsed data
         const requiredFields = ['customer_name', 'mobile_number', 'pincode', 'city', 'state', 'country', 'address']
@@ -264,20 +241,49 @@ Examples of tracking number extraction:
         })
         
       } catch (error) {
-        console.error(`❌ Error with model ${model}:`, error)
-        lastError = error instanceof Error ? error.message : 'Unknown error'
+        console.error(`❌ [API_FORMAT_ADDRESS_IMAGE] Error with model ${model}:`, error)
+        
+        if (error instanceof OpenAIError) {
+          lastError = error;
+          // If it's not retryable, don't try other models
+          if (!error.retryable) {
+            break;
+          }
+        } else {
+          lastError = new OpenAIError(
+            error instanceof Error ? error.message : 'Unknown error',
+            500,
+            'unknown_error',
+            undefined,
+            true
+          );
+        }
         continue // Try next model
       }
     }
     
     // If we get here, all models failed
-    throw new Error(`All models failed. Last error: ${lastError}`)
+    if (lastError instanceof OpenAIError) {
+      throw lastError;
+    } else {
+      throw new Error(`All models failed. Last error: ${lastError}`);
+    }
 
   } catch (error) {
-    console.error('Error processing image:', error)
+    console.error('❌ [API_FORMAT_ADDRESS_IMAGE] Error processing image:', error);
+    
+    if (error instanceof OpenAIError) {
+      return NextResponse.json({ 
+        error: error.message,
+        errorType: error.errorType,
+        retryable: error.retryable,
+        statusCode: error.statusCode
+      }, { status: error.statusCode >= 500 ? 500 : 400 });
+    }
+    
     return NextResponse.json({ 
       error: 'Failed to process image',
       details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    }, { status: 500 });
   }
 }

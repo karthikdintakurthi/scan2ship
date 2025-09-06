@@ -3,6 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { CreditService } from '@/lib/credit-service';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { 
+  callOpenAIWithRetry, 
+  extractJSONFromResponse, 
+  cleanOpenAIResponse, 
+  getEnhancedPrompt,
+  OpenAIError 
+} from '@/lib/openai-utils';
 
 // Authentication handled by centralized middleware
 
@@ -77,23 +84,8 @@ export async function POST(request: NextRequest) {
 
     console.log('🖼️ [API_VALIDATE_PAYMENT_SCREENSHOT] Image converted to base64, size:', base64Image.length);
 
-    // Prepare OpenAI Vision API request
-    const models = ['gpt-4o-mini', 'gpt-4o'];
-    let lastError = '';
-
-    for (const model of models) {
-      try {
-        console.log(`🤖 [API_VALIDATE_PAYMENT_SCREENSHOT] Trying model: ${model}`);
-
-        const requestBody = {
-          model: model,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: `You are a payment validation expert. Analyze this payment screenshot and extract the following information in JSON format:
+    // Prepare OpenAI Vision API request with enhanced prompt
+    const basePrompt = `You are a payment validation expert. Analyze this payment screenshot and extract the following information in JSON format:
 
 1. UTR Number: Look for UTR (Unique Transaction Reference) number, Transaction Reference, Payment Reference, or similar identifiers
 2. Payment Amount: Extract the exact payment amount in INR (Indian Rupees)
@@ -122,7 +114,25 @@ Return the response in this exact JSON format:
   "extractedText": "All text found in the image for debugging"
 }
 
-Focus on accuracy and only extract information that is clearly visible and properly labeled.`
+Focus on accuracy and only extract information that is clearly visible and properly labeled.`;
+
+    const enhancedPrompt = getEnhancedPrompt(basePrompt);
+    const models = ['gpt-4o-mini', 'gpt-4o'];
+    let lastError: OpenAIError | null = null;
+
+    for (const model of models) {
+      try {
+        console.log(`🤖 [API_VALIDATE_PAYMENT_SCREENSHOT] Trying model: ${model}`);
+
+        const requestBody = {
+          model: model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: enhancedPrompt
                 },
                 {
                   type: 'image_url',
@@ -139,53 +149,23 @@ Focus on accuracy and only extract information that is clearly visible and prope
 
         console.log('📋 [API_VALIDATE_PAYMENT_SCREENSHOT] Sending request to OpenAI Vision API...');
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody)
-        });
-
-        console.log('📋 [API_VALIDATE_PAYMENT_SCREENSHOT] OpenAI API Response Status:', response.status, response.statusText);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ [API_VALIDATE_PAYMENT_SCREENSHOT] OpenAI API Error Response for ${model}:`, errorText);
-          lastError = `OpenAI API error: ${response.status} - ${errorText}`;
-          continue; // Try next model
-        }
-
-        const data = await response.json();
+        const data = await callOpenAIWithRetry(openaiApiKey, requestBody);
         const content = data.choices[0]?.message?.content;
 
         console.log('🔍 [API_VALIDATE_PAYMENT_SCREENSHOT] OpenAI Vision API Response:');
         console.log('💬 Content:', content);
+        console.log('📊 Usage:', data.usage);
 
         if (!content) {
           throw new Error('No content received from OpenAI');
         }
 
-        // Parse the JSON response
-        let validationResult;
-        try {
-          // Extract JSON from the response (in case there's extra text)
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            validationResult = JSON.parse(jsonMatch[0]);
-            console.log('✅ [API_VALIDATE_PAYMENT_SCREENSHOT] JSON extracted using regex match');
-          } else {
-            validationResult = JSON.parse(content);
-            console.log('✅ [API_VALIDATE_PAYMENT_SCREENSHOT] JSON parsed directly from content');
-          }
-
-          console.log('📊 [API_VALIDATE_PAYMENT_SCREENSHOT] Parsed Validation Result:', JSON.stringify(validationResult, null, 2));
-        } catch (parseError) {
-          console.error('❌ [API_VALIDATE_PAYMENT_SCREENSHOT] Failed to parse OpenAI response:', content);
-          console.error('🔍 Parse Error Details:', parseError);
-          throw new Error('Invalid response format from OpenAI');
-        }
+        // Clean and parse the JSON response
+        const cleanedContent = cleanOpenAIResponse(content);
+        const validationResult = extractJSONFromResponse(cleanedContent);
+        
+        console.log('✅ [API_VALIDATE_PAYMENT_SCREENSHOT] Successfully parsed validation result');
+        console.log('📊 [API_VALIDATE_PAYMENT_SCREENSHOT] Parsed Validation Result:', JSON.stringify(validationResult, null, 2));
 
         // Validate the parsed data structure
         const requiredFields = ['utrNumber', 'paymentAmount', 'paymentStatus', 'upiId', 'validationPassed', 'validationMessage'];
@@ -238,20 +218,55 @@ Focus on accuracy and only extract information that is clearly visible and prope
 
       } catch (error) {
         console.error(`❌ [API_VALIDATE_PAYMENT_SCREENSHOT] Error with model ${model}:`, error);
-        lastError = error instanceof Error ? error.message : 'Unknown error';
+        
+        if (error instanceof OpenAIError) {
+          lastError = error;
+          // If it's not retryable, don't try other models
+          if (!error.retryable) {
+            break;
+          }
+        } else {
+          lastError = new OpenAIError(
+            error instanceof Error ? error.message : 'Unknown error',
+            500,
+            'unknown_error',
+            undefined,
+            true
+          );
+        }
         continue; // Try next model
       }
     }
 
     // If we get here, all models failed
     console.error('❌ [API_VALIDATE_PAYMENT_SCREENSHOT] All OpenAI models failed');
+    
+    if (lastError instanceof OpenAIError) {
+      return NextResponse.json({
+        error: lastError.message,
+        errorType: lastError.errorType,
+        retryable: lastError.retryable,
+        statusCode: lastError.statusCode
+      }, { status: lastError.statusCode >= 500 ? 500 : 400 });
+    }
+    
     return NextResponse.json({
       error: 'Failed to validate payment screenshot',
-      details: lastError
+      details: lastError?.message || 'Unknown error'
     }, { status: 500 });
 
   } catch (error) {
     console.error('❌ [API_VALIDATE_PAYMENT_SCREENSHOT] Unexpected error:', error);
+    
+    if (error instanceof OpenAIError) {
+      return NextResponse.json({ 
+        error: error.message,
+        errorType: error.errorType,
+        retryable: error.retryable,
+        statusCode: error.statusCode
+      }, { status: error.statusCode >= 500 ? 500 : 400 });
+    }
+    
     return NextResponse.json(
       { error: 'Failed to validate payment screenshot' },
       { status: 500 }

@@ -3,6 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { CreditService } from '@/lib/credit-service'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { 
+  callOpenAIWithRetry, 
+  extractJSONFromResponse, 
+  cleanOpenAIResponse, 
+  getEnhancedPrompt,
+  OpenAIError 
+} from '@/lib/openai-utils';
 
 // Authentication handled by centralized middleware
 
@@ -59,7 +66,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
     }
 
-    const prompt = `Please format the following Indian address and extract the required information. Return ONLY a valid JSON object with the exact structure specified:
+    const basePrompt = `Please format the following Indian address and extract the required information. Return ONLY a valid JSON object with the exact structure specified:
 
 Address text: "${addressText}"
 
@@ -147,60 +154,69 @@ Examples of special character cleanup:
 - "G.subrahmanyam, plot no 92; flat no.202" → address: "G.subrahmanyam, plot no 92 flat no.202"
 - "Surabhi Building, 80 fert main Road NGEF layout stage 2Nagarabhavi, Land Mark; Manjunatha Interiors" → address: "Surabhi Building, 80 fert main Road NGEF layout stage 2Nagarabhavi, Land Mark Manjunatha Interiors"`
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 500
-      })
-    })
+    // Use enhanced prompt with special character handling
+    const prompt = getEnhancedPrompt(basePrompt);
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ OpenAI API Error Response:', errorText)
-      throw new Error(`OpenAI API error: ${response.status}`)
-    }
+    const requestBody = {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 500
+    };
 
-    const data = await response.json()
-    const content = data.choices[0]?.message?.content
+    console.log('🤖 [API_FORMAT_ADDRESS] Calling OpenAI API with enhanced error handling...');
 
-    console.log('🔍 OpenAI API Response:')
-    console.log('📋 Full Response Data:', JSON.stringify(data, null, 2))
-    console.log('💬 Content:', content)
-
-    if (!content) {
-      throw new Error('No content received from OpenAI')
-    }
-
-    // Try to parse the JSON response
-    let parsedAddress
     try {
-      // Extract JSON from the response (in case there's extra text)
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        parsedAddress = JSON.parse(jsonMatch[0])
-        console.log('✅ JSON extracted using regex match')
-      } else {
-        parsedAddress = JSON.parse(content)
-        console.log('✅ JSON parsed directly from content')
+      const data = await callOpenAIWithRetry(openaiApiKey, requestBody);
+      const content = data.choices[0]?.message?.content;
+
+      console.log('🔍 [API_FORMAT_ADDRESS] OpenAI API Response:');
+      console.log('💬 Content:', content);
+      console.log('📊 Usage:', data.usage);
+
+      if (!content) {
+        throw new Error('No content received from OpenAI');
       }
+
+      // Clean and extract JSON from the response
+      const cleanedContent = cleanOpenAIResponse(content);
+      const parsedAddress = extractJSONFromResponse(cleanedContent);
+      
+      console.log('✅ [API_FORMAT_ADDRESS] Successfully parsed address data');
       
       console.log('📊 Parsed Address Data:', JSON.stringify(parsedAddress, null, 2))
-    } catch (parseError) {
-      console.error('❌ Failed to parse OpenAI response:', content)
-      console.error('🔍 Parse Error Details:', parseError)
-      throw new Error('Invalid response format from OpenAI')
+    } catch (openaiError) {
+      if (openaiError instanceof OpenAIError) {
+        console.error('❌ [API_FORMAT_ADDRESS] OpenAI API Error:', {
+          message: openaiError.message,
+          statusCode: openaiError.statusCode,
+          errorType: openaiError.errorType,
+          errorCode: openaiError.errorCode,
+          retryable: openaiError.retryable
+        });
+        
+        // Return more descriptive error messages
+        return NextResponse.json(
+          { 
+            error: openaiError.message,
+            errorType: openaiError.errorType,
+            retryable: openaiError.retryable,
+            statusCode: openaiError.statusCode
+          },
+          { status: openaiError.statusCode >= 500 ? 500 : 400 }
+        );
+      } else {
+        console.error('❌ [API_FORMAT_ADDRESS] Unexpected error:', openaiError);
+        return NextResponse.json(
+          { error: `Failed to process address: ${openaiError instanceof Error ? openaiError.message : 'Unknown error'}` },
+          { status: 500 }
+        );
+      }
     }
 
     // Validate the parsed data
@@ -241,10 +257,20 @@ Examples of special character cleanup:
     })
 
   } catch (error) {
-    console.error('Error formatting address:', error)
+    console.error('❌ [API_FORMAT_ADDRESS] Error formatting address:', error);
+    
+    if (error instanceof OpenAIError) {
+      return NextResponse.json({ 
+        error: error.message,
+        errorType: error.errorType,
+        retryable: error.retryable,
+        statusCode: error.statusCode
+      }, { status: error.statusCode >= 500 ? 500 : 400 });
+    }
+    
     return NextResponse.json({ 
       error: 'Failed to format address',
       details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    }, { status: 500 });
   }
 }
