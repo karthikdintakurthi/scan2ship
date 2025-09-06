@@ -4,7 +4,6 @@ import {
   applySecurityMiddleware, 
   InputValidator 
 } from '@/lib/security-middleware';
-import { validatePassword } from '@/lib/password-validator';
 import { securityConfig } from '@/lib/security-config';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -13,7 +12,7 @@ import jwt from 'jsonwebtoken';
 export async function POST(request: NextRequest) {
   try {
     // Apply security middleware (rate limiting for auth endpoints)
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'auth', cors: true, securityHeaders: true }
@@ -124,7 +123,7 @@ export async function POST(request: NextRequest) {
     // Create or update session
     const session = await prisma.sessions.upsert({
       where: {
-        token: loginToken
+        sessionToken: loginToken
       },
       update: {
         expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours
@@ -133,7 +132,12 @@ export async function POST(request: NextRequest) {
         id: crypto.randomUUID(),
         userId: user.id,
         clientId: user.clientId,
-        token: loginToken,
+        sessionToken: loginToken,
+        refreshToken: crypto.randomUUID(),
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        userAgent: request.headers.get('user-agent') || 'unknown',
+        role: user.role,
+        permissions: JSON.stringify(['read', 'write']),
         expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours
         createdAt: new Date()
       }

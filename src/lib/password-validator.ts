@@ -11,6 +11,7 @@ interface PasswordValidationResult {
   errors: string[];
   strength: 'weak' | 'medium' | 'strong' | 'very-strong';
   entropy: number;
+  score?: number;
 }
 
 interface PasswordHistoryEntry {
