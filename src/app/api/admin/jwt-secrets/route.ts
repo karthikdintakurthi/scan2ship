@@ -7,6 +7,23 @@ import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware'
 
 export async function GET(request: NextRequest) {
   try {
+    // Skip during build time
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      return NextResponse.json({
+        success: true,
+        data: {
+          stats: { totalSecrets: 0, activeSecrets: 0, expiredSecrets: 0, nextRotationDays: 0 },
+          currentToken: null,
+          rotationConfig: {
+            maxActiveSecrets: 3,
+            rotationIntervalDays: 30,
+            secretLifetimeDays: 90,
+            autoRotation: true
+          }
+        }
+      });
+    }
+
     // Apply security middleware
     const securityResponse = applySecurityMiddleware(
       request,
@@ -69,6 +86,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Skip during build time
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      return NextResponse.json({
+        success: true,
+        message: 'JWT secret rotation completed (build mode)',
+        data: {
+          newSecretId: 'build-mode-secret',
+          rotationTime: new Date().toISOString()
+        }
+      });
+    }
+
     // Apply security middleware
     const securityResponse = applySecurityMiddleware(
       request,

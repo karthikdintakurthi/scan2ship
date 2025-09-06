@@ -11,11 +11,21 @@ function validateJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   
   if (!secret) {
+    // During build time, use a fallback secret if JWT_SECRET is not set
+    if (process.env.NODE_ENV === 'development' || process.env.NEXT_PHASE === 'phase-production-build') {
+      console.warn('⚠️ JWT_SECRET not set, using fallback for build. Please set JWT_SECRET in production.');
+      return 'vanitha-logistics-fallback-jwt-secret-for-build-time-only-64-chars';
+    }
     throw new Error('JWT_SECRET environment variable is required for secure authentication');
   }
   
   // Ensure minimum length for security (at least 32 characters)
   if (secret.length < 32) {
+    // During build time, use a fallback secret if JWT_SECRET is too short
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      console.warn('⚠️ JWT_SECRET too short, using fallback for build. Please set JWT_SECRET to at least 32 characters in production.');
+      return 'vanitha-logistics-fallback-jwt-secret-for-build-time-only-64-chars';
+    }
     throw new Error('JWT_SECRET must be at least 32 characters long for security');
   }
   
@@ -56,11 +66,31 @@ export const jwtConfig = {
 
 // Enhanced JWT configuration with operation-based expiry
 export const enhancedJwtConfig = {
-  // Get primary secret from manager
-  getSecret: () => jwtSecretManager.getPrimarySecret(),
+  // Get primary secret from manager (with build-time safety)
+  getSecret: () => {
+    try {
+      return jwtSecretManager.getPrimarySecret();
+    } catch (error) {
+      // During build time, return a fallback secret
+      if (process.env.NEXT_PHASE === 'phase-production-build') {
+        return 'vanitha-logistics-fallback-jwt-secret-for-build-time-only-64-chars';
+      }
+      throw error;
+    }
+  },
   
-  // Get all active secrets for verification
-  getAllSecrets: () => jwtSecretManager.getActiveSecrets(),
+  // Get all active secrets for verification (with build-time safety)
+  getAllSecrets: () => {
+    try {
+      return jwtSecretManager.getActiveSecrets();
+    } catch (error) {
+      // During build time, return a fallback secret
+      if (process.env.NEXT_PHASE === 'phase-production-build') {
+        return ['vanitha-logistics-fallback-jwt-secret-for-build-time-only-64-chars'];
+      }
+      throw error;
+    }
+  },
   
   // Generate tokens with operation-specific expiry
   generateToken: (payload: any, operation: 'login' | 'refresh' | 'api' | 'admin' = 'login') => {
@@ -171,13 +201,13 @@ export async function initializeJWTSecrets(): Promise<void> {
   }
 }
 
-// Validate JWT configuration on module load
-try {
-  getJwtSecret();
-} catch (error) {
-  console.error('❌ JWT Configuration Error:', error instanceof Error ? error.message : 'Unknown error');
-  // In production, this should cause the application to fail to start
-  if (process.env.NODE_ENV === 'production') {
+// Validate JWT configuration on module load (only in runtime, not build time)
+if (typeof window === 'undefined' && process.env.NEXT_PHASE !== 'phase-production-build') {
+  try {
+    getJwtSecret();
+  } catch (error) {
+    console.error('❌ JWT Configuration Error:', error instanceof Error ? error.message : 'Unknown error');
+    // Always fail to start if JWT configuration is invalid - security is critical
     throw error;
   }
 }

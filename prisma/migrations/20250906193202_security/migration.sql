@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "public"."sessions" ALTER COLUMN "ipAddress" DROP DEFAULT,
+ALTER COLUMN "permissions" DROP DEFAULT,
+ALTER COLUMN "refreshToken" DROP DEFAULT,
+ALTER COLUMN "role" DROP DEFAULT,
+ALTER COLUMN "sessionToken" DROP DEFAULT,
+ALTER COLUMN "userAgent" DROP DEFAULT;

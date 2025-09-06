@@ -1056,7 +1056,146 @@ All APIs return consistent error responses:
 - Admin endpoints: 200 requests per minute per admin
 
 ## Webhooks
-The system supports webhooks for order status updates. Configure webhook URLs in client settings to receive real-time notifications.
+
+The system supports comprehensive webhook functionality for real-time event notifications. Webhooks allow external systems to receive instant updates when orders are created, updated, or other events occur.
+
+### Webhook Management APIs
+
+#### GET /api/webhooks
+**Description**: List all webhooks for the authenticated client
+
+**Headers**:
+```
+Authorization: Bearer <token>
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "webhooks": [
+    {
+      "id": "webhook-id",
+      "name": "My Webhook",
+      "url": "https://example.com/webhook",
+      "events": ["order.created"],
+      "isActive": true,
+      "retryCount": 3,
+      "timeout": 30000,
+      "headers": {}
+    }
+  ]
+}
+```
+
+#### POST /api/webhooks
+**Description**: Create a new webhook
+
+**Headers**:
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "name": "My Webhook",
+  "url": "https://example.com/webhook",
+  "events": ["order.created"],
+  "secret": "optional-secret-for-signature-validation",
+  "isActive": true,
+  "retryCount": 3,
+  "timeout": 30000,
+  "headers": {
+    "Authorization": "Bearer your-token"
+  }
+}
+```
+
+#### GET /api/webhooks/[id]
+**Description**: Get a specific webhook by ID
+
+#### PUT /api/webhooks/[id]
+**Description**: Update a webhook configuration
+
+#### DELETE /api/webhooks/[id]
+**Description**: Delete a webhook
+
+### Webhook Logs
+
+#### GET /api/webhooks/[id]/logs
+**Description**: Get webhook delivery logs
+
+**Query Parameters**:
+- `limit` (optional): Number of logs to return (default: 50)
+
+#### POST /api/webhooks/retry/[logId]
+**Description**: Retry a failed webhook delivery
+
+### Supported Events
+
+- `order.created` - Triggered when a new order is created
+- `order.updated` - Triggered when an order is updated (future)
+- `order.cancelled` - Triggered when an order is cancelled (future)
+- `*` - Receive all events (use with caution)
+
+### Webhook Payload Example
+
+When an order is created, webhooks receive:
+
+```json
+{
+  "event": "order.created",
+  "data": {
+    "order": {
+      "id": 123,
+      "orderNumber": "ORDER-123",
+      "referenceNumber": "REF-1234567890",
+      "trackingId": "TRACK123",
+      "name": "Customer Name",
+      "mobile": "9876543210",
+      "address": "Customer Address",
+      "city": "City",
+      "state": "State",
+      "country": "India",
+      "pincode": "123456",
+      "courierService": "Delhivery",
+      "pickupLocation": "Pickup Location",
+      "packageValue": 1000,
+      "weight": 500,
+      "totalItems": 1,
+      "isCod": false,
+      "codAmount": null,
+      "resellerName": null,
+      "resellerMobile": null,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "delhiveryWaybillNumber": "WB123456",
+      "delhiveryOrderId": "DO123456",
+      "delhiveryApiStatus": "success"
+    },
+    "client": {
+      "id": "client-id",
+      "companyName": "Client Company",
+      "name": "Client Name",
+      "email": "client@example.com"
+    }
+  },
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "orderId": 123
+}
+```
+
+### Webhook Security
+
+Webhooks can be secured with HMAC-SHA256 signature validation. If a webhook has a secret configured, the system will include a signature in the `X-Webhook-Signature` header:
+
+```
+X-Webhook-Signature: sha256=<signature>
+```
+
+For detailed webhook documentation, see [WEBHOOK_DOCUMENTATION.md](./WEBHOOK_DOCUMENTATION.md).
 
 ## SDKs and Libraries
 - JavaScript/Node.js SDK available

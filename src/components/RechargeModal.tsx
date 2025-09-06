@@ -31,8 +31,8 @@ export default function RechargeModal({ isOpen, onClose, onSuccess }: RechargeMo
   const errorRef = useRef<HTMLDivElement>(null);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetails>({
-    payeeVpa: 'scan2ship@ybl',
-    payeeName: 'Scan2Ship',
+    payeeVpa: process.env.NEXT_PUBLIC_UPI_ID || 'scan2ship@ybl',
+    payeeName: process.env.NEXT_PUBLIC_PAYEE_NAME || 'Scan2Ship',
     amount: 0,
     transactionNote: '',
     transactionRef: ''
@@ -62,8 +62,8 @@ export default function RechargeModal({ isOpen, onClose, onSuccess }: RechargeMo
     if (!isOpen) {
       setSelectedAmount(null);
       setPaymentDetails({
-        payeeVpa: 'scan2ship@ybl',
-        payeeName: 'Scan2Ship',
+        payeeVpa: process.env.NEXT_PUBLIC_UPI_ID || 'scan2ship@ybl',
+        payeeName: process.env.NEXT_PUBLIC_PAYEE_NAME || 'Scan2Ship',
         amount: 0,
         transactionNote: '',
         transactionRef: ''
@@ -104,7 +104,7 @@ export default function RechargeModal({ isOpen, onClose, onSuccess }: RechargeMo
 
       // Update payment details with generated reference
       const updatedDetails = {
-        payeeVpa: 'scan2ship@ybl',           // Always use correct UPI ID
+        payeeVpa: process.env.NEXT_PUBLIC_UPI_ID || 'scan2ship@ybl',           // Use environment variable
         payeeName: 'Scan2Ship',               // Always use correct Payee Name
         amount,
         transactionRef,
@@ -115,7 +115,7 @@ export default function RechargeModal({ isOpen, onClose, onSuccess }: RechargeMo
 
       // Construct UPI payment link using URLSearchParams for proper encoding
       const params = new URLSearchParams({
-        pa: 'scan2ship@ybl',                  // Payee VPA (UPI ID) - hardcoded
+        pa: process.env.NEXT_PUBLIC_UPI_ID || 'scan2ship@ybl',                  // Payee VPA (UPI ID) - from env
         pn: 'Scan2Ship',                      // Payee name - hardcoded
         am: String(amount),                   // Amount
         cu: "INR",                            // Currency
@@ -127,7 +127,7 @@ export default function RechargeModal({ isOpen, onClose, onSuccess }: RechargeMo
       // Log the generated UPI link for debugging
       console.log('🔗 Generated UPI Link:', upiLink);
       console.log('💰 Amount:', amount);
-      console.log('👤 Payee VPA: scan2ship@ybl (hardcoded)');
+      console.log('👤 Payee VPA:', process.env.NEXT_PUBLIC_UPI_ID || 'scan2ship@ybl', '(from env)');
       console.log('🏢 Payee Name: Scan2Ship (hardcoded)');
       console.log('📝 Transaction Note:', updatedDetails.transactionNote);
       console.log('🔍 Payment Details State:', updatedDetails);
@@ -288,10 +288,10 @@ export default function RechargeModal({ isOpen, onClose, onSuccess }: RechargeMo
 
   const handleDeepLink = () => {
     // Build UPI deep link with proper encoding
-    const upiUrl = `upi://pay?pa=scan2ship@ybl&pn=Scan2Ship&am=${paymentDetails.amount}&cu=INR&tn=${encodeURIComponent(paymentDetails.transactionNote)}`;
+    const upiUrl = `upi://pay?pa=${process.env.NEXT_PUBLIC_UPI_ID || 'scan2ship@ybl'}&pn=Scan2Ship&am=${paymentDetails.amount}&cu=INR&tn=${encodeURIComponent(paymentDetails.transactionNote)}`;
     
     // Build Android intent fallback
-    const intentUrl = `intent://pay?pa=scan2ship@ybl&pn=Scan2Ship&am=${paymentDetails.amount}&cu=INR&tn=${encodeURIComponent(paymentDetails.transactionNote)}#Intent;scheme=upi;end`;
+    const intentUrl = `intent://pay?pa=${process.env.NEXT_PUBLIC_UPI_ID || 'scan2ship@ybl'}&pn=Scan2Ship&am=${paymentDetails.amount}&cu=INR&tn=${encodeURIComponent(paymentDetails.transactionNote)}#Intent;scheme=upi;end`;
 
     // Try native UPI deep link first
     window.location.href = upiUrl;
@@ -548,9 +548,9 @@ export default function RechargeModal({ isOpen, onClose, onSuccess }: RechargeMo
                         <p className="text-sm text-gray-700">
                           <span className="font-medium">UPI ID:</span> 
                           {confirmationDetails.validationResult.upiIdMatches ? (
-                            <span className="text-green-600 ml-1">✅ scan2ship@ybl</span>
+                            <span className="text-green-600 ml-1">✅ {process.env.NEXT_PUBLIC_UPI_ID || 'scan2ship@ybl'}</span>
                           ) : (
-                            <span className="text-red-600 ml-1">❌ {confirmationDetails.validationResult.upiId || 'Not found'} (Expected: scan2ship@ybl)</span>
+                            <span className="text-red-600 ml-1">❌ {confirmationDetails.validationResult.upiId || 'Not found'} (Expected: {process.env.NEXT_PUBLIC_UPI_ID || 'scan2ship@ybl'})</span>
                           )}
                         </p>
                       </div>

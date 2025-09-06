@@ -4,23 +4,51 @@ import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middlew
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import crypto from 'crypto';
 
-// Encryption key for sensitive data (in production, use a proper key management system)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'vanitha-logistics-encryption-key-2024';
+// Encryption key for sensitive data (SECURITY: No fallback key for security)
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
-// Helper function to encrypt sensitive data
-function encrypt(text: string): string {
-  const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return encrypted;
+if (!ENCRYPTION_KEY) {
+  throw new Error('ENCRYPTION_KEY environment variable is required for security');
 }
 
-// Helper function to decrypt sensitive data
+// Helper function to encrypt sensitive data with proper IV
+function encrypt(text: string): string {
+  // Generate a random IV for each encryption
+  const iv = crypto.randomBytes(16);
+  
+  // Create cipher with IV
+  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+  
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  
+  // Prepend IV to encrypted data
+  return iv.toString('hex') + ':' + encrypted;
+}
+
+// Helper function to decrypt sensitive data with proper IV
 function decrypt(encryptedText: string): string {
-  const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
+  try {
+    // Split IV and encrypted data
+    const parts = encryptedText.split(':');
+    if (parts.length !== 2) {
+      throw new Error('Invalid encrypted data format');
+    }
+    
+    const iv = Buffer.from(parts[0], 'hex');
+    const encrypted = parts[1];
+    
+    // Create decipher with IV
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+    
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } catch (error) {
+    console.error('❌ Error decrypting value:', error);
+    throw new Error('Failed to decrypt sensitive data - encryption key may be invalid');
+  }
 }
 
 // Helper function to mask sensitive values

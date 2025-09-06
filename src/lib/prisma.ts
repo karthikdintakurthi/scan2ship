@@ -64,54 +64,9 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient({
   errorFormat: process.env.NODE_ENV === 'production' ? 'minimal' : 'pretty',
 });
 
-// Input validation function for security
-function validateInputData(data: any) {
-  const sensitiveFields = ['password', 'token', 'secret', 'key', 'apiKey'];
-  
-  for (const field of sensitiveFields) {
-    if (data[field] && typeof data[field] === 'string') {
-      // Check for potential SQL injection patterns
-      const suspiciousPatterns = [
-        /(\b(union|select|insert|update|delete|drop|create|alter)\b)/i,
-        /(\b(exec|execute|script|javascript|vbscript)\b)/i,
-        /(\b(0x[0-9a-f]+)\b)/i,
-        /(\b(declare|cast|convert)\b)/i
-      ];
-      
-      for (const pattern of suspiciousPatterns) {
-        if (pattern.test(data[field])) {
-          console.error(`🚨 Potential SQL injection detected in field: ${field}`);
-          throw new Error('Invalid input data detected');
-        }
-      }
-    }
-  }
-}
-
-// Security wrapper for Prisma operations
-export const securePrisma = {
-  // Wrap create operations with input validation
-  async create(model: string, data: any) {
-    validateInputData(data);
-    return (prisma as any)[model].create({ data });
-  },
-
-  // Wrap update operations with input validation
-  async update(model: string, where: any, data: any) {
-    validateInputData(data);
-    return (prisma as any)[model].update({ where, data });
-  },
-
-  // Wrap upsert operations with input validation
-  async upsert(model: string, where: any, create: any, update: any) {
-    validateInputData(create);
-    validateInputData(update);
-    return (prisma as any)[model].upsert({ where, create, update });
-  },
-
-  // Expose all other Prisma methods
-  ...prisma
-};
+// Note: Prisma automatically prevents SQL injection through parameterized queries
+// No custom validation needed as Prisma handles this securely
+// Use prisma directly for all database operations
 
 // Connection health check
 export async function checkDatabaseConnection(): Promise<boolean> {

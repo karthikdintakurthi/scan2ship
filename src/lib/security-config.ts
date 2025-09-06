@@ -13,14 +13,33 @@ export const securityConfig = {
     refreshThreshold: 15 * 60 * 1000, // 15 minutes before expiry
   },
   
-  // Password Policy
+  // Enhanced Password Policy
   password: {
-    minLength: 12,
+    minLength: 16,
     requireUppercase: true,
     requireLowercase: true,
     requireNumbers: true,
     requireSpecialChars: true,
-    maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
+    maxLength: 128,
+    maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
+    historyCount: 8,
+    lockoutAttempts: 3,
+    lockoutDuration: 30 * 60 * 1000, // 30 minutes
+    requireMfa: true,
+    // Additional security requirements
+    preventCommonPasswords: true,
+    preventUserInfo: true,
+    preventSequentialChars: true,
+    preventRepeatedChars: true,
+    maxConsecutiveChars: 2,
+    preventKeyboardPatterns: true,
+    preventDictionaryWords: true,
+    minUniqueChars: 12,
+    preventLeakedPasswords: true,
+    requireComplexity: true,
+    minEntropy: 80,
+    preventSimilarPasswords: true,
+    maxSimilarityThreshold: 0.7
   },
   
   // Rate Limiting
@@ -31,11 +50,23 @@ export const securityConfig = {
     skipFailedRequests: false,
   },
   
-  // Session Management
+  // Enhanced Session Management
   session: {
     maxConcurrentSessions: 3,
     idleTimeout: 30 * 60 * 1000, // 30 minutes
-    absoluteTimeout: 8 * 60 * 60 * 1000, // 8 hours
+    absoluteTimeout: 4 * 60 * 60 * 1000, // 4 hours (reduced from 8)
+    // Additional security measures
+    regenerateOnLogin: true,
+    regenerateOnRoleChange: true,
+    regenerateOnSuspiciousActivity: true,
+    requireReauthForSensitive: true,
+    trackSessionLocation: true,
+    enableSessionBinding: true,
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'strict' as const,
+    rolling: true,
+    renewThreshold: 30 * 60 * 1000, // 30 minutes before expiry
   },
   
   // CORS Configuration
@@ -57,11 +88,39 @@ export const securityConfig = {
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   },
   
-  // File Upload Security
+  // Enhanced File Upload Security
   fileUpload: {
     maxSize: 5 * 1024 * 1024, // 5MB
-    allowedTypes: ['image/jpeg', 'image/png', 'image/gif'],
-    scanForMalware: true, // Implement malware scanning
+    allowedTypes: [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'application/pdf', 'text/plain', 'application/json'
+    ],
+    allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.txt', '.json'],
+    scanForMalware: true,
+    quarantineSuspicious: true,
+    maxFilesPerRequest: 3,
+    uploadPath: './uploads',
+    tempPath: './temp',
+    // Additional security measures
+    scanFileContent: true,
+    validateFileHeaders: true,
+    preventExecutableUploads: true,
+    maxFileNameLength: 255,
+    sanitizeFileName: true,
+    requireVirusScan: true,
+    blockPasswordProtectedFiles: true,
+    validateImageDimensions: true,
+    maxImageWidth: 4096,
+    maxImageHeight: 4096,
+    stripMetadata: true,
+    generateThumbnails: true,
+    watermarkImages: false,
+    encryptSensitiveFiles: true,
+    auditFileAccess: true,
+    rateLimitPerUser: 10, // files per hour
+    rateLimitPerIP: 50, // files per hour
+    quarantinePath: './quarantine',
+    backupPath: './backups'
   },
   
   // API Security

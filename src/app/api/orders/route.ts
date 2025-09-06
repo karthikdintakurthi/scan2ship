@@ -7,6 +7,7 @@ import AnalyticsService from '@/lib/analytics-service';
 import { CreditService } from '@/lib/credit-service';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { WebhookService } from '@/lib/webhook-service';
 
 const delhiveryService = new DelhiveryService();
 
@@ -15,7 +16,7 @@ const delhiveryService = new DelhiveryService();
 export async function POST(request: NextRequest) {
   try {
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }
@@ -280,6 +281,58 @@ export async function POST(request: NextRequest) {
       console.error('❌ [API_ORDERS_POST] WhatsApp sending failed:', whatsappError);
     }
 
+    // Trigger webhooks for order creation
+    try {
+      console.log('🔗 [API_ORDERS_POST] Triggering webhooks for order creation');
+      
+      const webhookData = {
+        order: {
+          id: updatedOrder.id,
+          orderNumber: `ORDER-${updatedOrder.id}`,
+          referenceNumber: updatedOrder.reference_number,
+          trackingId: updatedOrder.tracking_id,
+          name: updatedOrder.name,
+          mobile: updatedOrder.mobile,
+          address: updatedOrder.address,
+          city: updatedOrder.city,
+          state: updatedOrder.state,
+          country: updatedOrder.country,
+          pincode: updatedOrder.pincode,
+          courierService: updatedOrder.courier_service,
+          pickupLocation: updatedOrder.pickup_location,
+          packageValue: updatedOrder.package_value,
+          weight: updatedOrder.weight,
+          totalItems: updatedOrder.total_items,
+          isCod: updatedOrder.is_cod,
+          codAmount: updatedOrder.cod_amount,
+          resellerName: updatedOrder.reseller_name,
+          resellerMobile: updatedOrder.reseller_mobile,
+          createdAt: updatedOrder.created_at,
+          updatedAt: updatedOrder.updated_at,
+          delhiveryWaybillNumber: updatedOrder.delhivery_waybill_number,
+          delhiveryOrderId: updatedOrder.delhivery_order_id,
+          delhiveryApiStatus: updatedOrder.delhivery_api_status
+        },
+        client: {
+          id: client.id,
+          companyName: client.companyName,
+          name: client.name,
+          email: client.email
+        }
+      };
+
+      // Trigger webhook asynchronously to not block the response
+      WebhookService.triggerWebhooks('order.created', webhookData, client.id, updatedOrder.id)
+        .then(() => {
+          console.log('✅ [API_ORDERS_POST] Webhooks triggered successfully');
+        })
+        .catch((webhookError) => {
+          console.error('❌ [API_ORDERS_POST] Webhook trigger failed:', webhookError);
+        });
+    } catch (webhookError) {
+      console.error('❌ [API_ORDERS_POST] Webhook setup failed:', webhookError);
+    }
+
     return NextResponse.json({
       success: true,
       order: {
@@ -303,7 +356,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }
@@ -421,7 +474,7 @@ export async function DELETE(request: NextRequest) {
     console.log('🔐 [API_ORDERS_DELETE] Starting authentication...');
     
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }

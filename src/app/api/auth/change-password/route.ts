@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { validatePassword, hashPassword, verifyPassword, DEFAULT_PASSWORD_POLICY } from '@/lib/password-policy';
-import { SessionManager } from '@/lib/session-manager';
+import { revokeAllUserSessions } from '@/lib/session-manager';
 
 export async function POST(request: NextRequest) {
   try {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Revoke all existing sessions for security
-    const revokedCount = await SessionManager.revokeAllUserSessions(user.id, 'password_change');
+    const revokedCount = await revokeAllUserSessions(user.id);
 
     // Log password change
     await prisma.audit_logs.create({

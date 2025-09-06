@@ -4,6 +4,8 @@ import {
   applySecurityMiddleware, 
   InputValidator 
 } from '@/lib/security-middleware';
+import { validatePassword } from '@/lib/password-validator';
+import { securityConfig } from '@/lib/security-config';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
@@ -35,8 +37,8 @@ export async function POST(request: NextRequest) {
     
     const passwordValidation = InputValidator.validateString(body.password, {
       required: true,
-      minLength: 6,
-      maxLength: 128
+      minLength: securityConfig.password.minLength,
+      maxLength: securityConfig.password.maxLength
     });
     
     if (!passwordValidation.valid) {

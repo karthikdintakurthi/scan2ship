@@ -20,28 +20,47 @@ if (ENCRYPTION_KEY.length < 32) {
 let configCache: Map<string, { value: string; timestamp: number }> = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Helper function to encrypt sensitive data
+// Helper function to encrypt sensitive data with proper IV
 function encrypt(text: string): string {
   if (!ENCRYPTION_KEY) {
     throw new Error('Encryption key not available');
   }
   
-  const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
+  // Generate a random IV for each encryption
+  const iv = crypto.randomBytes(16);
+  
+  // Create cipher with IV
+  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+  
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  return encrypted;
+  
+  // Prepend IV to encrypted data
+  return iv.toString('hex') + ':' + encrypted;
 }
 
-// Helper function to decrypt sensitive data
+// Helper function to decrypt sensitive data with proper IV
 function decrypt(encryptedText: string): string {
   if (!ENCRYPTION_KEY) {
     throw new Error('Encryption key not available');
   }
   
   try {
-    const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+    // Split IV and encrypted data
+    const parts = encryptedText.split(':');
+    if (parts.length !== 2) {
+      throw new Error('Invalid encrypted data format');
+    }
+    
+    const iv = Buffer.from(parts[0], 'hex');
+    const encrypted = parts[1];
+    
+    // Create decipher with IV
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+    
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
+    
     return decrypted;
   } catch (error) {
     console.error('❌ Error decrypting value:', error);

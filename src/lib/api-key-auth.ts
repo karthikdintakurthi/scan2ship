@@ -22,20 +22,8 @@ export async function authenticateApiKey(request: NextRequest): Promise<Authenti
 
   const apiKey = authHeader.substring(7);
   
-  // Temporary hardcoded API key for testing
-  if (apiKey === 'sk_karthik_admin_m3t2z3kww7t') {
-    console.log('🔑 [API_KEY_AUTH] Using hardcoded API key for testing');
-    return {
-      id: 'temp-api-key-001',
-      name: 'Karthik Admin Key (Temporary)',
-      key: apiKey,
-      clientId: 'default-client-001',
-      permissions: ['*'],
-      lastUsedAt: new Date(),
-      expiresAt: null,
-      isActive: true
-    };
-  }
+  // SECURITY: Hardcoded API key removed for security
+  // All API keys must be stored in database and properly managed
   
   try {
     const keyRecord = await prisma.api_keys.findUnique({

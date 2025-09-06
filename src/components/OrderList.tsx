@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getPickupLocations } from '@/lib/order-form-config'
 import { getActiveCourierServices } from '@/lib/courier-service-config'
-import * as ExcelJS from 'exceljs'
+import ExcelJS from 'exceljs'
 
 interface Order {
   id: number
@@ -34,6 +34,14 @@ interface Order {
   delhivery_api_error?: string
   delhivery_retry_count?: number
   last_delhivery_attempt?: string
+  
+  // Shopify integration fields
+  shopify_status?: string
+  shopify_tracking_number?: string
+  shopify_fulfillment_id?: string
+  shopify_api_status?: string
+  shopify_api_error?: string
+  last_shopify_attempt?: string
   
   // Additional Delhivery fields
   shipment_length?: number
@@ -67,6 +75,7 @@ export default function OrderList() {
   const [error, setError] = useState<string | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [retrying, setRetrying] = useState<number | null>(null)
+  const [isFulfilling, setIsFulfilling] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPickupLocation, setSelectedPickupLocation] = useState('')
   const [selectedCourierService, setSelectedCourierService] = useState('')
@@ -348,6 +357,51 @@ export default function OrderList() {
       console.error('Error retrying order:', error)
     } finally {
       setRetrying(null)
+    }
+  }
+
+  const handleFulfillOrder = async (orderId: number) => {
+    setIsFulfilling(true)
+    try {
+      // Get auth token from localStorage
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+
+      const response = await fetch(`/api/orders/${orderId}/fulfill`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        alert(`Order fulfilled successfully! Tracking ID: ${result.trackingId}`)
+        
+        // Refresh the orders list
+        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+        
+        // Update the selected order if it's the same one
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder({
+            ...selectedOrder,
+            tracking_id: result.trackingId,
+            delhivery_waybill_number: result.waybillNumber,
+            delhivery_api_status: 'success'
+          })
+        }
+      } else {
+        const error = await response.json()
+        alert(`Failed to fulfill order: ${error.error || error.message}`)
+      }
+    } catch (error) {
+      alert('Error fulfilling order')
+      console.error('Error fulfilling order:', error)
+    } finally {
+      setIsFulfilling(false)
     }
   }
 
@@ -859,6 +913,21 @@ export default function OrderList() {
         return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">ℹ️ Not Applicable</span>
       default:
         return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">Unknown</span>
+    }
+  }
+
+  const getShopifyStatusBadge = (order: Order) => {
+    switch (order.shopify_status) {
+      case 'fulfilled':
+        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Fulfilled</span>
+      case 'error':
+        return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">✗ Error</span>
+      case 'pending':
+        return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">⏳ Pending</span>
+      case 'synced':
+        return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">🔄 Synced</span>
+      default:
+        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">❓ Not Connected</span>
     }
   }
 
@@ -1567,9 +1636,62 @@ export default function OrderList() {
                     </div>
                   </div>
                   
+                  {/* Fulfill Button */}
+                  {(!selectedOrder.tracking_id || selectedOrder.delhivery_api_status !== 'success') && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <button
+                        onClick={() => handleFulfillOrder(selectedOrder.id)}
+                        disabled={isFulfilling}
+                        className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isFulfilling ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Fulfilling...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Fulfill Order
+                          </>
+                        )}
+                      </button>
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        Click to create waybill and update tracking information
+                      </p>
+                    </div>
+                  )}
 
                 </div>
-              ) : (
+              ) : null}
+
+              {/* Shopify Integration Status */}
+              <div className="mt-6 p-4 bg-purple-50 rounded-lg">
+                <h4 className="font-medium text-gray-900 mb-3">Shopify Integration Status</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-900">
+                  <div>
+                    <div><span className="font-medium">Status:</span> {getShopifyStatusBadge(selectedOrder)}</div>
+                    <div><span className="font-medium">Tracking Number:</span> {selectedOrder.shopify_tracking_number || 'Not assigned'}</div>
+                    <div><span className="font-medium">Fulfillment ID:</span> {selectedOrder.shopify_fulfillment_id || 'Not assigned'}</div>
+                  </div>
+                  <div>
+                    <div><span className="font-medium">API Status:</span> {selectedOrder.shopify_api_status || 'N/A'}</div>
+                    {selectedOrder.last_shopify_attempt && (
+                      <div><span className="font-medium">Last Attempt:</span> {formatDate(selectedOrder.last_shopify_attempt)}</div>
+                    )}
+                    {selectedOrder.shopify_api_error && (
+                      <div><span className="font-medium text-red-600">Error:</span> {selectedOrder.shopify_api_error}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {selectedOrder.courier_service.toLowerCase() !== 'delhivery' ? (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                   <h4 className="font-medium text-gray-900 mb-3">{getCourierServiceName(selectedOrder.courier_service)} Tracking</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-900">
@@ -1583,7 +1705,7 @@ export default function OrderList() {
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
 
 
