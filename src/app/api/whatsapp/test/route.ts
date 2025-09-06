@@ -6,7 +6,7 @@ import whatsappService from '@/lib/whatsapp-service';
 export async function POST(request: NextRequest) {
   try {
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }

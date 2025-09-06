@@ -16,7 +16,7 @@ import crypto from 'crypto';
 export async function POST(request: NextRequest) {
   try {
     // Apply security middleware with upload rate limiting
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'upload', cors: true, securityHeaders: true }

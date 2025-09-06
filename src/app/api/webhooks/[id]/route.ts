@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }
@@ -79,7 +79,7 @@ export async function PUT(
 ) {
   try {
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }
@@ -165,7 +165,7 @@ export async function DELETE(
 ) {
   try {
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }

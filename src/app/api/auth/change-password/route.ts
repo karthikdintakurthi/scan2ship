@@ -8,7 +8,7 @@ import { revokeAllUserSessions } from '@/lib/session-manager';
 export async function POST(request: NextRequest) {
   try {
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'auth', cors: true, securityHeaders: true }
