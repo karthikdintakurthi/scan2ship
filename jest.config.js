@@ -39,15 +39,11 @@ const customJestConfig = {
     url: 'http://localhost:3000',
   },
   // Fix for regex parsing issues
-  transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', {
-      presets: [
-        ['@babel/preset-env', { targets: { node: 'current' } }],
-        '@babel/preset-typescript',
-        ['@babel/preset-react', { runtime: 'automatic' }],
-      ],
-    }],
-  },
+         transform: {
+           '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', {
+             configFile: './babel.config.jest.js',
+           }],
+         },
 }
 
 module.exports = createJestConfig(customJestConfig)
