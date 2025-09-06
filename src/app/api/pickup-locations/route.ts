@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
-import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { authorizeUser, UserRole, PermissionLevel, getAuthenticatedUser } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -108,11 +108,32 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
 
     const body = await request.json();
     const { name, value, delhiveryApiKey } = body;
@@ -121,7 +142,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name and value are required' }, { status: 400 });
     }
 
-    console.log(`📝 [API_PICKUP_LOCATIONS_POST] Creating pickup location for client: ${user.clients.companyName}`);
+    console.log(`📝 [API_PICKUP_LOCATIONS_POST] Creating pickup location for client: ${user.client.companyName || user.client.id}`);
 
     // Create new pickup location
     const newLocation = await prisma.pickup_locations.create({
@@ -129,13 +150,13 @@ export async function POST(request: NextRequest) {
         label: name,
         value: value,
         delhiveryApiKey: delhiveryApiKey || null,
-        clientId: user.clients.id
+        clientId: user.clientId
       }
     });
 
     console.log(`✅ [API_PICKUP_LOCATIONS_POST] Created pickup location: ${newLocation.label}`);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       location: {
         id: newLocation.id,
@@ -145,22 +166,49 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    // Apply security headers
+    securityHeaders(response);
+    return response;
+
   } catch (error) {
     console.error('❌ [API_PICKUP_LOCATIONS_POST] Error creating pickup location:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to create pickup location' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    // Authenticate user
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
 
     const body = await request.json();
     const { locations } = body;
@@ -169,7 +217,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Locations array is required' }, { status: 400 });
     }
 
-    console.log(`📝 [API_PICKUP_LOCATIONS_PUT] Updating pickup locations for client: ${user.clients.companyName}`);
+    console.log(`📝 [API_PICKUP_LOCATIONS_PUT] Updating pickup locations for client: ${user.client.companyName || user.client.id}`);
 
     // Update pickup locations
     const updatePromises = locations.map(async (location: any) => {
@@ -189,16 +237,22 @@ export async function PUT(request: NextRequest) {
 
     console.log(`✅ [API_PICKUP_LOCATIONS_PUT] Updated ${locations.length} pickup locations`);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: 'Pickup locations updated successfully'
     });
 
+    // Apply security headers
+    securityHeaders(response);
+    return response;
+
   } catch (error) {
     console.error('❌ [API_PICKUP_LOCATIONS_PUT] Error updating pickup locations:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to update pickup locations' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }

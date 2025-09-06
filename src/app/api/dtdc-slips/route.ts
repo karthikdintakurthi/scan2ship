@@ -1,48 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
-
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
-
-    if (!user || !user.isActive || !user.clients.isActive) {
-      return null;
-    }
-
-    return { user, client: user.clients };
-  } catch (error) {
-    return null;
-  }
-}
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 // GET: Retrieve DTDC slips configuration
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate user
-    const auth = await getAuthenticatedUser(request);
-    if (!auth) {
-      console.log('❌ [API_DTDC_SLIPS_GET] Authentication failed');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
 
-    const { client } = auth;
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
+    const client = user.client;
     console.log(`🔍 [API_DTDC_SLIPS_GET] Fetching DTDC slips config for client: ${client.companyName}`);
 
     // Get DTDC slips configuration from client_config table
@@ -88,31 +78,56 @@ export async function GET(request: NextRequest) {
 
     console.log(`✅ [API_DTDC_SLIPS_GET] Returning DTDC slips config:`, dtdcSlips);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       dtdcSlips
     });
 
+    // Apply security headers
+    securityHeaders(response);
+    return response;
+
   } catch (error) {
     console.error('❌ [API_DTDC_SLIPS_GET] Error fetching DTDC slips config:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to fetch DTDC slips configuration' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }
 
 // PUT: Update DTDC slips configuration
 export async function PUT(request: NextRequest) {
   try {
-    // Authenticate user
-    const auth = await getAuthenticatedUser(request);
-    if (!auth) {
-      console.log('❌ [API_DTDC_SLIPS_PUT] Authentication failed');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
 
-    const { client } = auth;
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
+    const client = user.client;
     const body = await request.json();
     const { dtdcSlips } = body;
 
@@ -187,16 +202,22 @@ export async function PUT(request: NextRequest) {
 
     console.log(`✅ [API_DTDC_SLIPS_PUT] DTDC slips config updated successfully for ${client.companyName}`);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: 'DTDC slips configuration updated successfully'
     });
 
+    // Apply security headers
+    securityHeaders(response);
+    return response;
+
   } catch (error) {
     console.error('❌ [API_DTDC_SLIPS_PUT] Error updating DTDC slips config:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to update DTDC slips configuration' },
       { status: 500 }
     );
+    securityHeaders(response);
+    return response;
   }
 }

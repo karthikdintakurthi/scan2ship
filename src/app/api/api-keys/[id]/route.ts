@@ -1,38 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
-
-// Helper function to get authenticated user
-async function getAuthenticatedUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  
-  try {
-    const session = await prisma.sessions.findUnique({
-      where: { token },
-      include: {
-        users: {
-          include: {
-            clients: true
-          }
-        }
-      }
-    });
-
-    if (!session || session.expiresAt < new Date()) {
-      return null;
-    }
-
-    return session.users;
-  } catch (error) {
-    console.error('Auth error:', error);
-    return null;
-  }
-}
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
 // PUT /api/api-keys/[id] - Update API key
 export async function PUT(
@@ -40,10 +10,32 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
 
     const { id } = await params;
     const { name, permissions, isActive } = await request.json();
@@ -69,7 +61,7 @@ export async function PUT(
       }
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       apiKey: {
         id: updatedApiKey.id,
@@ -83,9 +75,13 @@ export async function PUT(
         updatedAt: updatedApiKey.updatedAt
       }
     });
+    securityHeaders(response);
+    return response;
   } catch (error) {
     console.error('API Keys PUT error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const response = NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    securityHeaders(response);
+    return response;
   }
 }
 
@@ -95,10 +91,32 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Apply security middleware
+    const securityResponse = applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
     }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.DELETE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const user = authResult.user!;
 
     const { id } = await params;
 
@@ -121,12 +139,16 @@ export async function DELETE(
       }
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: 'API key deactivated successfully'
     });
+    securityHeaders(response);
+    return response;
   } catch (error) {
     console.error('API Keys DELETE error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const response = NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    securityHeaders(response);
+    return response;
   }
 }
