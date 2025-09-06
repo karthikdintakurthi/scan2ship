@@ -252,7 +252,7 @@ Focus on accuracy and only extract information that is clearly visible and prope
     
     return NextResponse.json({
       error: 'Failed to validate payment screenshot',
-      details: lastError?.message || 'Unknown error'
+      details: lastError instanceof Error ? lastError.message : 'Unknown error'
     }, { status: 500 });
 
   } catch (error) {

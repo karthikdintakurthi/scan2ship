@@ -246,7 +246,7 @@ export async function callOpenAIWithRetry(
       return data;
       
     } catch (error) {
-      lastError = error;
+      lastError = error instanceof Error ? error : new Error('Unknown error');
       
       if (error instanceof OpenAIError && error.retryable && attempt < maxRetries) {
         const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff

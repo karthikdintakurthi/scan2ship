@@ -172,6 +172,7 @@ Examples of special character cleanup:
 
     console.log('🤖 [API_FORMAT_ADDRESS] Calling OpenAI API with enhanced error handling...');
 
+    let parsedAddress: any;
     try {
       const data = await callOpenAIWithRetry(openaiApiKey, requestBody);
       const content = data.choices[0]?.message?.content;
@@ -186,10 +187,9 @@ Examples of special character cleanup:
 
       // Clean and extract JSON from the response
       const cleanedContent = cleanOpenAIResponse(content);
-      const parsedAddress = extractJSONFromResponse(cleanedContent);
+      parsedAddress = extractJSONFromResponse(cleanedContent);
       
       console.log('✅ [API_FORMAT_ADDRESS] Successfully parsed address data');
-      
       console.log('📊 Parsed Address Data:', JSON.stringify(parsedAddress, null, 2))
     } catch (openaiError) {
       if (openaiError instanceof OpenAIError) {
