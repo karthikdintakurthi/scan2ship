@@ -12,3 +12,8 @@ next/
 /.next
 /.next/cache/webpack/client-development
 /.next/cache
+backups/prod_schema_20250906_194044.prisma
+backups/prod_backup_20250906_194040.sql
+backups/prod_backup_20250906_194035.sql
+backups/prod_backup_20250906_194030.sql
+backups/local_backup_20250906_194027.sql
