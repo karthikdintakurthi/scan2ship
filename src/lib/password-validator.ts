@@ -195,6 +195,18 @@ export function validatePassword(
   const errors: string[] = [];
   const config = securityConfig.password;
   
+  // Handle null/undefined password
+  if (!password || typeof password !== 'string') {
+    errors.push('Password is required');
+    return {
+      isValid: false,
+      errors,
+      strength: 'weak',
+      entropy: 0,
+      score: 0
+    };
+  }
+  
   // Length validation
   if (password.length < config.minLength) {
     errors.push(`Password must be at least ${config.minLength} characters long`);

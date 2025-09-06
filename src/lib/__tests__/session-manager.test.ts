@@ -15,22 +15,23 @@ import {
 } from '../session-manager';
 
 // Mock Prisma
-const mockPrisma = {
-  sessions: {
-    create: jest.fn(),
-    findFirst: jest.fn(),
-    findMany: jest.fn(),
-    update: jest.fn(),
-    updateMany: jest.fn(),
-    delete: jest.fn(),
-    deleteMany: jest.fn(),
-    count: jest.fn(),
-  },
-};
-
 jest.mock('../prisma', () => ({
-  prisma: mockPrisma,
+  prisma: {
+    sessions: {
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      delete: jest.fn(),
+      deleteMany: jest.fn(),
+      count: jest.fn(),
+    },
+  },
 }));
+
+// Get the mocked prisma instance
+const { prisma: mockPrisma } = require('../prisma');
 
 describe('Session Manager', () => {
   beforeEach(() => {

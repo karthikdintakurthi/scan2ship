@@ -52,6 +52,87 @@ Object.defineProperty(global, 'crypto', {
 // Mock fetch
 global.fetch = jest.fn()
 
+// Mock Request and Response for Next.js API routes
+global.Request = class Request {
+  constructor(input, init = {}) {
+    this.url = typeof input === 'string' ? input : input.url
+    this.method = init.method || 'GET'
+    this.headers = new Map(Object.entries(init.headers || {}))
+    this.body = init.body
+  }
+  
+  async json() {
+    return JSON.parse(this.body || '{}')
+  }
+  
+  async formData() {
+    return new FormData()
+  }
+}
+
+global.Response = class Response {
+  constructor(body, init = {}) {
+    this.body = body
+    this.status = init.status || 200
+    this.statusText = init.statusText || 'OK'
+    this.headers = new Map(Object.entries(init.headers || {}))
+  }
+  
+  async json() {
+    return JSON.parse(this.body || '{}')
+  }
+}
+
+// Mock NextResponse
+global.NextResponse = {
+  json: jest.fn((data, init = {}) => ({
+    json: jest.fn().mockResolvedValue(data),
+    status: init.status || 200,
+    headers: new Map(Object.entries(init.headers || {})),
+  })),
+  redirect: jest.fn((url, status = 302) => ({
+    status,
+    headers: new Map([['location', url]]),
+  })),
+  next: jest.fn(() => ({
+    status: 200,
+  })),
+}
+
+global.Headers = class Headers {
+  constructor(init = {}) {
+    this.map = new Map(Object.entries(init))
+  }
+  
+  get(name) {
+    return this.map.get(name.toLowerCase())
+  }
+  
+  set(name, value) {
+    this.map.set(name.toLowerCase(), value)
+  }
+  
+  has(name) {
+    return this.map.has(name.toLowerCase())
+  }
+  
+  delete(name) {
+    this.map.delete(name.toLowerCase())
+  }
+  
+  entries() {
+    return this.map.entries()
+  }
+  
+  keys() {
+    return this.map.keys()
+  }
+  
+  values() {
+    return this.map.values()
+  }
+}
+
 // Mock console methods to reduce noise in tests
 const originalConsoleError = console.error
 const originalConsoleWarn = console.warn
@@ -68,7 +149,7 @@ afterEach(() => {
 })
 
 // Mock Prisma - using dedicated mock file
-jest.mock('@/lib/prisma')
+// jest.mock('@/lib/prisma') // Commented out to avoid module resolution issues
 
 // Mock bcrypt
 jest.mock('bcryptjs', () => ({
