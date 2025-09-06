@@ -319,13 +319,21 @@ export function applySecurityMiddleware(
     }
   }
   
-  // Apply rate limiting
-  const rateLimitResult = rateLimit(request, rateLimitType);
-  if (!rateLimitResult.allowed) {
-    return NextResponse.json(
-      { error: rateLimitResult.message },
-      { status: 429 }
-    );
+  // Skip rate limiting in development/testing mode
+  const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+  const disableRateLimit = process.env.DISABLE_RATE_LIMIT === 'true';
+  
+  if (!isDevelopment && !disableRateLimit) {
+    // Apply rate limiting only in production
+    const rateLimitResult = rateLimit(request, rateLimitType);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: rateLimitResult.message },
+        { status: 429 }
+      );
+    }
+  } else {
+    console.log('🚫 [RATE_LIMIT] Rate limiting disabled for testing/development');
   }
   
   // Apply security headers
