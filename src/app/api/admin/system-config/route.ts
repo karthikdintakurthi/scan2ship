@@ -82,7 +82,7 @@ function maskSensitiveValue(value: string, type: string, isEncrypted: boolean): 
 export async function GET(request: NextRequest) {
   try {
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
     console.log('🚀 [API_ADMIN_SYSTEM_CONFIG_POST] Starting request...');
     
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }
@@ -259,7 +259,7 @@ export async function PUT(request: NextRequest) {
     console.log('🚀 [API_ADMIN_SYSTEM_CONFIG_PUT] Starting request...');
     
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }

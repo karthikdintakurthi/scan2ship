@@ -11,7 +11,7 @@ export async function GET(
     console.log('🚀 [API_ADMIN_CLIENT_CONFIG_GET] Starting request...');
     
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }
@@ -244,7 +244,7 @@ export async function PUT(
     console.log('🚀 [API_ADMIN_CLIENT_CONFIG_PUT] Starting request...');
     
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }

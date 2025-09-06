@@ -12,7 +12,7 @@ export async function PUT(
     console.log('🔐 [ADMIN_UPDATE_CLIENT_PASSWORD] Starting request...');
     
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }

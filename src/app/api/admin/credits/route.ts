@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     console.log('📊 [API_ADMIN_CREDITS_GET] Request received');
     
     // Apply security middleware
-    const securityResponse = applySecurityMiddleware(
+    const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
       { rateLimit: 'api', cors: true, securityHeaders: true }
