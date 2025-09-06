@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClientSide } from '@/hooks/useClientSide';
+import { usePathname } from 'next/navigation';
 import SaaSLogin from './SaaSLogin';
 import Navigation from './Navigation';
 
@@ -12,9 +13,13 @@ interface AuthWrapperProps {
 
 export default function AuthWrapper({ children }: AuthWrapperProps) {
   const { isClient, isHydrated } = useClientSide();
+  const pathname = usePathname();
   
   // Always call useAuth hook to maintain hook order consistency
   const auth = useAuth();
+
+  // Allow public access to tracking page
+  const isPublicPage = pathname === '/tracking';
 
   // Handle authentication errors gracefully
   useEffect(() => {
@@ -27,6 +32,18 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
   // Show loading spinner while checking authentication or if not client-side yet
   // Also handle SSR case where auth.isLoading will be true
   if (!isClient || !isHydrated || auth.isLoading) {
+    // For tracking page, show a simple loading state
+    if (isPublicPage) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4" suppressHydrationWarning>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4" suppressHydrationWarning>
         <div className="max-w-md w-full">
@@ -43,6 +60,11 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
         </div>
       </div>
     );
+  }
+
+  // Allow public pages to render without authentication
+  if (isPublicPage) {
+    return <>{children}</>;
   }
 
   // Show SaaS login if not authenticated
