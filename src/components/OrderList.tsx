@@ -7,6 +7,7 @@ import ExcelJS from 'exceljs'
 
 interface Order {
   id: number
+  clientId: string
   name: string
   mobile: string
   address: string
@@ -46,6 +47,7 @@ interface Order {
   // Additional Delhivery fields
   shipment_length?: number
   shipment_breadth?: number
+  shipment_width?: number
   shipment_height?: number
   product_description?: string
   return_address?: string
@@ -78,6 +80,8 @@ export default function OrderList() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [retrying, setRetrying] = useState<number | null>(null)
   const [isFulfilling, setIsFulfilling] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editFormData, setEditFormData] = useState<Partial<Order>>({})
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPickupLocation, setSelectedPickupLocation] = useState('')
   const [selectedCourierService, setSelectedCourierService] = useState('')
@@ -449,6 +453,172 @@ export default function OrderList() {
       console.error('Error fulfilling order:', error)
     } finally {
       setIsFulfilling(false)
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!selectedOrder || !editFormData) return
+
+    try {
+      // Get auth token from localStorage
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+
+      // If order has Delhivery tracking code, update Delhivery first, then update database
+      if (selectedOrder.delhivery_waybill_number && selectedOrder.courier_service.toLowerCase() === 'delhivery') {
+        console.log('🔄 [ORDER_UPDATE] Delhivery order detected - updating Delhivery first')
+        
+        // Create updated order data for Delhivery call
+        const updatedOrderData = {
+          ...selectedOrder,
+          ...editFormData
+        }
+        
+        // Update Delhivery first
+        const delhiveryUpdateSuccess = await updateDelhiveryOrder(updatedOrderData)
+        
+        if (delhiveryUpdateSuccess) {
+          // Delhivery update successful - now update database
+          console.log('✅ [ORDER_UPDATE] Delhivery update successful, now updating database')
+          
+          const response = await fetch(`/api/orders/${selectedOrder.id}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(editFormData),
+          })
+
+          if (response.ok) {
+            const updatedOrder = await response.json()
+            setSelectedOrder(updatedOrder)
+            setIsEditMode(false)
+            setEditFormData({})
+            
+            // Refresh the orders list
+            fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+            
+            alert('Order updated successfully!')
+          } else {
+            const error = await response.json()
+            alert(`Delhivery update succeeded but database update failed: ${error.error || error.message}`)
+          }
+        } else {
+          // Delhivery update failed - don't update database
+          console.log('❌ [ORDER_UPDATE] Delhivery update failed, skipping database update')
+          alert('Order update failed. Delhivery update was unsuccessful, so no changes were made.')
+        }
+      } else {
+        // For non-Delhivery orders, update database immediately
+        const response = await fetch(`/api/orders/${selectedOrder.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(editFormData),
+        })
+
+        if (response.ok) {
+          const updatedOrder = await response.json()
+          setSelectedOrder(updatedOrder)
+          setIsEditMode(false)
+          setEditFormData({})
+          
+          // Refresh the orders list
+          fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+          
+          alert('Order updated successfully!')
+        } else {
+          const error = await response.json()
+          alert(`Failed to update order: ${error.error || error.message}`)
+        }
+      }
+    } catch (error) {
+      console.error('Update error:', error)
+      alert('Failed to update order. Please try again.')
+    }
+  }
+
+  const handleEditInputChange = (field: keyof Order, value: string | number | boolean) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const updateDelhiveryOrder = async (order: Order): Promise<boolean> => {
+    try {
+      console.log('🔄 [DELHIVERY_UPDATE] Updating Delhivery order:', order.delhivery_waybill_number)
+      
+      // Prepare Delhivery update payload according to official documentation
+      // Note: pickupLocation is internal Scan2Ship field, not sent to Delhivery
+      // Note: shipment dimensions are not sent to Delhivery update API
+      const delhiveryPayload: any = {
+        waybill: order.delhivery_waybill_number,
+        pt: order.is_cod ? 'COD' : 'Pre-paid',
+        cod: order.is_cod ? (order.cod_amount || 0) : 0,
+        weight: order.weight || 100, // Weight in grams
+        
+        // Customer details for address updates
+        name: order.name,
+        phone: order.mobile,
+        address: order.address,
+        city: order.city,
+        state: order.state,
+        pincode: order.pincode,
+        country: order.country
+      }
+
+      console.log('📦 [DELHIVERY_UPDATE] Clean Delhivery Payload (no internal fields):', delhiveryPayload)
+
+      // Call Delhivery API to update order
+      // Include pickupLocation for API key lookup only
+      const apiPayload = {
+        ...delhiveryPayload,
+        pickupLocation: order.pickup_location // Internal field for API key lookup
+      }
+      
+      const delhiveryResponse = await fetch('/api/delhivery/update-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiPayload),
+      })
+
+      if (delhiveryResponse.ok) {
+        const delhiveryResult = await delhiveryResponse.json()
+        console.log('✅ [DELHIVERY_UPDATE] Success:', delhiveryResult)
+        
+        // Check if the response indicates success
+        if (delhiveryResult.success) {
+          console.log('✅ [DELHIVERY_UPDATE] Order updated successfully in Delhivery')
+          return true
+        } else {
+          console.error('❌ [DELHIVERY_UPDATE] Delhivery API returned success: false')
+          return false
+        }
+      } else {
+        const delhiveryError = await delhiveryResponse.json()
+        console.error('❌ [DELHIVERY_UPDATE] Failed:', delhiveryError)
+        
+        // Show specific error for authentication issues
+        if (delhiveryResponse.status === 401) {
+          console.warn('⚠️ [DELHIVERY_UPDATE] API key authentication failed - order updated locally but not in Delhivery')
+        } else {
+          console.warn('⚠️ [DELHIVERY_UPDATE] Delhivery update failed - order updated locally but not in Delhivery')
+        }
+        return false
+      }
+    } catch (error) {
+      console.error('❌ [DELHIVERY_UPDATE] Error:', error)
+      // Don't show error to user as the main order update was successful
+      // Just log it for debugging
+      return false
     }
   }
 
@@ -1669,47 +1839,278 @@ export default function OrderList() {
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Order Details</h3>
-                <button
-                  onClick={() => setSelectedOrder(null)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-2">
+                  {!isEditMode ? (
+                    <button
+                      onClick={() => {
+                        setIsEditMode(true)
+                        // Only include editable fields in the form data
+                        if (selectedOrder) {
+                          setEditFormData({
+                            name: selectedOrder.name,
+                            mobile: selectedOrder.mobile,
+                            address: selectedOrder.address,
+                            city: selectedOrder.city,
+                            state: selectedOrder.state,
+                            country: selectedOrder.country,
+                            pincode: selectedOrder.pincode,
+                            courier_service: selectedOrder.courier_service,
+                            pickup_location: selectedOrder.pickup_location,
+                            package_value: selectedOrder.package_value,
+                            weight: selectedOrder.weight,
+                            total_items: selectedOrder.total_items,
+                            is_cod: selectedOrder.is_cod,
+                            cod_amount: selectedOrder.cod_amount,
+                            tracking_id: selectedOrder.tracking_id,
+                            reference_number: selectedOrder.reference_number
+                          })
+                        } else {
+                          setEditFormData({})
+                        }
+                      }}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-1"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Edit
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveEdit}
+                        className="px-3 py-1 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsEditMode(false)
+                          setEditFormData({})
+                        }}
+                        className="px-3 py-1 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSelectedOrder(null)
+                      setIsEditMode(false)
+                      setEditFormData({})
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Customer Information</h4>
                   <div className="space-y-2 text-sm text-gray-900">
-                    <div><span className="font-medium">Name:</span> {selectedOrder.name}</div>
-                    <div><span className="font-medium">Mobile:</span> {selectedOrder.mobile}</div>
-                    <div><span className="font-medium">Address:</span> {selectedOrder.address}</div>
-                    <div><span className="font-medium">City:</span> {selectedOrder.city}</div>
-                    <div><span className="font-medium">State:</span> {selectedOrder.state}</div>
-                    <div><span className="font-medium">Country:</span> {selectedOrder.country}</div>
-                    <div><span className="font-medium">Pincode:</span> {selectedOrder.pincode}</div>
+                    {isEditMode ? (
+                      <>
+                        <div>
+                          <label className="font-medium">Name:</label>
+                          <input
+                            type="text"
+                            value={editFormData.name || ''}
+                            onChange={(e) => handleEditInputChange('name', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">Mobile:</label>
+                          <input
+                            type="text"
+                            value={editFormData.mobile || ''}
+                            onChange={(e) => handleEditInputChange('mobile', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">Address:</label>
+                          <textarea
+                            value={editFormData.address || ''}
+                            onChange={(e) => handleEditInputChange('address', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            rows={2}
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">City:</label>
+                          <input
+                            type="text"
+                            value={editFormData.city || ''}
+                            onChange={(e) => handleEditInputChange('city', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">State:</label>
+                          <input
+                            type="text"
+                            value={editFormData.state || ''}
+                            onChange={(e) => handleEditInputChange('state', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">Country:</label>
+                          <input
+                            type="text"
+                            value={editFormData.country || ''}
+                            onChange={(e) => handleEditInputChange('country', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">Pincode:</label>
+                          <input
+                            type="text"
+                            value={editFormData.pincode || ''}
+                            onChange={(e) => handleEditInputChange('pincode', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div><span className="font-medium">Name:</span> {selectedOrder.name}</div>
+                        <div><span className="font-medium">Mobile:</span> {selectedOrder.mobile}</div>
+                        <div><span className="font-medium">Address:</span> {selectedOrder.address}</div>
+                        <div><span className="font-medium">City:</span> {selectedOrder.city}</div>
+                        <div><span className="font-medium">State:</span> {selectedOrder.state}</div>
+                        <div><span className="font-medium">Country:</span> {selectedOrder.country}</div>
+                        <div><span className="font-medium">Pincode:</span> {selectedOrder.pincode}</div>
+                      </>
+                    )}
                   </div>
                 </div>
                 
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Order Information</h4>
                   <div className="space-y-2 text-sm text-gray-900">
-                    <div><span className="font-medium">Courier:</span> {selectedOrder.courier_service}</div>
-                    <div><span className="font-medium">Pickup Location:</span> {selectedOrder.pickup_location}</div>
-                    <div><span className="font-medium">Package Value:</span> {formatCurrency(selectedOrder.package_value)}</div>
-                    <div><span className="font-medium">Weight:</span> {selectedOrder.weight} g</div>
-                    <div><span className="font-medium">Total Items:</span> {selectedOrder.total_items}</div>
-                    <div><span className="font-medium">COD:</span> {selectedOrder.is_cod ? 'Yes' : 'No'}</div>
-                    {selectedOrder.is_cod && selectedOrder.cod_amount && (
-                      <div><span className="font-medium">COD Amount:</span> {formatCurrency(selectedOrder.cod_amount)}</div>
-                    )}
-                    {selectedOrder.tracking_id && (
-                      <div><span className="font-medium">Tracking ID:</span> {selectedOrder.tracking_id}</div>
-                    )}
-                    {selectedOrder.reference_number && (
-                      <div><span className="font-medium">Reference:</span> {selectedOrder.reference_number}</div>
+                    {isEditMode ? (
+                      <>
+                        <div>
+                          <label className="font-medium">Courier:</label>
+                          <select
+                            value={editFormData.courier_service || ''}
+                            onChange={(e) => handleEditInputChange('courier_service', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          >
+                            <option value="delhivery">Delhivery</option>
+                            <option value="dtdc">DTDC</option>
+                            <option value="india_post">India Post</option>
+                            <option value="blue_dart">Blue Dart</option>
+                            <option value="fedex">FedEx</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="font-medium">Pickup Location:</label>
+                          <input
+                            type="text"
+                            value={editFormData.pickup_location || ''}
+                            onChange={(e) => handleEditInputChange('pickup_location', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">Package Value:</label>
+                          <input
+                            type="number"
+                            value={editFormData.package_value || ''}
+                            onChange={(e) => handleEditInputChange('package_value', parseFloat(e.target.value) || 0)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">Weight:</label>
+                          <input
+                            type="number"
+                            value={editFormData.weight || ''}
+                            onChange={(e) => handleEditInputChange('weight', parseFloat(e.target.value) || 0)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">Total Items:</label>
+                          <input
+                            type="number"
+                            value={editFormData.total_items || ''}
+                            onChange={(e) => handleEditInputChange('total_items', parseInt(e.target.value) || 0)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">COD:</label>
+                          <input
+                            type="checkbox"
+                            checked={editFormData.is_cod || false}
+                            onChange={(e) => handleEditInputChange('is_cod', e.target.checked)}
+                            className="ml-2"
+                          />
+                        </div>
+                        {(editFormData.is_cod || selectedOrder.is_cod) && (
+                          <div>
+                            <label className="font-medium">COD Amount:</label>
+                            <input
+                              type="number"
+                              value={editFormData.cod_amount || ''}
+                              onChange={(e) => handleEditInputChange('cod_amount', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                        )}
+                        <div>
+                          <label className="font-medium">Tracking ID:</label>
+                          <input
+                            type="text"
+                            value={editFormData.tracking_id || ''}
+                            onChange={(e) => handleEditInputChange('tracking_id', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium">Reference:</label>
+                          <input
+                            type="text"
+                            value={editFormData.reference_number || ''}
+                            onChange={(e) => handleEditInputChange('reference_number', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div><span className="font-medium">Courier:</span> {selectedOrder.courier_service}</div>
+                        <div><span className="font-medium">Pickup Location:</span> {selectedOrder.pickup_location}</div>
+                        <div><span className="font-medium">Package Value:</span> {formatCurrency(selectedOrder.package_value)}</div>
+                        <div><span className="font-medium">Weight:</span> {selectedOrder.weight} g</div>
+                        <div><span className="font-medium">Total Items:</span> {selectedOrder.total_items}</div>
+                        <div><span className="font-medium">COD:</span> {selectedOrder.is_cod ? 'Yes' : 'No'}</div>
+                        {selectedOrder.is_cod && selectedOrder.cod_amount && (
+                          <div><span className="font-medium">COD Amount:</span> {formatCurrency(selectedOrder.cod_amount)}</div>
+                        )}
+                        {selectedOrder.tracking_id && (
+                          <div><span className="font-medium">Tracking ID:</span> {selectedOrder.tracking_id}</div>
+                        )}
+                        {selectedOrder.reference_number && (
+                          <div><span className="font-medium">Reference:</span> {selectedOrder.reference_number}</div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1770,26 +2171,6 @@ export default function OrderList() {
                 </div>
               ) : null}
 
-              {/* Shopify Integration Status */}
-              <div className="mt-6 p-4 bg-purple-50 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-3">Shopify Integration Status</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-900">
-                  <div>
-                    <div><span className="font-medium">Status:</span> {getShopifyStatusBadge(selectedOrder)}</div>
-                    <div><span className="font-medium">Tracking Number:</span> {selectedOrder.shopify_tracking_number || 'Not assigned'}</div>
-                    <div><span className="font-medium">Fulfillment ID:</span> {selectedOrder.shopify_fulfillment_id || 'Not assigned'}</div>
-                  </div>
-                  <div>
-                    <div><span className="font-medium">API Status:</span> {selectedOrder.shopify_api_status || 'N/A'}</div>
-                    {selectedOrder.last_shopify_attempt && (
-                      <div><span className="font-medium">Last Attempt:</span> {formatDate(selectedOrder.last_shopify_attempt)}</div>
-                    )}
-                    {selectedOrder.shopify_api_error && (
-                      <div><span className="font-medium text-red-600">Error:</span> {selectedOrder.shopify_api_error}</div>
-                    )}
-                  </div>
-                </div>
-              </div>
 
               {selectedOrder.courier_service.toLowerCase() !== 'delhivery' ? (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg">
