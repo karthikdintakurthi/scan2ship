@@ -76,10 +76,11 @@ model client_order_configs {
   requirePackageValue       Boolean @default(true)
   requireWeight             Boolean @default(true)
   requireTotalItems         Boolean @default(true)
-  clientId                  String  @unique
-  enableReferencePrefix     Boolean @default(true)
   enableResellerFallback    Boolean @default(true)
   enableThermalPrint        Boolean @default(false)
+  enableReferencePrefix     Boolean @default(true)
+  clientId                  String  @unique
+  pickup_location_overrides Json?   @default("{}")
   displayLogoOnWaybill      Boolean @default(false)
   logoFileName              String?
   logoFileSize              Int?
@@ -90,39 +91,38 @@ model client_order_configs {
 }
 
 model clients {
-  id                    String                 @id
-  name                  String
-  companyName           String
-  email                 String                 @unique
-  phone                 String?
-  address               String?
-  city                  String?
-  state                 String?
-  country               String                 @default("India")
-  pincode               String?
-  subscriptionPlan      String                 @default("basic")
-  subscriptionStatus    String                 @default("active")
-  subscriptionExpiresAt DateTime?
-  isActive              Boolean                @default(true)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime
-  analytics_events      analytics_events[]
-  api_keys              api_keys[]
-  client_config         client_config[]
-  client_credit_costs   client_credit_costs[]
-  client_credits        client_credits?
-  client_order_configs  client_order_configs?
-  courier_services      courier_services[]
-  credit_transactions   credit_transactions[]
-  order_analytics       order_analytics[]
-  orders                orders[]
-  pickup_locations      pickup_locations[]
-  pickup_requests       pickup_requests[]
-  sessions              sessions[]
-  shopify_integrations  shopify_integrations[]
-  shopify_orders        shopify_orders[]
-  users                 users[]
-  webhooks              webhooks[]
+  id                              String                            @id
+  name                            String
+  companyName                     String
+  email                           String                            @unique
+  phone                           String?
+  address                         String?
+  city                            String?
+  state                           String?
+  country                         String                            @default("India")
+  pincode                         String?
+  subscriptionPlan                String                            @default("basic")
+  subscriptionStatus              String                            @default("active")
+  subscriptionExpiresAt           DateTime?
+  isActive                        Boolean                           @default(true)
+  createdAt                       DateTime                          @default(now())
+  updatedAt                       DateTime
+  analytics_events                analytics_events[]
+  client_config                   client_config[]
+  client_credit_costs             client_credit_costs[]
+  client_credits                  client_credits?
+  client_order_configs            client_order_configs?
+  courier_services                courier_services[]
+  credit_transactions             credit_transactions[]
+  order_analytics                 order_analytics[]
+  orders                          orders[]
+  pickup_location_order_configs   pickup_location_order_configs[]
+  pickup_location_shopify_configs pickup_location_shopify_configs[]
+  pickup_locations                pickup_locations[]
+  pickup_requests                 pickup_requests[]
+  sessions                        sessions[]
+  users                           users[]
+  webhooks                        webhooks[]
 }
 
 model courier_services {
@@ -156,10 +156,10 @@ model credit_transactions {
   orderId            Int?
   createdAt          DateTime @default(now())
   clientName         String
+  utrNumber          String?
   screenshotFileName String?
   screenshotFileSize Int?
   screenshotFileType String?
-  utrNumber          String?
   clients            clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
   orders             orders?  @relation(fields: [orderId], references: [id])
   users              users?   @relation(fields: [userId], references: [id])
@@ -228,24 +228,31 @@ model orders {
   invoice_date             String?
   return_reason            String?
   ewbn                     String?
-  last_shopify_attempt     DateTime?
-  shopify_api_error        String?
-  shopify_api_status       String?
+  shopify_customer_email   String?
   shopify_fulfillment_id   String?
-  shopify_status           String?
-  shopify_tracking_number  String?
+  shopify_note             String?
+  shopify_order_id         String?
+  shopify_order_number     String?
+  shopify_tags             String?
+  shopify_update_error     String?
+  shopify_update_status    String?
+  shopify_update_timestamp DateTime?
+  tracking_url             String?
   credit_transactions      credit_transactions[]
   order_analytics          order_analytics?
   clients                  clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 model pickup_locations {
-  id              String  @id
-  value           String
-  label           String
-  delhiveryApiKey String?
-  clientId        String
-  clients         clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id                              String                           @id
+  value                           String
+  label                           String
+  delhiveryApiKey                 String?
+  clientId                        String
+  pickup_location_order_configs   pickup_location_order_configs?
+  pickup_location_shopify_configs pickup_location_shopify_configs?
+  clients                         clients                          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user_pickup_locations           user_pickup_locations[]
 
   @@unique([label, clientId])
 }
@@ -289,78 +296,24 @@ model system_config {
 }
 
 model users {
-  id                  String                @id
-  email               String
-  name                String
-  password            String?
-  role                String                @default("user")
-  isActive            Boolean               @default(true)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime
-  clientId            String
-  analytics_events    analytics_events[]
-  credit_transactions credit_transactions[]
-  order_analytics     order_analytics[]
-  pickup_requests     pickup_requests[]
-  sessions            sessions[]
-  clients             clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id                    String                  @id
+  email                 String
+  name                  String
+  password              String?
+  role                  String                  @default("user")
+  isActive              Boolean                 @default(true)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime
+  clientId              String
+  analytics_events      analytics_events[]
+  credit_transactions   credit_transactions[]
+  order_analytics       order_analytics[]
+  pickup_requests       pickup_requests[]
+  sessions              sessions[]
+  user_pickup_locations user_pickup_locations[]
+  clients               clients                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([email, clientId])
-}
-
-model api_keys {
-  id          String    @id
-  name        String
-  key         String    @unique
-  secret      String?
-  clientId    String
-  isActive    Boolean   @default(true)
-  permissions String[]
-  lastUsedAt  DateTime?
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime
-  clients     clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@index([key])
-  @@index([clientId])
-}
-
-model shopify_integrations {
-  id            String    @id
-  clientId      String
-  shopDomain    String
-  accessToken   String
-  webhookSecret String?
-  isActive      Boolean   @default(true)
-  lastSyncAt    DateTime?
-  syncStatus    String    @default("pending")
-  errorMessage  String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime
-  clients       clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@unique([shopDomain, clientId])
-  @@index([clientId])
-  @@index([shopDomain])
-}
-
-model shopify_orders {
-  id               String   @id
-  clientId         String
-  shopifyOrderId   String
-  shopifyOrderName String
-  scan2shipOrderId Int?
-  status           String   @default("pending")
-  syncData         Json?
-  errorMessage     String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime
-  clients          clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@unique([shopifyOrderId, clientId])
-  @@index([clientId])
-  @@index([shopifyOrderId])
 }
 
 model webhooks {
@@ -466,27 +419,89 @@ model blocked_ips {
 }
 
 model pickup_requests {
-  id                    String   @id
-  clientId              String
-  userId                String
-  pickup_date           String
-  pickup_time           String
-  pickup_address        String
-  contact_person        String
-  contact_phone         String
-  special_instructions  String?
-  pickup_location       String
-  expected_package_count Int     @default(1)
-  delhivery_request_id  String?
-  status                String   @default("scheduled")
-  created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
-  
-  clients               clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  users                 users    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id                     String   @id
+  clientId               String
+  userId                 String
+  pickup_date            String
+  pickup_time            String
+  pickup_address         String
+  contact_person         String
+  contact_phone          String
+  special_instructions   String?
+  pickup_location        String
+  delhivery_request_id   String?
+  status                 String   @default("scheduled")
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+  expected_package_count Int      @default(1)
+  clients                clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users                  users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([clientId])
   @@index([userId])
   @@index([status])
   @@index([pickup_date])
+}
+
+model pickup_location_order_configs {
+  id                        String           @id
+  pickupLocationId          String           @unique
+  clientId                  String
+  defaultProductDescription String           @default("ARTIFICAL JEWELLERY")
+  defaultPackageValue       Float            @default(5000)
+  defaultWeight             Float            @default(100)
+  defaultTotalItems         Int              @default(1)
+  codEnabledByDefault       Boolean          @default(false)
+  defaultCodAmount          Float?
+  minPackageValue           Float            @default(100)
+  maxPackageValue           Float            @default(100000)
+  minWeight                 Float            @default(1)
+  maxWeight                 Float            @default(50000)
+  minTotalItems             Int              @default(1)
+  maxTotalItems             Int              @default(100)
+  requireProductDescription Boolean          @default(true)
+  requirePackageValue       Boolean          @default(true)
+  requireWeight             Boolean          @default(true)
+  requireTotalItems         Boolean          @default(true)
+  enableResellerFallback    Boolean          @default(true)
+  enableThermalPrint        Boolean          @default(false)
+  enableReferencePrefix     Boolean          @default(true)
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime
+  clients                   clients          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  pickup_locations          pickup_locations @relation(fields: [pickupLocationId], references: [id], onDelete: Cascade)
+}
+
+model pickup_location_shopify_configs {
+  id                     String           @id
+  pickupLocationId       String           @unique
+  clientId               String
+  shopifyPickupLocation  String
+  shopifyWebhookSecret   String
+  shopifyApiKey          String
+  shopifyApiSecret       String
+  shopifyShopDomain      String
+  shopifyAdminApiToken   String
+  shopifyWebhookVersion  String           @default("2025-07")
+  isActive               Boolean          @default(true)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime
+  shopifyDefaultClientId String?
+  clients                clients          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  pickup_locations       pickup_locations @relation(fields: [pickupLocationId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([shopifyShopDomain])
+}
+
+model user_pickup_locations {
+  id               String           @id
+  userId           String
+  pickupLocationId String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  pickup_locations pickup_locations @relation(fields: [pickupLocationId], references: [id], onDelete: Cascade)
+  users            users            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pickupLocationId])
 }
