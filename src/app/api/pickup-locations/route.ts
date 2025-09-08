@@ -48,13 +48,13 @@ export async function GET(request: NextRequest) {
         console.log(`🔑 [PICKUP_LOCATIONS] Raw API key for ${location.label}: ${apiKey.substring(0, 8)}...`);
       }
 
-              return {
-          id: location.id,
-          value: location.value,
-          label: location.label,
-          delhiveryApiKey: apiKey,
-          // Note: isActive field doesn't exist in pickup_locations table
-          // Add default configuration for other required fields
+      return {
+        id: location.id,
+        value: location.value,
+        label: location.label,
+        delhiveryApiKey: apiKey,
+        // Note: isActive field doesn't exist in pickup_locations table
+        // Add default configuration for other required fields
         productDetails: {
           description: 'ARTIFICAL JEWELLERY',
           commodity_value: 5000,

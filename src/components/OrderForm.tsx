@@ -99,6 +99,10 @@ export default function OrderForm() {
         setOrderConfig(formConfig);
         setClientOrderConfig(clientConfig);
         
+        // Debug logging for Alt Mobile Number setting
+        console.log('🔍 [ORDER_FORM] Client config loaded:', clientConfig);
+        console.log('🔍 [ORDER_FORM] enableAltMobileNumber:', clientConfig?.enableAltMobileNumber);
+        
         // Load saved courier service from localStorage if available
         const savedCourierService = localStorage.getItem('scan2ship_courier_service');
         console.log('🔍 [ORDER_FORM] Saved courier service from localStorage:', savedCourierService);
@@ -1327,18 +1331,27 @@ export default function OrderForm() {
                 />
               </div>
               
-              <div>
-                <label htmlFor="alt_mobile_number" className="block text-sm font-medium text-gray-700 mb-1">
-                  Alternate Mobile Number
-                </label>
-                <input
-                  type="tel"
-                  id="alt_mobile_number"
-                  value={formData.alt_mobile_number}
-                  onChange={(e) => handleInputChange('alt_mobile_number', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
+              {(() => {
+                console.log('🔍 [ORDER_FORM] Rendering Alt Mobile field check:', {
+                  clientOrderConfig: !!clientOrderConfig,
+                  enableAltMobileNumber: clientOrderConfig?.enableAltMobileNumber,
+                  shouldShow: clientOrderConfig?.enableAltMobileNumber
+                });
+                return clientOrderConfig?.enableAltMobileNumber;
+              })() && (
+                <div>
+                  <label htmlFor="alt_mobile_number" className="block text-sm font-medium text-gray-700 mb-1">
+                    Alternate Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    id="alt_mobile_number"
+                    value={formData.alt_mobile_number}
+                    onChange={(e) => handleInputChange('alt_mobile_number', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              )}
               
               <div className="md:col-span-2">
                 <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">

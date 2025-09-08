@@ -80,6 +80,9 @@ export async function GET(request: NextRequest) {
           
           // Reference prefix settings
           enableReferencePrefix: true,
+          
+          // Alt mobile number settings
+          enableAltMobileNumber: false,
 
         }
       });
@@ -90,7 +93,8 @@ export async function GET(request: NextRequest) {
       defaultPackageValue: orderConfig.defaultPackageValue,
       defaultWeight: orderConfig.defaultWeight,
       defaultTotalItems: orderConfig.defaultTotalItems,
-      codEnabledByDefault: orderConfig.codEnabledByDefault
+      codEnabledByDefault: orderConfig.codEnabledByDefault,
+      enableAltMobileNumber: orderConfig.enableAltMobileNumber
     });
 
     const response = NextResponse.json({
@@ -127,6 +131,9 @@ export async function GET(request: NextRequest) {
         
         // Reference prefix settings
         enableReferencePrefix: orderConfig.enableReferencePrefix,
+        
+        // Alt mobile number settings
+        enableAltMobileNumber: orderConfig.enableAltMobileNumber,
 
       },
       clientId: user.clientId,
@@ -165,7 +172,8 @@ export async function PUT(request: NextRequest) {
     // Check if this is a partial update (just specific settings) or full update
     if ((body.hasOwnProperty('enableResellerFallback') && Object.keys(body).length === 1) ||
         (body.hasOwnProperty('enableThermalPrint') && Object.keys(body).length === 1) ||
-        (body.hasOwnProperty('enableReferencePrefix') && Object.keys(body).length === 1)) {
+        (body.hasOwnProperty('enableReferencePrefix') && Object.keys(body).length === 1) ||
+        (body.hasOwnProperty('enableAltMobileNumber') && Object.keys(body).length === 1)) {
               // Partial update - just update the specific setting
         const updateData: any = {};
         
@@ -184,10 +192,15 @@ export async function PUT(request: NextRequest) {
           console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reference prefix: ${body.enableReferencePrefix}`);
         }
         
+        if (body.hasOwnProperty('enableAltMobileNumber')) {
+          updateData.enableAltMobileNumber = body.enableAltMobileNumber;
+          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - alt mobile number: ${body.enableAltMobileNumber}`);
+        }
+        
         const updatedConfig = await prisma.client_order_configs.update({
-        where: { clientId: client.id },
-        data: updateData
-      });
+          where: { clientId: client.id },
+          data: updateData
+        });
 
       let settingName = 'unknown';
       let settingValue = 'unknown';
@@ -201,7 +214,9 @@ export async function PUT(request: NextRequest) {
       } else if (body.hasOwnProperty('enableReferencePrefix')) {
         settingName = 'reference prefix';
         settingValue = body.enableReferencePrefix;
-
+      } else if (body.hasOwnProperty('enableAltMobileNumber')) {
+        settingName = 'alt mobile number';
+        settingValue = body.enableAltMobileNumber;
       }
       
       console.log(`✅ [API_ORDER_CONFIG_PUT] ${settingName} updated for client ${client.companyName}: ${settingValue}`);

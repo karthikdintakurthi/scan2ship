@@ -315,6 +315,34 @@ export default function TrackingPage() {
                               </div>
                             )}
 
+                            {/* Tracking Links for DTDC and India Post */}
+                            {order.tracking_id && (
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <span className="text-lg">🔗</span>
+                                <span className="font-medium">Track:</span>
+                                {order.courier_service.toLowerCase() === 'dtdc' && (
+                                  <a
+                                    href="https://www.dtdc.in/trace.asp"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 underline text-xs"
+                                  >
+                                    DTDC →
+                                  </a>
+                                )}
+                                {order.courier_service.toLowerCase() === 'india_post' && (
+                                  <a
+                                    href="https://www.indiapost.gov.in/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 underline text-xs"
+                                  >
+                                    India Post →
+                                  </a>
+                                )}
+                              </div>
+                            )}
+
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <span className="text-lg">📅</span>
                               <span className="font-medium">Ordered:</span>
@@ -334,6 +362,26 @@ export default function TrackingPage() {
                               >
                                 <span>📦</span>
                                 Track on Delhivery
+                              </a>
+                            ) : order.courier_service.toLowerCase() === 'dtdc' ? (
+                              <a
+                                href="https://www.dtdc.in/trace.asp"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors cursor-pointer"
+                              >
+                                <span>📦</span>
+                                Track on DTDC
+                              </a>
+                            ) : order.courier_service.toLowerCase() === 'india_post' ? (
+                              <a
+                                href="https://www.indiapost.gov.in/"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors cursor-pointer"
+                              >
+                                <span>📦</span>
+                                Track on India Post
                               </a>
                             ) : (
                               <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">
