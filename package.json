@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "rm -rf node_modules/.prisma && prisma generate && next build",
     "start": "next start",
     "prestart": "node scripts/validate-environment.js && node scripts/validate-security-config.js",
-    "postinstall": "prisma generate",
+    "postinstall": "rm -rf node_modules/.prisma && prisma generate",
     "lint": "eslint",
     "test": "jest",
     "test:watch": "jest --watch",
