@@ -18,6 +18,43 @@ model analytics_events {
   users     users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model audit_logs {
+  id        String   @id
+  eventType String
+  severity  String
+  userId    String?
+  clientId  String?
+  sessionId String?
+  ipAddress String
+  userAgent String
+  resource  String?
+  action    String?
+  details   String
+  metadata  String
+  riskScore Int
+  tags      String[]
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+  @@index([createdAt])
+  @@index([eventType])
+  @@index([ipAddress])
+  @@index([severity])
+  @@index([tags])
+  @@index([userId])
+}
+
+model blocked_ips {
+  id        String   @id
+  ipAddress String   @unique
+  reason    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([ipAddress])
+}
+
 model client_config {
   id          String   @id
   clientId    String
@@ -165,6 +202,20 @@ model credit_transactions {
   users              users?   @relation(fields: [userId], references: [id])
 }
 
+model csrf_tokens {
+  id        String   @id
+  token     String   @unique
+  userId    String?
+  sessionId String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([sessionId])
+  @@index([token])
+  @@index([userId])
+}
+
 model order_analytics {
   id              String   @id
   orderId         Int      @unique
@@ -243,206 +294,6 @@ model orders {
   clients                  clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
-model pickup_locations {
-  id                              String                           @id
-  value                           String
-  label                           String
-  delhiveryApiKey                 String?
-  clientId                        String
-  pickup_location_order_configs   pickup_location_order_configs?
-  pickup_location_shopify_configs pickup_location_shopify_configs?
-  clients                         clients                          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  user_pickup_locations           user_pickup_locations[]
-
-  @@unique([label, clientId])
-}
-
-model sessions {
-  id           String    @id
-  userId       String
-  clientId     String
-  expiresAt    DateTime
-  createdAt    DateTime  @default(now())
-  ipAddress    String
-  isActive     Boolean   @default(true)
-  lastActivity DateTime  @default(now())
-  location     String?
-  permissions  String
-  refreshToken String    @unique
-  revokedAt    DateTime?
-  role         String
-  sessionToken String    @unique
-  userAgent    String
-  clients      clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  users        users     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([sessionToken])
-  @@index([refreshToken])
-  @@index([isActive])
-  @@index([expiresAt])
-}
-
-model system_config {
-  id          String   @id
-  key         String   @unique
-  value       String
-  type        String   @default("string")
-  category    String   @default("general")
-  description String?
-  isEncrypted Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-}
-
-model users {
-  id                    String                  @id
-  email                 String
-  name                  String
-  password              String?
-  role                  String                  @default("user")
-  isActive              Boolean                 @default(true)
-  createdAt             DateTime                @default(now())
-  updatedAt             DateTime
-  clientId              String
-  analytics_events      analytics_events[]
-  credit_transactions   credit_transactions[]
-  order_analytics       order_analytics[]
-  pickup_requests       pickup_requests[]
-  sessions              sessions[]
-  user_pickup_locations user_pickup_locations[]
-  clients               clients                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@unique([email, clientId])
-}
-
-model webhooks {
-  id           String         @id
-  clientId     String
-  name         String
-  url          String
-  events       String[]
-  secret       String?
-  isActive     Boolean        @default(true)
-  retryCount   Int            @default(3)
-  timeout      Int            @default(30000)
-  headers      Json?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime
-  webhook_logs webhook_logs[]
-  clients      clients        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@index([clientId])
-  @@index([isActive])
-}
-
-model webhook_logs {
-  id           String   @id
-  webhookId    String
-  eventType    String
-  orderId      Int?
-  status       String
-  responseCode Int?
-  responseBody String?
-  errorMessage String?
-  attemptCount Int      @default(1)
-  createdAt    DateTime @default(now())
-  webhooks     webhooks @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-
-  @@index([webhookId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model rate_limits {
-  id          String   @id
-  key         String   @unique
-  count       Int      @default(0)
-  windowStart DateTime
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([expiresAt])
-  @@index([key])
-}
-
-model audit_logs {
-  id        String   @id
-  eventType String
-  severity  String
-  userId    String?
-  clientId  String?
-  sessionId String?
-  ipAddress String
-  userAgent String
-  resource  String?
-  action    String?
-  details   String
-  metadata  String
-  riskScore Int
-  tags      String[]
-  createdAt DateTime @default(now())
-
-  @@index([eventType])
-  @@index([severity])
-  @@index([userId])
-  @@index([clientId])
-  @@index([ipAddress])
-  @@index([createdAt])
-  @@index([tags])
-}
-
-model csrf_tokens {
-  id        String   @id
-  token     String   @unique
-  userId    String?
-  sessionId String?
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([token])
-  @@index([userId])
-  @@index([sessionId])
-  @@index([expiresAt])
-}
-
-model blocked_ips {
-  id        String   @id
-  ipAddress String   @unique
-  reason    String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([ipAddress])
-  @@index([expiresAt])
-}
-
-model pickup_requests {
-  id                     String   @id
-  clientId               String
-  userId                 String
-  pickup_date            String
-  pickup_time            String
-  pickup_address         String
-  contact_person         String
-  contact_phone          String
-  special_instructions   String?
-  pickup_location        String
-  delhivery_request_id   String?
-  status                 String   @default("scheduled")
-  created_at             DateTime @default(now())
-  updated_at             DateTime @updatedAt
-  expected_package_count Int      @default(1)
-  clients                clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  users                  users    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([clientId])
-  @@index([userId])
-  @@index([status])
-  @@index([pickup_date])
-}
-
 model pickup_location_order_configs {
   id                        String           @id
   pickupLocationId          String           @unique
@@ -494,6 +345,96 @@ model pickup_location_shopify_configs {
   @@index([shopifyShopDomain])
 }
 
+model pickup_locations {
+  id                              String                           @id
+  value                           String
+  label                           String
+  delhiveryApiKey                 String?
+  clientId                        String
+  pickup_location_order_configs   pickup_location_order_configs?
+  pickup_location_shopify_configs pickup_location_shopify_configs?
+  clients                         clients                          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user_pickup_locations           user_pickup_locations[]
+
+  @@unique([label, clientId])
+}
+
+model pickup_requests {
+  id                     String   @id
+  clientId               String
+  userId                 String
+  pickup_date            String
+  pickup_time            String
+  pickup_address         String
+  contact_person         String
+  contact_phone          String
+  special_instructions   String?
+  pickup_location        String
+  delhivery_request_id   String?
+  status                 String   @default("scheduled")
+  created_at             DateTime @default(now())
+  updated_at             DateTime
+  expected_package_count Int      @default(1)
+  clients                clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users                  users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([pickup_date])
+  @@index([status])
+  @@index([userId])
+}
+
+model rate_limits {
+  id          String   @id
+  key         String   @unique
+  count       Int      @default(0)
+  windowStart DateTime
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+
+  @@index([expiresAt])
+  @@index([key])
+}
+
+model sessions {
+  id           String    @id
+  userId       String
+  clientId     String
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  ipAddress    String
+  isActive     Boolean   @default(true)
+  lastActivity DateTime  @default(now())
+  location     String?
+  permissions  String
+  refreshToken String    @unique
+  revokedAt    DateTime?
+  role         String
+  sessionToken String    @unique
+  userAgent    String
+  clients      clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users        users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([isActive])
+  @@index([refreshToken])
+  @@index([sessionToken])
+  @@index([userId])
+}
+
+model system_config {
+  id          String   @id
+  key         String   @unique
+  value       String
+  type        String   @default("string")
+  category    String   @default("general")
+  description String?
+  isEncrypted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+}
+
 model user_pickup_locations {
   id               String           @id
   userId           String
@@ -504,4 +445,63 @@ model user_pickup_locations {
   users            users            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, pickupLocationId])
+}
+
+model users {
+  id                    String                  @id
+  email                 String
+  name                  String
+  password              String?
+  role                  String                  @default("user")
+  isActive              Boolean                 @default(true)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime
+  clientId              String
+  analytics_events      analytics_events[]
+  credit_transactions   credit_transactions[]
+  order_analytics       order_analytics[]
+  pickup_requests       pickup_requests[]
+  sessions              sessions[]
+  user_pickup_locations user_pickup_locations[]
+  clients               clients                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([email, clientId])
+}
+
+model webhook_logs {
+  id           String   @id
+  webhookId    String
+  eventType    String
+  orderId      Int?
+  status       String
+  responseCode Int?
+  responseBody String?
+  errorMessage String?
+  attemptCount Int      @default(1)
+  createdAt    DateTime @default(now())
+  webhooks     webhooks @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([webhookId])
+}
+
+model webhooks {
+  id           String         @id
+  clientId     String
+  name         String
+  url          String
+  events       String[]
+  secret       String?
+  isActive     Boolean        @default(true)
+  retryCount   Int            @default(3)
+  timeout      Int            @default(30000)
+  headers      Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  webhook_logs webhook_logs[]
+  clients      clients        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([isActive])
 }
