@@ -13,25 +13,71 @@ export async function checkAndFixDatabaseSchema(): Promise<{
   const fixes: string[] = [];
 
   try {
-    // Check for missing pickup_location_overrides column
-    try {
-      await prisma.$executeRaw`
-        SELECT pickup_location_overrides 
-        FROM client_order_configs 
-        LIMIT 1
-      `;
-    } catch (error) {
-      if (error.message && error.message.includes('pickup_location_overrides')) {
-        issues.push('Missing pickup_location_overrides column in client_order_configs table');
-        
-        try {
-          await prisma.$executeRaw`
-            ALTER TABLE client_order_configs 
-            ADD COLUMN IF NOT EXISTS pickup_location_overrides JSONB DEFAULT '{}'
-          `;
-          fixes.push('Added pickup_location_overrides column to client_order_configs table');
-        } catch (fixError) {
-          issues.push(`Failed to add pickup_location_overrides column: ${fixError.message}`);
+    // Check for missing columns in client_order_configs table
+    const clientOrderConfigsColumns = [
+      { name: 'pickup_location_overrides', type: 'JSONB', default: "'{}'" },
+      { name: 'displayLogoOnWaybill', type: 'BOOLEAN', default: 'false' },
+      { name: 'logoFileName', type: 'TEXT', default: 'NULL' },
+      { name: 'logoFileSize', type: 'INTEGER', default: 'NULL' },
+      { name: 'logoFileType', type: 'TEXT', default: 'NULL' },
+      { name: 'logoEnabledCouriers', type: 'TEXT', default: 'NULL' },
+      { name: 'enableAltMobileNumber', type: 'BOOLEAN', default: 'false' }
+    ];
+
+    for (const column of clientOrderConfigsColumns) {
+      try {
+        await prisma.$executeRaw`
+          SELECT ${column.name} 
+          FROM client_order_configs 
+          LIMIT 1
+        `;
+      } catch (error) {
+        if (error.message && error.message.includes(column.name)) {
+          issues.push(`Missing ${column.name} column in client_order_configs table`);
+          
+          try {
+            await prisma.$executeRaw`
+              ALTER TABLE client_order_configs 
+              ADD COLUMN IF NOT EXISTS ${column.name} ${column.type} DEFAULT ${column.default}
+            `;
+            fixes.push(`Added ${column.name} column to client_order_configs table`);
+          } catch (fixError) {
+            issues.push(`Failed to add ${column.name} column: ${fixError.message}`);
+          }
+        }
+      }
+    }
+
+    // Check for missing columns in rate_limits table
+    const rateLimitsColumns = [
+      { name: 'key', type: 'TEXT', default: "''" },
+      { name: 'count', type: 'INTEGER', default: '0' },
+      { name: 'windowStart', type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' },
+      { name: 'expiresAt', type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' },
+      { name: 'createdAt', type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' },
+      { name: 'updatedAt', type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' }
+    ];
+
+    for (const column of rateLimitsColumns) {
+      try {
+        await prisma.$executeRaw`
+          SELECT ${column.name} 
+          FROM rate_limits 
+          LIMIT 1
+        `;
+      } catch (error) {
+        if (error.message && error.message.includes(column.name)) {
+          issues.push(`Missing ${column.name} column in rate_limits table`);
+          
+          try {
+            await prisma.$executeRaw`
+              ALTER TABLE rate_limits 
+              ADD COLUMN IF NOT EXISTS ${column.name} ${column.type} DEFAULT ${column.default}
+            `;
+            fixes.push(`Added ${column.name} column to rate_limits table`);
+          } catch (fixError) {
+            issues.push(`Failed to add ${column.name} column: ${fixError.message}`);
+          }
         }
       }
     }
@@ -109,20 +155,25 @@ export async function safeDatabaseQuery<T>(
   } catch (error) {
     console.error(`❌ [${context}] Database query failed:`, error);
     
-    // If the error is about missing column, try to fix it
-    if (error.message && error.message.includes('pickup_location_overrides')) {
-      console.log(`🔧 [${context}] Detected missing pickup_location_overrides column, attempting to add it...`);
+    // Check if the error is about missing columns and try to fix them
+    if (error.message && error.message.includes('does not exist in the current database')) {
+      console.log(`🔧 [${context}] Detected missing database column, attempting to fix schema...`);
+      
       try {
-        await prisma.$executeRaw`
-          ALTER TABLE client_order_configs 
-          ADD COLUMN IF NOT EXISTS pickup_location_overrides JSONB DEFAULT '{}'
-        `;
-        console.log(`✅ [${context}] Added missing pickup_location_overrides column`);
+        // Run the comprehensive schema fix
+        const result = await checkAndFixDatabaseSchema();
         
-        // Retry the original query
-        return await queryFn();
+        if (result.fixes.length > 0) {
+          console.log(`✅ [${context}] Applied ${result.fixes.length} schema fixes:`, result.fixes);
+          
+          // Retry the original query
+          return await queryFn();
+        } else {
+          console.log(`⚠️ [${context}] No fixes were applied, re-throwing original error`);
+          throw error;
+        }
       } catch (fixError) {
-        console.error(`❌ [${context}] Failed to add missing column:`, fixError);
+        console.error(`❌ [${context}] Failed to fix schema:`, fixError);
         throw error; // Re-throw original error
       }
     }
