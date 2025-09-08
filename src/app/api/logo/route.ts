@@ -174,8 +174,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  console.log('🔍 [API_LOGO_GET] Starting request processing...');
+  console.log('🔍 [API_LOGO_GET] Request URL:', request.url);
+  console.log('🔍 [API_LOGO_GET] Request headers:', Object.fromEntries(request.headers.entries()));
+  
   try {
     // Apply security middleware
+    console.log('🔍 [API_LOGO_GET] Applying security middleware...');
     const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
@@ -183,11 +188,14 @@ export async function GET(request: NextRequest) {
     );
     
     if (securityResponse) {
+      console.log('🔍 [API_LOGO_GET] Security middleware blocked request');
       securityHeaders(securityResponse);
       return securityResponse;
     }
+    console.log('🔍 [API_LOGO_GET] Security middleware passed');
 
     // Authorize user
+    console.log('🔍 [API_LOGO_GET] Starting user authorization...');
     const authResult = await authorizeUser(request, {
       requiredRole: UserRole.USER,
       requiredPermissions: [PermissionLevel.READ],
@@ -196,23 +204,39 @@ export async function GET(request: NextRequest) {
     });
 
     if (authResult.response) {
+      console.log('🔍 [API_LOGO_GET] Authorization failed:', authResult.response.status);
       securityHeaders(authResult.response);
       return authResult.response;
     }
 
     const { client } = authResult.user!;
+    console.log('🔍 [API_LOGO_GET] User authorized successfully:', {
+      userId: authResult.user!.id,
+      email: authResult.user!.email,
+      role: authResult.user!.role,
+      clientId: client.id
+    });
 
     // Get client order config
+    console.log('🔍 [API_LOGO_GET] Querying database for order config...');
     const orderConfig = await prisma.client_order_configs.findUnique({
       where: { clientId: client.id }
     });
 
     if (!orderConfig || !orderConfig.logoFileName) {
+      console.log('🔍 [API_LOGO_GET] No logo found for client:', client.id);
       return NextResponse.json({
         success: true,
         logo: null
       });
     }
+
+    console.log('🔍 [API_LOGO_GET] Logo found:', {
+      fileName: orderConfig.logoFileName,
+      fileSize: orderConfig.logoFileSize,
+      fileType: orderConfig.logoFileType,
+      displayLogoOnWaybill: orderConfig.displayLogoOnWaybill
+    });
 
     return NextResponse.json({
       success: true,
@@ -227,10 +251,26 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ [LOGO_GET] Error getting logo:', error);
+    console.error('❌ [API_LOGO_GET] Error getting logo:', error);
+    console.error('❌ [API_LOGO_GET] Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause
+    });
+    
+    // Log additional context for debugging
+    console.error('❌ [API_LOGO_GET] Request context:', {
+      url: request.url,
+      method: request.method,
+      headers: Object.fromEntries(request.headers.entries())
+    });
+    
     return NextResponse.json({
       success: false,
-      error: 'Failed to get logo information'
+      error: 'Failed to get logo information',
+      details: error.message,
+      timestamp: new Date().toISOString()
     }, { status: 500 });
   }
 }

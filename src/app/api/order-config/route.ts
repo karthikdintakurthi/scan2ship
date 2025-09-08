@@ -4,8 +4,13 @@ import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middlew
 import { authorizeUser, UserRole, PermissionLevel, getAuthenticatedUser } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
+  console.log('🔍 [API_ORDER_CONFIG_GET] Starting request processing...');
+  console.log('🔍 [API_ORDER_CONFIG_GET] Request URL:', request.url);
+  console.log('🔍 [API_ORDER_CONFIG_GET] Request headers:', Object.fromEntries(request.headers.entries()));
+  
   try {
     // Apply security middleware
+    console.log('🔍 [API_ORDER_CONFIG_GET] Applying security middleware...');
     const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
@@ -13,11 +18,14 @@ export async function GET(request: NextRequest) {
     );
     
     if (securityResponse) {
+      console.log('🔍 [API_ORDER_CONFIG_GET] Security middleware blocked request');
       securityHeaders(securityResponse);
       return securityResponse;
     }
+    console.log('🔍 [API_ORDER_CONFIG_GET] Security middleware passed');
 
     // Authorize user
+    console.log('🔍 [API_ORDER_CONFIG_GET] Starting user authorization...');
     const authResult = await authorizeUser(request, {
       requiredRole: UserRole.USER,
       requiredPermissions: [PermissionLevel.READ],
@@ -26,16 +34,24 @@ export async function GET(request: NextRequest) {
     });
 
     if (authResult.response) {
+      console.log('🔍 [API_ORDER_CONFIG_GET] Authorization failed:', authResult.response.status);
       securityHeaders(authResult.response);
       return authResult.response;
     }
 
     const user = authResult.user!;
+    console.log('🔍 [API_ORDER_CONFIG_GET] User authorized successfully:', {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      clientId: user.clientId
+    });
 
     console.log(`📊 [API_ORDER_CONFIG_GET] Fetching order config for user: ${user.email} (${user.role})`);
     console.log(`📊 [API_ORDER_CONFIG_GET] Fetching order config for client: ${user.client.companyName || user.client.id} (ID: ${user.clientId})`);
 
     // Get order configuration for the current client
+    console.log('🔍 [API_ORDER_CONFIG_GET] Querying database for order config...');
     let orderConfig = await prisma.client_order_configs.findUnique({
       where: { clientId: user.clientId }
     });
@@ -43,6 +59,7 @@ export async function GET(request: NextRequest) {
     // If no order config exists, create a default one
     if (!orderConfig) {
       console.log(`📝 [API_ORDER_CONFIG_GET] No order config found, creating default for client ${user.client.companyName || user.client.id}`);
+      console.log('🔍 [API_ORDER_CONFIG_GET] Creating new order config with all required fields...');
       
       orderConfig = await prisma.client_order_configs.create({
         data: {
@@ -101,9 +118,12 @@ export async function GET(request: NextRequest) {
       defaultWeight: orderConfig.defaultWeight,
       defaultTotalItems: orderConfig.defaultTotalItems,
       codEnabledByDefault: orderConfig.codEnabledByDefault,
-      enableAltMobileNumber: orderConfig.enableAltMobileNumber
+      enableAltMobileNumber: orderConfig.enableAltMobileNumber,
+      displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
+      logoFileName: orderConfig.logoFileName
     });
 
+    console.log('🔍 [API_ORDER_CONFIG_GET] Creating response object...');
     const response = NextResponse.json({
       orderConfig: {
         // Default values
@@ -160,8 +180,26 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ [API_ORDER_CONFIG_GET] Error fetching order config:', error);
+    console.error('❌ [API_ORDER_CONFIG_GET] Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause
+    });
+    
+    // Log additional context for debugging
+    console.error('❌ [API_ORDER_CONFIG_GET] Request context:', {
+      url: request.url,
+      method: request.method,
+      headers: Object.fromEntries(request.headers.entries())
+    });
+    
     const response = NextResponse.json(
-      { error: 'Failed to fetch order configuration' },
+      { 
+        error: 'Failed to fetch order configuration',
+        details: error.message,
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
     securityHeaders(response);
