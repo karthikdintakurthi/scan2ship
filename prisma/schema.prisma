@@ -2,8 +2,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Schema version: 2025-09-08-migration-fix
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
