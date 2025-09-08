@@ -110,7 +110,30 @@ export async function POST(request: NextRequest) {
     } else {
       orderConfig = await prisma.client_order_configs.create({
         data: {
+          id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           clientId: client.id,
+          // Default values
+          defaultProductDescription: 'ARTIFICAL JEWELLERY',
+          defaultPackageValue: 5000,
+          defaultWeight: 100,
+          defaultTotalItems: 1,
+          codEnabledByDefault: false,
+          defaultCodAmount: null,
+          minPackageValue: 100,
+          maxPackageValue: 100000,
+          minWeight: 1,
+          maxWeight: 50000,
+          minTotalItems: 1,
+          maxTotalItems: 100,
+          requireProductDescription: true,
+          requirePackageValue: true,
+          requireWeight: true,
+          requireTotalItems: true,
+          enableResellerFallback: true,
+          enableThermalPrint: false,
+          enableReferencePrefix: true,
+          enableAltMobileNumber: false,
+          // Logo settings
           logoFileName: fileName,
           logoFileSize: file.size,
           logoFileType: file.type,

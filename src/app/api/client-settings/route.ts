@@ -68,7 +68,15 @@ export async function PUT(request: NextRequest) {
           requirePackageValue: true,
           requireWeight: true,
           requireTotalItems: true,
-          enableResellerFallback: true
+          enableResellerFallback: true,
+          enableThermalPrint: false,
+          enableReferencePrefix: true,
+          enableAltMobileNumber: false,
+          displayLogoOnWaybill: false,
+          logoFileName: null,
+          logoFileSize: null,
+          logoFileType: null,
+          logoEnabledCouriers: null
         }
       });
 

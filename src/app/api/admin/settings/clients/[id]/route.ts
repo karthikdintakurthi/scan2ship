@@ -467,7 +467,15 @@ export async function PUT(
           requireTotalItems: updateData.clientOrderConfig.requireTotalItems,
           
           // Reseller settings
-          enableResellerFallback: updateData.clientOrderConfig.enableResellerFallback
+          enableResellerFallback: updateData.clientOrderConfig.enableResellerFallback,
+          enableThermalPrint: updateData.clientOrderConfig.enableThermalPrint || false,
+          enableReferencePrefix: updateData.clientOrderConfig.enableReferencePrefix || true,
+          enableAltMobileNumber: updateData.clientOrderConfig.enableAltMobileNumber || false,
+          displayLogoOnWaybill: updateData.clientOrderConfig.displayLogoOnWaybill || false,
+          logoFileName: updateData.clientOrderConfig.logoFileName || null,
+          logoFileSize: updateData.clientOrderConfig.logoFileSize || null,
+          logoFileType: updateData.clientOrderConfig.logoFileType || null,
+          logoEnabledCouriers: updateData.clientOrderConfig.logoEnabledCouriers || null
         },
         create: {
           id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -497,7 +505,15 @@ export async function PUT(
           requireTotalItems: updateData.clientOrderConfig.requireTotalItems,
           
           // Reseller settings
-          enableResellerFallback: updateData.clientOrderConfig.enableResellerFallback
+          enableResellerFallback: updateData.clientOrderConfig.enableResellerFallback,
+          enableThermalPrint: updateData.clientOrderConfig.enableThermalPrint || false,
+          enableReferencePrefix: updateData.clientOrderConfig.enableReferencePrefix || true,
+          enableAltMobileNumber: updateData.clientOrderConfig.enableAltMobileNumber || false,
+          displayLogoOnWaybill: updateData.clientOrderConfig.displayLogoOnWaybill || false,
+          logoFileName: updateData.clientOrderConfig.logoFileName || null,
+          logoFileSize: updateData.clientOrderConfig.logoFileSize || null,
+          logoFileType: updateData.clientOrderConfig.logoFileType || null,
+          logoEnabledCouriers: updateData.clientOrderConfig.logoEnabledCouriers || null
         }
       });
       

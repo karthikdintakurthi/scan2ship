@@ -168,7 +168,14 @@ export async function POST(request: NextRequest) {
           if (delhiveryResult.prepaid) {
             errorMessage = `Wallet balance issue: ${delhiveryResult.prepaid}`;
           } else if (delhiveryResult.error) {
-            errorMessage = delhiveryResult.error;
+            // Handle nested error object structure
+            if (typeof delhiveryResult.error === 'object' && delhiveryResult.error.message) {
+              errorMessage = delhiveryResult.error.message;
+            } else if (typeof delhiveryResult.error === 'string') {
+              errorMessage = delhiveryResult.error;
+            } else {
+              errorMessage = JSON.stringify(delhiveryResult.error);
+            }
           } else if (delhiveryResult.message) {
             errorMessage = delhiveryResult.message;
           } else if (typeof delhiveryResult === 'string') {

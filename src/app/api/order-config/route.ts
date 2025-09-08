@@ -83,6 +83,13 @@ export async function GET(request: NextRequest) {
           
           // Alt mobile number settings
           enableAltMobileNumber: false,
+          
+          // Logo settings
+          displayLogoOnWaybill: false,
+          logoFileName: null,
+          logoFileSize: null,
+          logoFileType: null,
+          logoEnabledCouriers: null
 
         }
       });
@@ -134,6 +141,13 @@ export async function GET(request: NextRequest) {
         
         // Alt mobile number settings
         enableAltMobileNumber: orderConfig.enableAltMobileNumber,
+        
+        // Logo settings
+        displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
+        logoFileName: orderConfig.logoFileName,
+        logoFileSize: orderConfig.logoFileSize,
+        logoFileType: orderConfig.logoFileType,
+        logoEnabledCouriers: orderConfig.logoEnabledCouriers
 
       },
       clientId: user.clientId,
@@ -260,6 +274,12 @@ export async function PUT(request: NextRequest) {
         enableResellerFallback: orderConfig.enableResellerFallback,
         enableThermalPrint: orderConfig.enableThermalPrint,
         enableReferencePrefix: orderConfig.enableReferencePrefix,
+        enableAltMobileNumber: orderConfig.enableAltMobileNumber,
+        displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
+        logoFileName: orderConfig.logoFileName,
+        logoFileSize: orderConfig.logoFileSize,
+        logoFileType: orderConfig.logoFileType,
+        logoEnabledCouriers: orderConfig.logoEnabledCouriers
 
       },
       create: {
@@ -284,6 +304,12 @@ export async function PUT(request: NextRequest) {
         enableResellerFallback: orderConfig.enableResellerFallback,
         enableThermalPrint: orderConfig.enableThermalPrint,
         enableReferencePrefix: orderConfig.enableReferencePrefix,
+        enableAltMobileNumber: orderConfig.enableAltMobileNumber,
+        displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
+        logoFileName: orderConfig.logoFileName,
+        logoFileSize: orderConfig.logoFileSize,
+        logoFileType: orderConfig.logoFileType,
+        logoEnabledCouriers: orderConfig.logoEnabledCouriers
 
       }
     });
