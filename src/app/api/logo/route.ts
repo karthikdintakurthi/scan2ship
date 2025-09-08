@@ -5,6 +5,7 @@ import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middlew
 import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { safeDatabaseQuery } from '@/lib/database-health-check';
 
 export async function POST(request: NextRequest) {
   try {
@@ -79,9 +80,12 @@ export async function POST(request: NextRequest) {
     await writeFile(filePath, buffer);
 
     // Get or create client order config
-    let orderConfig = await prisma.client_order_configs.findUnique({
-      where: { clientId: client.id }
-    });
+    let orderConfig = await safeDatabaseQuery(
+      () => prisma.client_order_configs.findUnique({
+        where: { clientId: client.id }
+      }),
+      'LOGO_UPLOAD'
+    );
 
     // Delete old logo if it exists
     if (orderConfig?.logoFileName) {
@@ -219,9 +223,12 @@ export async function GET(request: NextRequest) {
 
     // Get client order config
     console.log('🔍 [API_LOGO_GET] Querying database for order config...');
-    const orderConfig = await prisma.client_order_configs.findUnique({
-      where: { clientId: client.id }
-    });
+    const orderConfig = await safeDatabaseQuery(
+      () => prisma.client_order_configs.findUnique({
+        where: { clientId: client.id }
+      }),
+      'API_LOGO_GET'
+    );
 
     if (!orderConfig || !orderConfig.logoFileName) {
       console.log('🔍 [API_LOGO_GET] No logo found for client:', client.id);
@@ -310,9 +317,12 @@ export async function PUT(request: NextRequest) {
     const logoEnabledCouriers = formData.get('logoEnabledCouriers') as string;
 
     // Get or create client order config
-    let orderConfig = await prisma.client_order_configs.findUnique({
-      where: { clientId: client.id }
-    });
+    let orderConfig = await safeDatabaseQuery(
+      () => prisma.client_order_configs.findUnique({
+        where: { clientId: client.id }
+      }),
+      'LOGO_UPDATE'
+    );
 
     if (!orderConfig) {
       return NextResponse.json({ error: 'No order configuration found' }, { status: 404 });
@@ -385,9 +395,12 @@ export async function DELETE(request: NextRequest) {
     const { client } = authResult.user!;
 
     // Get client order config
-    const orderConfig = await prisma.client_order_configs.findUnique({
-      where: { clientId: client.id }
-    });
+    const orderConfig = await safeDatabaseQuery(
+      () => prisma.client_order_configs.findUnique({
+        where: { clientId: client.id }
+      }),
+      'LOGO_DELETE'
+    );
 
     if (!orderConfig || !orderConfig.logoFileName) {
       return NextResponse.json({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel, getAuthenticatedUser } from '@/lib/auth-middleware';
+import { safeDatabaseQuery } from '@/lib/database-health-check';
 
 export async function GET(request: NextRequest) {
   console.log('🔍 [API_ORDER_CONFIG_GET] Starting request processing...');
@@ -52,9 +53,12 @@ export async function GET(request: NextRequest) {
 
     // Get order configuration for the current client
     console.log('🔍 [API_ORDER_CONFIG_GET] Querying database for order config...');
-    let orderConfig = await prisma.client_order_configs.findUnique({
-      where: { clientId: user.clientId }
-    });
+    const orderConfig = await safeDatabaseQuery(
+      () => prisma.client_order_configs.findUnique({
+        where: { clientId: user.clientId }
+      }),
+      'API_ORDER_CONFIG_GET'
+    );
 
     // If no order config exists, create a default one
     if (!orderConfig) {
