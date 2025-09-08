@@ -437,3 +437,4 @@ export async function DELETE(request: NextRequest) {
     }, { status: 500 });
   }
 }
+// Force rebuild - Mon Sep  8 18:18:39 EDT 2025
