@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
-import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { authorizeUser, UserRole, PermissionLevel, getAuthenticatedUser } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -184,9 +184,7 @@ export async function PUT(request: NextRequest) {
           console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reference prefix: ${body.enableReferencePrefix}`);
         }
         
-
-      
-      const updatedConfig = await prisma.client_order_configs.update({
+        const updatedConfig = await prisma.client_order_configs.update({
         where: { clientId: client.id },
         data: updateData
       });

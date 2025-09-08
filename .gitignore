@@ -79,3 +79,6 @@ node_modules/
 .env.qa
 
 scripts/
+backups/
+client-client-1757053279044-4q7l63yi1-orders-import-2025-09-08.sql
+client-client-1757053279044-4q7l63yi1-orders-export-2025-09-08.json
