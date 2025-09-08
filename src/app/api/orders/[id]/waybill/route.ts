@@ -42,7 +42,7 @@ function getCourierServiceName(courierCode: string): string {
 }
 
 // Function to generate universal waybill HTML
-function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courierService: string): string {
+function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courierService: string, logoInfo?: { url: string; displayLogoOnWaybill: boolean }): string {
   const html = `
 <!DOCTYPE html>
 <html>
@@ -70,6 +70,27 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             border-bottom: 2px solid #333;
             padding-bottom: 20px;
             margin-bottom: 30px;
+            position: relative;
+        }
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .logo-container {
+            position: absolute;
+            left: 25%;
+        }
+        .logo-container img {
+            max-height: 60px;
+            max-width: 150px;
+            object-fit: contain;
+        }
+        .header-text {
+            flex: 1;
+            min-width: 200px;
         }
         .header h1 {
             margin: 0;
@@ -153,11 +174,21 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
 <body>
     <div class="container">
         <div class="header">
-            <h1>${getCourierServiceName(courierService)} Courier</h1>
-            <div class="payment-status">Payment: ${order.is_cod ? 'COD' : 'Pre-paid'}${order.is_cod && order.cod_amount ? ` (₹${order.cod_amount})` : ''}</div>
+            <div class="header-content">
+                ${logoInfo && logoInfo.displayLogoOnWaybill ? `
+                <div class="logo-container">
+                    <img src="${logoInfo.url}" alt="Company Logo" />
+                </div>
+                ` : ''}
+                <div class="header-text">
+                    <h1>${getCourierServiceName(courierService)} Courier</h1>
+                    <div class="payment-status">Payment: ${order.is_cod ? 'COD' : 'Pre-paid'}${order.is_cod && order.cod_amount ? ` (₹${order.cod_amount})` : ''}</div>
+                </div>
+            </div>
         </div>
         
-        ${order.courier_service.toLowerCase() !== 'india_post' ? `
+        ${order.courier_service.toLowerCase() !== 'india_post' && 
+          !(order.courier_service.toLowerCase() === 'dtdc' && (!order.tracking_id || order.tracking_id.trim() === '')) ? `
         <div class="waybill-section">
             <div class="waybill-label">Tracking Number:</div>
             ${barcodeDataURL ? `
@@ -251,11 +282,15 @@ export async function GET(
     const url = new URL(request.url)
     const isThermal = url.searchParams.get('thermal') === 'true'
     
-    // Get order details with client information
+    // Get order details with client information and logo config
     const order = await prisma.orders.findUnique({
       where: { id: orderId },
       include: {
-        clients: true
+        clients: {
+          include: {
+            client_order_configs: true
+          }
+        }
       }
     })
 
@@ -276,10 +311,33 @@ export async function GET(
       trackingNumber = order.delhivery_waybill_number
     }
 
-    // TEMPORARY: Don't generate barcode for India Post orders
+    // Generate barcode only if there's a valid tracking number
     let barcodeDataURL = '';
     if (order.courier_service.toLowerCase() !== 'india_post') {
-      barcodeDataURL = await generateBarcode(trackingNumber);
+      // For DTDC orders, only generate barcode if tracking_id exists (not empty)
+      if (order.courier_service.toLowerCase() === 'dtdc') {
+        if (order.tracking_id && order.tracking_id.trim() !== '') {
+          barcodeDataURL = await generateBarcode(order.tracking_id);
+        }
+        // For DTDC, use tracking_id for display, fallback to reference_number if no tracking_id
+        trackingNumber = order.tracking_id && order.tracking_id.trim() !== '' ? order.tracking_id : order.reference_number || `ORDER-${order.id}`;
+      } else {
+        // For other couriers (Delhivery, etc.), generate barcode normally
+        barcodeDataURL = await generateBarcode(trackingNumber);
+      }
+    }
+
+    // Check if logo should be displayed for this courier service
+    let logoInfo: { url: string; displayLogoOnWaybill: boolean } | undefined;
+    const orderConfig = order.clients.client_order_configs;
+    if (orderConfig && orderConfig.logoFileName && orderConfig.displayLogoOnWaybill) {
+      const enabledCouriers = JSON.parse(orderConfig.logoEnabledCouriers || '[]');
+      if (enabledCouriers.includes(order.courier_service.toLowerCase())) {
+        logoInfo = {
+          url: `/images/uploads/logos/${orderConfig.logoFileName}`,
+          displayLogoOnWaybill: true
+        };
+      }
     }
     
     let htmlContent: string
@@ -294,14 +352,18 @@ export async function GET(
         oid: order.reference_number
       }
       const thermalData = createThermalLabelData(order, packageInfo)
+      // Add logo info to thermal data
+      if (logoInfo) {
+        thermalData.logoInfo = logoInfo;
+      }
       htmlContent = generateThermalLabelHTML(thermalData)
       filename = `thermal-waybill-${trackingNumber}.html`
-      console.log('✅ Thermal waybill generated for order:', orderId, 'Courier:', order.courier_service)
+      console.log('✅ Thermal waybill generated for order:', orderId, 'Courier:', order.courier_service, 'Logo:', logoInfo ? 'Yes' : 'No')
     } else {
       // Generate universal waybill HTML
-      htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service)
+      htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service, logoInfo)
       filename = `waybill-${trackingNumber}.html`
-      console.log('✅ Universal waybill generated for order:', orderId, 'Courier:', order.courier_service)
+      console.log('✅ Universal waybill generated for order:', orderId, 'Courier:', order.courier_service, 'Logo:', logoInfo ? 'Yes' : 'No')
     }
 
     return new NextResponse(htmlContent, {

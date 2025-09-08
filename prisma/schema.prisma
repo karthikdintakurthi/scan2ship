@@ -76,29 +76,35 @@ model client_order_configs {
   requirePackageValue       Boolean @default(true)
   requireWeight             Boolean @default(true)
   requireTotalItems         Boolean @default(true)
+  clientId                  String  @unique
+  enableReferencePrefix     Boolean @default(true)
   enableResellerFallback    Boolean @default(true)
   enableThermalPrint        Boolean @default(false)
-  enableReferencePrefix     Boolean @default(true)
-  clientId                  String  @unique
+  displayLogoOnWaybill      Boolean @default(false)
+  logoFileName              String?
+  logoFileSize              Int?
+  logoFileType              String?
+  logoEnabledCouriers       String?
+  enableAltMobileNumber     Boolean @default(false)
   clients                   clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 model clients {
-  id                    String                @id
+  id                    String                 @id
   name                  String
   companyName           String
-  email                 String                @unique
+  email                 String                 @unique
   phone                 String?
   address               String?
   city                  String?
   state                 String?
-  country               String                @default("India")
+  country               String                 @default("India")
   pincode               String?
-  subscriptionPlan      String                @default("basic")
-  subscriptionStatus    String                @default("active")
+  subscriptionPlan      String                 @default("basic")
+  subscriptionStatus    String                 @default("active")
   subscriptionExpiresAt DateTime?
-  isActive              Boolean               @default(true)
-  createdAt             DateTime              @default(now())
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
   updatedAt             DateTime
   analytics_events      analytics_events[]
   api_keys              api_keys[]
@@ -111,6 +117,7 @@ model clients {
   order_analytics       order_analytics[]
   orders                orders[]
   pickup_locations      pickup_locations[]
+  pickup_requests       pickup_requests[]
   sessions              sessions[]
   shopify_integrations  shopify_integrations[]
   shopify_orders        shopify_orders[]
@@ -119,21 +126,20 @@ model clients {
 }
 
 model courier_services {
-  id        String  @id
-  isActive  Boolean @default(true)
-  clientId  String
-  isDefault Boolean @default(false)
-  code      String
-  name      String
-  // Rate calculation fields
-  baseRate      Float?  // Base shipping rate in INR
-  ratePerKg     Float?  // Additional rate per kg in INR
-  minWeight     Float?  // Minimum weight for base rate (in grams)
-  maxWeight     Float?  // Maximum weight supported (in grams)
-  codCharges    Float?  // COD charges in INR
-  freeShippingThreshold Float? // Free shipping above this value (in INR)
-  estimatedDays Int?    // Estimated delivery days
-  clients       clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id                    String  @id
+  isActive              Boolean @default(true)
+  clientId              String
+  isDefault             Boolean @default(false)
+  code                  String
+  name                  String
+  baseRate              Float?
+  codCharges            Float?
+  estimatedDays         Int?
+  freeShippingThreshold Float?
+  maxWeight             Float?
+  minWeight             Float?
+  ratePerKg             Float?
+  clients               clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([code, clientId])
 }
@@ -150,10 +156,10 @@ model credit_transactions {
   orderId            Int?
   createdAt          DateTime @default(now())
   clientName         String
-  utrNumber          String?
   screenshotFileName String?
   screenshotFileSize Int?
   screenshotFileType String?
+  utrNumber          String?
   clients            clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
   orders             orders?  @relation(fields: [orderId], references: [id])
   users              users?   @relation(fields: [userId], references: [id])
@@ -201,15 +207,6 @@ model orders {
   delhivery_api_error      String?
   delhivery_retry_count    Int                   @default(0)
   last_delhivery_attempt   DateTime?
-  
-  // Shopify integration fields
-  shopify_status           String?               // pending, synced, fulfilled, error
-  shopify_tracking_number  String?
-  shopify_fulfillment_id   String?
-  shopify_api_status       String?               // pending, success, failed
-  shopify_api_error        String?
-  last_shopify_attempt     DateTime?
-  
   shipment_length          Float?
   shipment_breadth         Float?
   shipment_height          Float?
@@ -231,6 +228,12 @@ model orders {
   invoice_date             String?
   return_reason            String?
   ewbn                     String?
+  last_shopify_attempt     DateTime?
+  shopify_api_error        String?
+  shopify_api_status       String?
+  shopify_fulfillment_id   String?
+  shopify_status           String?
+  shopify_tracking_number  String?
   credit_transactions      credit_transactions[]
   order_analytics          order_analytics?
   clients                  clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -251,18 +254,18 @@ model sessions {
   id           String    @id
   userId       String
   clientId     String
-  sessionToken String    @unique
-  refreshToken String    @unique
-  ipAddress    String
-  userAgent    String
-  location     String?
-  role         String
-  permissions  String    // JSON string
-  createdAt    DateTime  @default(now())
-  lastActivity DateTime  @default(now())
   expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  ipAddress    String
   isActive     Boolean   @default(true)
+  lastActivity DateTime  @default(now())
+  location     String?
+  permissions  String
+  refreshToken String    @unique
   revokedAt    DateTime?
+  role         String
+  sessionToken String    @unique
+  userAgent    String
   clients      clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   users        users     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -298,6 +301,7 @@ model users {
   analytics_events    analytics_events[]
   credit_transactions credit_transactions[]
   order_analytics     order_analytics[]
+  pickup_requests     pickup_requests[]
   sessions            sessions[]
   clients             clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
@@ -305,36 +309,36 @@ model users {
 }
 
 model api_keys {
-  id          String   @id
+  id          String    @id
   name        String
-  key         String   @unique
-  secret      String?  // For HMAC validation
+  key         String    @unique
+  secret      String?
   clientId    String
-  isActive    Boolean  @default(true)
-  permissions String[] // Array of permissions like ["orders:read", "orders:write"]
+  isActive    Boolean   @default(true)
+  permissions String[]
   lastUsedAt  DateTime?
   expiresAt   DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   updatedAt   DateTime
-  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clients     clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([key])
   @@index([clientId])
 }
 
 model shopify_integrations {
-  id                String   @id
-  clientId          String
-  shopDomain        String   // e.g., "mystore.myshopify.com"
-  accessToken       String   // Shopify access token
-  webhookSecret     String?  // For webhook validation
-  isActive          Boolean  @default(true)
-  lastSyncAt        DateTime?
-  syncStatus        String   @default("pending") // pending, active, error
-  errorMessage      String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime
-  clients           clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id            String    @id
+  clientId      String
+  shopDomain    String
+  accessToken   String
+  webhookSecret String?
+  isActive      Boolean   @default(true)
+  lastSyncAt    DateTime?
+  syncStatus    String    @default("pending")
+  errorMessage  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime
+  clients       clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([shopDomain, clientId])
   @@index([clientId])
@@ -342,17 +346,17 @@ model shopify_integrations {
 }
 
 model shopify_orders {
-  id                String   @id
-  clientId          String
-  shopifyOrderId    String   // Shopify order ID
-  shopifyOrderName  String   // e.g., "#1001"
-  scan2shipOrderId  Int?     // Reference to orders table
-  status            String   @default("pending") // pending, synced, error
-  syncData          Json?    // Store Shopify order data
-  errorMessage      String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime
-  clients           clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id               String   @id
+  clientId         String
+  shopifyOrderId   String
+  shopifyOrderName String
+  scan2shipOrderId Int?
+  status           String   @default("pending")
+  syncData         Json?
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime
+  clients          clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([shopifyOrderId, clientId])
   @@index([clientId])
@@ -360,37 +364,37 @@ model shopify_orders {
 }
 
 model webhooks {
-  id          String   @id
-  clientId    String
-  name        String
-  url         String
-  events      String[] // Array of events like ["order.created", "order.updated"]
-  secret      String?  // For webhook signature validation
-  isActive    Boolean  @default(true)
-  retryCount  Int      @default(3)
-  timeout     Int      @default(30000) // Timeout in milliseconds
-  headers     Json?    // Custom headers to send with webhook
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-  clients     clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id           String         @id
+  clientId     String
+  name         String
+  url          String
+  events       String[]
+  secret       String?
+  isActive     Boolean        @default(true)
+  retryCount   Int            @default(3)
+  timeout      Int            @default(30000)
+  headers      Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
   webhook_logs webhook_logs[]
+  clients      clients        @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
   @@index([isActive])
 }
 
 model webhook_logs {
-  id          String   @id
-  webhookId   String
-  eventType   String
-  orderId     Int?
-  status      String   // success, failed, pending
+  id           String   @id
+  webhookId    String
+  eventType    String
+  orderId      Int?
+  status       String
   responseCode Int?
   responseBody String?
   errorMessage String?
-  attemptCount Int     @default(1)
-  createdAt   DateTime @default(now())
-  webhooks    webhooks @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  attemptCount Int      @default(1)
+  createdAt    DateTime @default(now())
+  webhooks     webhooks @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
   @@index([webhookId])
   @@index([status])
@@ -410,7 +414,6 @@ model rate_limits {
   @@index([key])
 }
 
-
 model audit_logs {
   id        String   @id
   eventType String
@@ -422,10 +425,10 @@ model audit_logs {
   userAgent String
   resource  String?
   action    String?
-  details   String   // JSON string
-  metadata  String   // JSON string
+  details   String
+  metadata  String
   riskScore Int
-  tags      String[] // Array of strings
+  tags      String[]
   createdAt DateTime @default(now())
 
   @@index([eventType])
@@ -438,12 +441,12 @@ model audit_logs {
 }
 
 model csrf_tokens {
-  id        String    @id
-  token     String    @unique
+  id        String   @id
+  token     String   @unique
   userId    String?
   sessionId String?
   expiresAt DateTime
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([token])
   @@index([userId])
@@ -460,4 +463,30 @@ model blocked_ips {
 
   @@index([ipAddress])
   @@index([expiresAt])
+}
+
+model pickup_requests {
+  id                    String   @id
+  clientId              String
+  userId                String
+  pickup_date           String
+  pickup_time           String
+  pickup_address        String
+  contact_person        String
+  contact_phone         String
+  special_instructions  String?
+  pickup_location       String
+  expected_package_count Int     @default(1)
+  delhivery_request_id  String?
+  status                String   @default("scheduled")
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+  
+  clients               clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users                 users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([clientId])
+  @@index([userId])
+  @@index([status])
+  @@index([pickup_date])
 }

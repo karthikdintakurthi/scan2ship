@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { clearOrderConfigCache } from '@/lib/order-config';
 
 interface PickupLocation {
   id: string;
@@ -82,6 +83,9 @@ interface ClientConfigData {
     
     // Reference number prefix settings
     enableReferencePrefix: boolean;
+    
+    // Alt mobile number settings
+    enableAltMobileNumber: boolean;
   };
   dtdcSlips?: {
     from: string;
@@ -118,6 +122,18 @@ export default function ClientSettingsPage() {
     used: ''
   });
   const [dtdcSlipsEnabled, setDtdcSlipsEnabled] = useState(false);
+
+  // Logo state
+  const [logo, setLogo] = useState<{
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    displayLogoOnWaybill: boolean;
+    logoEnabledCouriers: string;
+    url: string;
+  } | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoDeleting, setLogoDeleting] = useState(false);
 
   // New item states
   const [newPickupLocation, setNewPickupLocation] = useState({
@@ -156,6 +172,7 @@ export default function ClientSettingsPage() {
     if (currentUser && currentClient && currentUser.role !== 'admin') {
       fetchClientConfig();
       loadDtdcSlipsFromDatabase();
+      loadLogo();
     }
   }, [currentUser, currentClient]);
 
@@ -605,7 +622,257 @@ export default function ClientSettingsPage() {
     }
   };
 
+  // Function to handle alt mobile number checkbox change
+  const handleAltMobileNumberChange = async (enabled: boolean) => {
+    if (!config?.clientOrderConfig) return;
+    
+    try {
+      setIsSaving(true);
+      setError('');
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
 
+      // Update the local state immediately for better UX
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableAltMobileNumber: enabled
+          }
+        };
+      });
+
+      const response = await fetch('/api/order-config', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          enableAltMobileNumber: enabled
+        }),
+      });
+
+      if (response.ok) {
+        setSuccess('Alt Mobile Number setting updated successfully!');
+        // Clear the order config cache so the form will reload with the new setting
+        clearOrderConfigCache();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to update alt mobile number setting');
+        
+        // Revert the local state change on error
+        setConfig(prev => {
+          if (!prev?.clientOrderConfig) return prev;
+          return {
+            ...prev,
+            clientOrderConfig: {
+              ...prev.clientOrderConfig,
+              enableAltMobileNumber: !enabled
+            }
+          };
+        });
+      }
+    } catch (error) {
+      console.error('❌ [ALT_MOBILE_NUMBER] Error updating setting:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update alt mobile number setting');
+      
+      // Revert the local state change on error
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableAltMobileNumber: !enabled
+          }
+        };
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Logo functions
+  const loadLogo = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/logo', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.logo) {
+          setLogo(data.logo);
+        } else {
+          setLogo(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading logo:', error);
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setLogoUploading(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const formData = new FormData();
+      formData.append('logo', file);
+      formData.append('displayLogoOnWaybill', logo?.displayLogoOnWaybill?.toString() || 'false');
+      formData.append('logoEnabledCouriers', logo?.logoEnabledCouriers || '[]');
+
+      const response = await fetch('/api/logo', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setLogo(data.logo);
+          setSuccess('Logo uploaded successfully!');
+        } else {
+          setError(data.error || 'Failed to upload logo');
+        }
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to upload logo');
+      }
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      setError('Failed to upload logo');
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const handleLogoDelete = async () => {
+    if (!logo) return;
+
+    setLogoDeleting(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/logo', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setLogo(null);
+          setSuccess('Logo deleted successfully!');
+        } else {
+          setError(data.error || 'Failed to delete logo');
+        }
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to delete logo');
+      }
+    } catch (error) {
+      console.error('Error deleting logo:', error);
+      setError('Failed to delete logo');
+    } finally {
+      setLogoDeleting(false);
+    }
+  };
+
+  const handleDisplayLogoToggle = async (enabled: boolean) => {
+    if (!logo) return;
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const formData = new FormData();
+      formData.append('displayLogoOnWaybill', enabled.toString());
+      formData.append('logoEnabledCouriers', logo.logoEnabledCouriers);
+
+      const response = await fetch('/api/logo', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setLogo(prev => prev ? { ...prev, displayLogoOnWaybill: enabled } : null);
+          setSuccess('Logo display setting updated successfully!');
+        } else {
+          setError(data.error || 'Failed to update logo display setting');
+        }
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to update logo display setting');
+      }
+    } catch (error) {
+      console.error('Error updating logo display setting:', error);
+      setError('Failed to update logo display setting');
+    }
+  };
+
+  const handleCourierSelectionChange = async (courierCode: string, enabled: boolean) => {
+    if (!logo) return;
+
+    try {
+      const currentCouriers = JSON.parse(logo.logoEnabledCouriers || '[]');
+      let updatedCouriers;
+      
+      if (enabled) {
+        updatedCouriers = [...currentCouriers, courierCode];
+      } else {
+        updatedCouriers = currentCouriers.filter((code: string) => code !== courierCode);
+      }
+
+      const token = localStorage.getItem('authToken');
+      const formData = new FormData();
+      formData.append('displayLogoOnWaybill', logo.displayLogoOnWaybill.toString());
+      formData.append('logoEnabledCouriers', JSON.stringify(updatedCouriers));
+
+      const response = await fetch('/api/logo', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setLogo(prev => prev ? { ...prev, logoEnabledCouriers: JSON.stringify(updatedCouriers) } : null);
+          setSuccess('Courier selection updated successfully!');
+        } else {
+          setError(data.error || 'Failed to update courier selection');
+        }
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to update courier selection');
+      }
+    } catch (error) {
+      console.error('Error updating courier selection:', error);
+      setError('Failed to update courier selection');
+    }
+  };
 
   // Function to fetch order configuration for a specific client
   const fetchOrderConfigForClient = async (clientId: string) => {
@@ -1228,6 +1495,31 @@ export default function ClientSettingsPage() {
                           When enabled, auto-generated reference numbers use alphanumeric + mobile format. When disabled, auto-generated uses only mobile number, but custom values still use custom + mobile format.
                         </dd>
                       </div>
+                      <div>
+                        <dt className="text-xs text-gray-500">Alt Mobile Number Field</dt>
+                        <dd className="text-sm text-gray-900">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={config.clientOrderConfig.enableAltMobileNumber || false}
+                              onChange={(e) => handleAltMobileNumberChange(e.target.checked)}
+                              disabled={isSaving}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                              {(config.clientOrderConfig.enableAltMobileNumber || false) ? 'Enabled' : 'Disabled'}
+                            </span>
+                            {isSaving && (
+                              <span className="ml-2 text-xs text-gray-500">
+                                Saving...
+                              </span>
+                            )}
+                          </label>
+                        </dd>
+                        <dd className="text-xs text-gray-500 mt-1">
+                          When enabled, an additional "Alt Mobile Number" field will be shown in the create order form
+                        </dd>
+                      </div>
 
                     </dl>
                   </div>
@@ -1235,6 +1527,138 @@ export default function ClientSettingsPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Logo Settings */}
+        <div className="bg-white shadow rounded-lg mb-8 mt-8">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900">Company Logo</h2>
+                <p className="text-sm text-gray-600 mt-1">Upload your company logo to display on waybills</p>
+              </div>
+            </div>
+          </div>
+          <div className="px-6 py-4">
+            <div className="space-y-6">
+              {/* Current Logo Display */}
+              {logo && (
+                <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex-shrink-0">
+                    <img
+                      src={logo.url}
+                      alt="Company Logo"
+                      className="h-16 w-16 object-contain border border-gray-200 rounded"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-medium text-gray-900">Current Logo</h3>
+                    <p className="text-xs text-gray-500">
+                      {logo.fileName} • {(logo.fileSize / 1024).toFixed(1)} KB • {logo.fileType}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <button
+                      onClick={handleLogoDelete}
+                      disabled={logoDeleting}
+                      className="px-3 py-1 text-sm text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {logoDeleting ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Logo Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Logo
+                </label>
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={handleLogoUpload}
+                    disabled={logoUploading}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {logoUploading && (
+                    <span className="text-sm text-gray-500">Uploading...</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Supported formats: JPEG, PNG, GIF, WebP. Maximum size: 5MB.
+                </p>
+              </div>
+
+              {/* Display Logo on Waybill Toggle */}
+              {logo && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={logo.displayLogoOnWaybill}
+                        onChange={(e) => handleDisplayLogoToggle(e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <span className="ml-2 text-sm font-medium text-gray-700">
+                        Display logo on waybill
+                      </span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      When enabled, your company logo will be displayed on selected courier waybills
+                    </p>
+                  </div>
+
+                  {/* Courier Service Selection */}
+                  {logo.displayLogoOnWaybill && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select courier services to display logo:
+                      </label>
+                      <div className="space-y-2">
+                        {config?.courierServices?.map((courier) => {
+                          const enabledCouriers = JSON.parse(logo.logoEnabledCouriers || '[]');
+                          const isEnabled = enabledCouriers.includes(courier.code);
+                          
+                          return (
+                            <label key={courier.id} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={isEnabled}
+                                onChange={(e) => handleCourierSelectionChange(courier.code, e.target.checked)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">
+                                {courier.name}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Logo will only appear on waybills for the selected courier services
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* No Logo State */}
+              {!logo && (
+                <div className="text-center py-8 text-gray-500">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">No logo uploaded</h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Upload a logo to display it on your waybills
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* DTDC Slips */}

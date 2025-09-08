@@ -20,6 +20,10 @@ export interface ThermalLabelData {
   packageValue?: number
   quantity?: number
   date?: string
+  logoInfo?: {
+    url: string
+    displayLogoOnWaybill: boolean
+  }
 }
 
 export function generateThermalLabelHTML(data: ThermalLabelData): string {
@@ -67,6 +71,32 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
             border-bottom: 1px solid #000;
             padding-bottom: 2mm;
             margin-bottom: 2mm;
+            position: relative;
+        }
+        
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2mm;
+            flex-wrap: wrap;
+        }
+        
+        .logo-container {
+            position: absolute;
+            left: 5px;
+            top: 0px;
+        }
+        
+        .logo-container img {
+            max-height: 15mm;
+            max-width: 30mm;
+            object-fit: contain;
+        }
+        
+        .header-text {
+            flex: 1;
+            min-width: 40mm;
         }
         
         .courier-name {
@@ -184,8 +214,17 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
     <div class="label-container">
         <!-- Header -->
         <div class="header">
-            <div class="courier-name">${data.courierService.toUpperCase()}</div>
-            <div class="payment-info">Payment: ${data.paymentType}</div>
+            <div class="header-content">
+                ${data.logoInfo && data.logoInfo.displayLogoOnWaybill ? `
+                <div class="logo-container">
+                    <img src="${data.logoInfo.url}" alt="Company Logo" />
+                </div>
+                ` : ''}
+                <div class="header-text">
+                    <div class="courier-name">${data.courierService.toUpperCase()}</div>
+                    <div class="payment-info">Payment: ${data.paymentType}</div>
+                </div>
+            </div>
         </div>
         
         <!-- Barcode Section -->
