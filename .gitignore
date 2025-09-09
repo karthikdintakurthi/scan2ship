@@ -78,6 +78,8 @@ node_modules/
 /.next/cache
 .env.qa
 
+.env*
+
 scripts/
 backups/
 client-client-1757053279044-4q7l63yi1-orders-import-2025-09-08.sql
