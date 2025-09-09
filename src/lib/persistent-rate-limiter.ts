@@ -87,7 +87,7 @@ export async function rateLimit(
     }
     
     // Get current rate limit data
-    const existing = await prisma.rate_limits.findUnique({
+    const existing = await prisma.rate_limits.findFirst({
       where: { key }
     });
     
@@ -113,7 +113,7 @@ export async function rateLimit(
     if (existing.windowStart < windowStart) {
       // Reset window
       await prisma.rate_limits.update({
-        where: { key },
+        where: { id: existing.id },
         data: {
           count: 1,
           windowStart,
@@ -143,7 +143,7 @@ export async function rateLimit(
     
     // Increment count
     await prisma.rate_limits.update({
-      where: { key },
+      where: { id: existing.id },
       data: {
         count: existing.count + 1
       }
@@ -174,7 +174,7 @@ export async function getRateLimitStatus(
   const key = `${type}:${clientId}`;
   
   try {
-    const existing = await prisma.rate_limits.findUnique({
+    const existing = await prisma.rate_limits.findFirst({
       where: { key }
     });
     
@@ -224,11 +224,7 @@ export async function resetRateLimit(
   type?: keyof typeof rateLimitConfig
 ): Promise<boolean> {
   try {
-    const whereClause: any = {
-      key: {
-        startsWith: type ? `${type}:` : undefined
-      }
-    };
+    const whereClause: any = {};
     
     if (type) {
       whereClause.key = `${type}:${clientId}`;

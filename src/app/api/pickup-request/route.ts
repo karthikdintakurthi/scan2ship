@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
         console.log(`🚚 [API_PICKUP_REQUEST] Delhivery response for ${pickupLocation.label} - Status: ${delhiveryResponse.status}`);
         console.log(`🚚 [API_PICKUP_REQUEST] Delhivery response for ${pickupLocation.label}:`, delhiveryResult);
 
-        if (delhiveryResponse.ok && (delhiveryResult.success || delhiveryResult.request_id || delhiveryResult.pickup_id)) {
+        if (delhiveryResponse.ok && delhiveryResult.success) {
           // Save pickup request to database
           const pickupRequest = await prisma.pickup_requests.create({
             data: {
@@ -165,6 +165,8 @@ export async function POST(request: NextRequest) {
           
           // Extract meaningful error message from Delhivery response
           let errorMessage = 'Unknown error from Delhivery API';
+          
+          // Handle specific error cases
           if (delhiveryResult.prepaid) {
             errorMessage = `Wallet balance issue: ${delhiveryResult.prepaid}`;
           } else if (delhiveryResult.error) {
@@ -176,10 +178,18 @@ export async function POST(request: NextRequest) {
             } else {
               errorMessage = JSON.stringify(delhiveryResult.error);
             }
+          } else if (delhiveryResult.data && delhiveryResult.data.message) {
+            // Handle data.message for duplicate pickup requests
+            errorMessage = delhiveryResult.data.message;
           } else if (delhiveryResult.message) {
             errorMessage = delhiveryResult.message;
           } else if (typeof delhiveryResult === 'string') {
             errorMessage = delhiveryResult;
+          }
+          
+          // Add pickup_id to error message if available (for duplicate requests)
+          if (delhiveryResult.pickup_id) {
+            errorMessage += ` (Pickup ID: ${delhiveryResult.pickup_id})`;
           }
           
           errors.push({
