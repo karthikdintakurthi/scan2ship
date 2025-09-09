@@ -325,7 +325,7 @@ model rate_limits {
   windowEnd   DateTime
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now())
-  key         String   @default("")
+  key         String   @unique @default("")
   count       Int      @default(0)
   expiresAt   DateTime @default(now()) @db.Timestamp(6)
 }
