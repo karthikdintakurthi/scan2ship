@@ -63,9 +63,38 @@ export async function POST(request: NextRequest) {
     }
 
     // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'images', 'uploads', 'logos');
-    if (!existsSync(uploadsDir)) {
-      mkdirSync(uploadsDir, { recursive: true });
+    // Try multiple directory locations for better production compatibility
+    let uploadsDir;
+    const possibleDirs = [
+      join(process.cwd(), 'public', 'images', 'uploads', 'logos'),
+      join(process.cwd(), 'uploads', 'logos'),
+      join('/tmp', 'scan2ship', 'logos'),
+      join(process.cwd(), 'public', 'uploads', 'logos')
+    ];
+    
+    let dirCreated = false;
+    for (const dir of possibleDirs) {
+      try {
+        if (!existsSync(dir)) {
+          mkdirSync(dir, { recursive: true });
+          console.log('✅ [LOGO_UPLOAD] Created uploads directory:', dir);
+        }
+        uploadsDir = dir;
+        dirCreated = true;
+        break;
+      } catch (error) {
+        console.warn(`⚠️ [LOGO_UPLOAD] Failed to create directory ${dir}:`, error);
+        continue;
+      }
+    }
+    
+    if (!dirCreated) {
+      console.error('❌ [LOGO_UPLOAD] Failed to create any upload directory');
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to create upload directory',
+        details: 'Unable to create upload directory in any of the attempted locations'
+      }, { status: 500 });
     }
 
     // Generate unique filename
@@ -75,17 +104,38 @@ export async function POST(request: NextRequest) {
     const filePath = join(uploadsDir, fileName);
 
     // Convert file to buffer and save
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
+    try {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filePath, buffer);
+      console.log('✅ [LOGO_UPLOAD] File saved successfully:', filePath);
+    } catch (error) {
+      console.error('❌ [LOGO_UPLOAD] Failed to save file:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to save logo file',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
+    }
 
     // Get or create client order config
-    let orderConfig = await safeDatabaseQuery(
-      () => prisma.client_order_configs.findUnique({
-        where: { clientId: client.id }
-      }),
-      'LOGO_UPLOAD'
-    );
+    let orderConfig;
+    try {
+      orderConfig = await safeDatabaseQuery(
+        () => prisma.client_order_configs.findUnique({
+          where: { clientId: client.id }
+        }),
+        'LOGO_UPLOAD'
+      );
+      console.log('✅ [LOGO_UPLOAD] Retrieved order config for client:', client.id);
+    } catch (error) {
+      console.error('❌ [LOGO_UPLOAD] Failed to retrieve order config:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to retrieve client configuration',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
+    }
 
     // Delete old logo if it exists
     if (orderConfig?.logoFileName) {
@@ -100,51 +150,72 @@ export async function POST(request: NextRequest) {
     }
 
     // Update or create order config with logo information
-    if (orderConfig) {
-      orderConfig = await prisma.client_order_configs.update({
-        where: { clientId: client.id },
-        data: {
-          logoFileName: fileName,
-          logoFileSize: file.size,
-          logoFileType: file.type,
-          displayLogoOnWaybill: displayLogoOnWaybill,
-          logoEnabledCouriers: logoEnabledCouriers || '[]'
+    try {
+      if (orderConfig) {
+        orderConfig = await prisma.client_order_configs.update({
+          where: { clientId: client.id },
+          data: {
+            logoFileName: fileName,
+            logoFileSize: file.size,
+            logoFileType: file.type,
+            displayLogoOnWaybill: displayLogoOnWaybill,
+            logoEnabledCouriers: logoEnabledCouriers || '[]'
+          }
+        });
+        console.log('✅ [LOGO_UPLOAD] Updated existing order config');
+      } else {
+        orderConfig = await prisma.client_order_configs.create({
+          data: {
+            id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            clientId: client.id,
+            // Default values
+            defaultProductDescription: 'ARTIFICAL JEWELLERY',
+            defaultPackageValue: 5000,
+            defaultWeight: 100,
+            defaultTotalItems: 1,
+            codEnabledByDefault: false,
+            defaultCodAmount: null,
+            minPackageValue: 100,
+            maxPackageValue: 100000,
+            minWeight: 1,
+            maxWeight: 50000,
+            minTotalItems: 1,
+            maxTotalItems: 100,
+            requireProductDescription: true,
+            requirePackageValue: true,
+            requireWeight: true,
+            requireTotalItems: true,
+            enableResellerFallback: true,
+            enableThermalPrint: false,
+            enableReferencePrefix: true,
+            enableAltMobileNumber: false,
+            // Logo settings
+            logoFileName: fileName,
+            logoFileSize: file.size,
+            logoFileType: file.type,
+            displayLogoOnWaybill: displayLogoOnWaybill,
+            logoEnabledCouriers: logoEnabledCouriers || '[]'
+          }
+        });
+        console.log('✅ [LOGO_UPLOAD] Created new order config');
+      }
+    } catch (error) {
+      console.error('❌ [LOGO_UPLOAD] Failed to update/create order config:', error);
+      // Try to clean up the uploaded file
+      try {
+        if (existsSync(filePath)) {
+          await unlink(filePath);
+          console.log('🧹 [LOGO_UPLOAD] Cleaned up uploaded file after database error');
         }
-      });
-    } else {
-      orderConfig = await prisma.client_order_configs.create({
-        data: {
-          id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          clientId: client.id,
-          // Default values
-          defaultProductDescription: 'ARTIFICAL JEWELLERY',
-          defaultPackageValue: 5000,
-          defaultWeight: 100,
-          defaultTotalItems: 1,
-          codEnabledByDefault: false,
-          defaultCodAmount: null,
-          minPackageValue: 100,
-          maxPackageValue: 100000,
-          minWeight: 1,
-          maxWeight: 50000,
-          minTotalItems: 1,
-          maxTotalItems: 100,
-          requireProductDescription: true,
-          requirePackageValue: true,
-          requireWeight: true,
-          requireTotalItems: true,
-          enableResellerFallback: true,
-          enableThermalPrint: false,
-          enableReferencePrefix: true,
-          enableAltMobileNumber: false,
-          // Logo settings
-          logoFileName: fileName,
-          logoFileSize: file.size,
-          logoFileType: file.type,
-          displayLogoOnWaybill: displayLogoOnWaybill,
-          logoEnabledCouriers: logoEnabledCouriers || '[]'
-        }
-      });
+      } catch (cleanupError) {
+        console.error('❌ [LOGO_UPLOAD] Failed to clean up uploaded file:', cleanupError);
+      }
+      
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to save logo information to database',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
     }
 
     console.log('✅ [LOGO_UPLOAD] Logo uploaded successfully:', {
@@ -155,6 +226,19 @@ export async function POST(request: NextRequest) {
       displayLogoOnWaybill: displayLogoOnWaybill
     });
 
+    // Generate the correct URL based on the directory used
+    let logoUrl;
+    if (uploadsDir.includes('public/images/uploads/logos')) {
+      logoUrl = `/images/uploads/logos/${fileName}`;
+    } else if (uploadsDir.includes('public/uploads/logos')) {
+      logoUrl = `/uploads/logos/${fileName}`;
+    } else if (uploadsDir.includes('/tmp/scan2ship/logos')) {
+      // For temp directory, we need to serve it differently
+      logoUrl = `/api/logo/file/${fileName}`;
+    } else {
+      logoUrl = `/uploads/logos/${fileName}`;
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Logo uploaded successfully',
@@ -164,7 +248,7 @@ export async function POST(request: NextRequest) {
         fileType: file.type,
         displayLogoOnWaybill: displayLogoOnWaybill,
         logoEnabledCouriers: logoEnabledCouriers || '[]',
-        url: `/images/uploads/logos/${fileName}`
+        url: logoUrl
       }
     });
 
