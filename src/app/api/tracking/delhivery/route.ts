@@ -185,38 +185,16 @@ export async function GET(request: NextRequest) {
       }))
     };
 
-    // Update the order's tracking status in the database
-    const normalizedStatus = shipment.Status.Status.toLowerCase().replace(/\s+/g, '_')
-    
+    // Update the order's updated_at timestamp
+    // Note: tracking_status field is temporarily disabled until migration is applied to production
     try {
-      // Check if tracking_status column exists before updating
-      const columnExists = await prisma.$queryRaw`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'orders' 
-        AND column_name = 'tracking_status'
-        AND table_schema = 'public'
-      `;
-      
-      if (Array.isArray(columnExists) && columnExists.length > 0) {
-        await prisma.orders.update({
-          where: { id: order.id },
-          data: {
-            tracking_status: normalizedStatus,
-            updated_at: new Date()
-          }
-        });
-        console.log(`📝 [API_TRACKING_DELHIVERY] Updated order ${order.id} with tracking status: ${normalizedStatus}`);
-      } else {
-        // Column doesn't exist, just update the updated_at field
-        await prisma.orders.update({
-          where: { id: order.id },
-          data: {
-            updated_at: new Date()
-          }
-        });
-        console.log(`📝 [API_TRACKING_DELHIVERY] Updated order ${order.id} updated_at (tracking_status column not available)`);
-      }
+      await prisma.orders.update({
+        where: { id: order.id },
+        data: {
+          updated_at: new Date()
+        }
+      });
+      console.log(`📝 [API_TRACKING_DELHIVERY] Updated order ${order.id} timestamp (tracking_status temporarily disabled)`);
     } catch (updateError) {
       console.warn(`⚠️ [API_TRACKING_DELHIVERY] Failed to update order ${order.id}:`, updateError);
       // Continue with the response even if update fails
