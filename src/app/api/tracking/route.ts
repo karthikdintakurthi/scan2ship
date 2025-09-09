@@ -31,30 +31,41 @@ export async function POST(request: NextRequest) {
     console.log('🔍 [TRACKING_API] Searching for orders with mobile:', searchMobile);
 
     // Fetch orders grouped by client
-    const orders = await prisma.orders.findMany({
-      where: {
-        mobile: searchMobile
-      },
-      include: {
-        clients: {
-          select: {
-            id: true,
-            name: true,
-            companyName: true
-          }
-        }
-      },
-      orderBy: {
-        created_at: 'desc'
-      }
-    });
+    // Use raw query to avoid Prisma client issues with missing tracking_status column
+    const orders = await prisma.$queryRaw`
+      SELECT 
+        o.id,
+        o."clientId",
+        o.name,
+        o.mobile,
+        o.address,
+        o.city,
+        o.state,
+        o.pincode,
+        o.courier_service,
+        o.package_value,
+        o.weight,
+        o.total_items,
+        o.tracking_id,
+        o.reference_number,
+        o.is_cod,
+        o.cod_amount,
+        o.created_at,
+        c.id as "client_id",
+        c.name as "client_name",
+        c."companyName" as "client_company_name"
+      FROM orders o
+      LEFT JOIN clients c ON o."clientId" = c.id
+      WHERE o.mobile = ${searchMobile}
+      ORDER BY o.created_at DESC
+    ` as any[];
 
     console.log(`🔍 [TRACKING_API] Found ${orders.length} orders for mobile: ${searchMobile}`);
 
     // Group orders by client
     const ordersByClient = orders.reduce((acc, order) => {
       const clientId = order.clientId;
-      const clientName = order.clients.companyName || order.clients.name;
+      const clientName = order.client_company_name || order.client_name;
       
       if (!acc[clientId]) {
         acc[clientId] = {
