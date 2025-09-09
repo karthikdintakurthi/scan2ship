@@ -110,6 +110,7 @@ model client_order_configs {
   logoFileType              String?
   logoEnabledCouriers       String?
   enableAltMobileNumber     Boolean? @default(false)
+  logoUrl                   String?
   clients                   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 

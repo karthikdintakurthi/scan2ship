@@ -330,13 +330,21 @@ export async function GET(
     // Check if logo should be displayed for this courier service
     let logoInfo: { url: string; displayLogoOnWaybill: boolean } | undefined;
     const orderConfig = order.clients.client_order_configs;
-    if (orderConfig && orderConfig.logoFileName && orderConfig.displayLogoOnWaybill) {
+    if (orderConfig && orderConfig.displayLogoOnWaybill) {
       const enabledCouriers = JSON.parse(orderConfig.logoEnabledCouriers || '[]');
       if (enabledCouriers.includes(order.courier_service.toLowerCase())) {
-        logoInfo = {
-          url: `/images/uploads/logos/${orderConfig.logoFileName}`,
-          displayLogoOnWaybill: true
-        };
+        // Check for uploaded logo file first, then fallback to logo URL
+        if (orderConfig.logoFileName) {
+          logoInfo = {
+            url: `/images/uploads/logos/${orderConfig.logoFileName}`,
+            displayLogoOnWaybill: true
+          };
+        } else if (orderConfig.logoUrl) {
+          logoInfo = {
+            url: orderConfig.logoUrl,
+            displayLogoOnWaybill: true
+          };
+        }
       }
     }
     

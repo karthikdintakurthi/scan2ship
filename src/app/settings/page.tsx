@@ -125,15 +125,19 @@ export default function ClientSettingsPage() {
 
   // Logo state
   const [logo, setLogo] = useState<{
-    fileName: string;
-    fileSize: number;
-    fileType: string;
+    fileName?: string;
+    fileSize?: number;
+    fileType?: string;
+    logoUrl?: string;
     displayLogoOnWaybill: boolean;
     logoEnabledCouriers: string;
     url: string;
+    type?: 'uploaded' | 'url';
   } | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoDeleting, setLogoDeleting] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('');
+  const [logoUrlSaving, setLogoUrlSaving] = useState(false);
 
   // New item states
   const [newPickupLocation, setNewPickupLocation] = useState({
@@ -702,6 +706,7 @@ export default function ClientSettingsPage() {
   // Logo functions
   const loadLogo = async () => {
     try {
+      console.log('🔍 [LOAD_LOGO] Starting to load logo...');
       const token = localStorage.getItem('authToken');
       const response = await fetch('/api/logo', {
         headers: {
@@ -711,14 +716,26 @@ export default function ClientSettingsPage() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 [LOAD_LOGO] API Response:', data);
         if (data.success && data.logo) {
+          console.log('🔍 [LOAD_LOGO] Setting logo state:', data.logo);
+          console.log('🔍 [LOAD_LOGO] logoEnabledCouriers type:', typeof data.logo.logoEnabledCouriers);
+          console.log('🔍 [LOAD_LOGO] logoEnabledCouriers value:', data.logo.logoEnabledCouriers);
           setLogo(data.logo);
+          // Set the logoUrl state for the input field
+          if (data.logo.logoUrl) {
+            setLogoUrl(data.logo.logoUrl);
+          }
         } else {
+          console.log('🔍 [LOAD_LOGO] No logo found, setting to null');
           setLogo(null);
+          setLogoUrl('');
         }
+      } else {
+        console.error('🔍 [LOAD_LOGO] API Error:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error('Error loading logo:', error);
+      console.error('🔍 [LOAD_LOGO] Error loading logo:', error);
     }
   };
 
@@ -762,6 +779,43 @@ export default function ClientSettingsPage() {
     }
   };
 
+  const handleLogoUrlSave = async () => {
+    setLogoUrlSaving(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/logo', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          logoUrl: logoUrl.trim() || null,
+          displayLogoOnWaybill: logo?.displayLogoOnWaybill || false,
+          logoEnabledCouriers: logo?.logoEnabledCouriers || '[]'
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setLogo(data.logo);
+          setSuccess('Logo URL updated successfully!');
+        } else {
+          setError(data.error || 'Failed to update logo URL');
+        }
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to update logo URL');
+      }
+    } catch (error) {
+      console.error('Error updating logo URL:', error);
+      setError('Failed to update logo URL');
+    } finally {
+      setLogoUrlSaving(false);
+    }
+  };
+
   const handleLogoDelete = async () => {
     if (!logo) return;
 
@@ -779,6 +833,7 @@ export default function ClientSettingsPage() {
         const data = await response.json();
         if (data.success) {
           setLogo(null);
+          setLogoUrl('');
           setSuccess('Logo deleted successfully!');
         } else {
           setError(data.error || 'Failed to delete logo');
@@ -800,16 +855,18 @@ export default function ClientSettingsPage() {
 
     try {
       const token = localStorage.getItem('authToken');
-      const formData = new FormData();
-      formData.append('displayLogoOnWaybill', enabled.toString());
-      formData.append('logoEnabledCouriers', logo.logoEnabledCouriers);
-
+      
       const response = await fetch('/api/logo', {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        body: formData
+        body: JSON.stringify({
+          logoUrl: logo.logoUrl || null,
+          displayLogoOnWaybill: enabled,
+          logoEnabledCouriers: logo.logoEnabledCouriers
+        })
       });
 
       if (response.ok) {
@@ -834,31 +891,47 @@ export default function ClientSettingsPage() {
     if (!logo) return;
 
     try {
+      console.log('🔍 [COURIER_CHANGE] Starting courier change:', { courierCode, enabled });
+      console.log('🔍 [COURIER_CHANGE] Current logo.logoEnabledCouriers:', logo.logoEnabledCouriers);
+      console.log('🔍 [COURIER_CHANGE] Type of logoEnabledCouriers:', typeof logo.logoEnabledCouriers);
+      
       const currentCouriers = JSON.parse(logo.logoEnabledCouriers || '[]');
+      console.log('🔍 [COURIER_CHANGE] Parsed currentCouriers:', currentCouriers);
+      
       let updatedCouriers;
       
       if (enabled) {
         updatedCouriers = [...currentCouriers, courierCode];
+        console.log('🔍 [COURIER_CHANGE] Adding courier, updatedCouriers:', updatedCouriers);
       } else {
         updatedCouriers = currentCouriers.filter((code: string) => code !== courierCode);
+        console.log('🔍 [COURIER_CHANGE] Removing courier, updatedCouriers:', updatedCouriers);
       }
 
       const token = localStorage.getItem('authToken');
-      const formData = new FormData();
-      formData.append('displayLogoOnWaybill', logo.displayLogoOnWaybill.toString());
-      formData.append('logoEnabledCouriers', JSON.stringify(updatedCouriers));
-
+      
+      const requestBody = {
+        logoUrl: logo.logoUrl || null,
+        displayLogoOnWaybill: logo.displayLogoOnWaybill,
+        logoEnabledCouriers: JSON.stringify(updatedCouriers)
+      };
+      
+      console.log('🔍 [COURIER_CHANGE] Request body:', requestBody);
+      
       const response = await fetch('/api/logo', {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        body: formData
+        body: JSON.stringify(requestBody)
       });
 
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 [COURIER_CHANGE] API Response:', data);
         if (data.success) {
+          console.log('🔍 [COURIER_CHANGE] Updating local state with:', JSON.stringify(updatedCouriers));
           setLogo(prev => prev ? { ...prev, logoEnabledCouriers: JSON.stringify(updatedCouriers) } : null);
           setSuccess('Courier selection updated successfully!');
         } else {
@@ -866,10 +939,11 @@ export default function ClientSettingsPage() {
         }
       } else {
         const errorData = await response.json();
+        console.error('🔍 [COURIER_CHANGE] API Error:', response.status, errorData);
         setError(errorData.error || 'Failed to update courier selection');
       }
     } catch (error) {
-      console.error('Error updating courier selection:', error);
+      console.error('🔍 [COURIER_CHANGE] Error updating courier selection:', error);
       setError('Failed to update courier selection');
     }
   };
@@ -1549,13 +1623,30 @@ export default function ClientSettingsPage() {
                       src={logo.url}
                       alt="Company Logo"
                       className="h-16 w-16 object-contain border border-gray-200 rounded"
+                      onError={(e) => {
+                        // Fallback for broken images
+                        e.currentTarget.src = '/images/scan2ship.png';
+                      }}
                     />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-sm font-medium text-gray-900">Current Logo</h3>
                     <p className="text-xs text-gray-500">
-                      {logo.fileName} • {(logo.fileSize / 1024).toFixed(1)} KB • {logo.fileType}
+                      {logo.type === 'uploaded' && logo.fileName && logo.fileSize && logo.fileType
+                        ? `${logo.fileName} • ${(logo.fileSize / 1024).toFixed(1)} KB • ${logo.fileType}`
+                        : logo.type === 'url' && logo.logoUrl
+                        ? `URL: ${logo.logoUrl}`
+                        : 'Logo'}
                     </p>
+                    {logo.type && (
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        logo.type === 'uploaded' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {logo.type === 'uploaded' ? 'Uploaded File' : 'URL'}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-shrink-0">
                     <button
@@ -1588,6 +1679,33 @@ export default function ClientSettingsPage() {
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
                   Supported formats: JPEG, PNG, GIF, WebP. Maximum size: 5MB.
+                </p>
+              </div>
+
+              {/* Logo URL Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Or provide logo URL
+                </label>
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="url"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="https://example.com/logo.png"
+                    disabled={logoUrlSaving}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <button
+                    onClick={handleLogoUrlSave}
+                    disabled={logoUrlSaving || !logoUrl.trim()}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {logoUrlSaving ? 'Saving...' : 'Save URL'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Provide a direct URL to your logo image. This will be used as a fallback if no file is uploaded.
                 </p>
               </div>
 

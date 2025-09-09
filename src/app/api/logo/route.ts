@@ -7,6 +7,177 @@ import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { safeDatabaseQuery } from '@/lib/database-health-check';
 
+// PUT method for updating logo URL
+export async function PUT(request: NextRequest) {
+  try {
+    // Apply security middleware
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    );
+    
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    // Authorize user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+
+    const { client } = authResult.user!;
+
+    // Get the request body
+    let body;
+    try {
+      const bodyText = await request.text();
+      console.log('🔍 [LOGO_URL_UPDATE] Request body length:', bodyText.length);
+      console.log('🔍 [LOGO_URL_UPDATE] Request body first 100 chars:', bodyText.substring(0, 100));
+      console.log('🔍 [LOGO_URL_UPDATE] Request body last 100 chars:', bodyText.substring(Math.max(0, bodyText.length - 100)));
+      
+      if (!bodyText || bodyText.trim() === '') {
+        console.error('❌ [LOGO_URL_UPDATE] Empty request body');
+        return NextResponse.json({
+          success: false,
+          error: 'Empty request body'
+        }, { status: 400 });
+      }
+      
+      body = JSON.parse(bodyText);
+    } catch (error) {
+      console.error('❌ [LOGO_URL_UPDATE] JSON parse error:', error);
+      console.error('❌ [LOGO_URL_UPDATE] Raw body:', await request.text());
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid JSON in request body',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 400 });
+    }
+    
+    const { logoUrl, displayLogoOnWaybill, logoEnabledCouriers } = body;
+
+    // Validate URL if provided
+    if (logoUrl && logoUrl.trim() !== '') {
+      try {
+        new URL(logoUrl);
+      } catch (error) {
+        return NextResponse.json({
+          success: false,
+          error: 'Invalid URL format'
+        }, { status: 400 });
+      }
+    }
+
+    // Get or create client order config
+    let orderConfig;
+    try {
+      orderConfig = await safeDatabaseQuery(
+        () => prisma.client_order_configs.findUnique({
+          where: { clientId: client.id }
+        }),
+        'LOGO_URL_UPDATE'
+      );
+      console.log('✅ [LOGO_URL_UPDATE] Retrieved order config for client:', client.id);
+    } catch (error) {
+      console.error('❌ [LOGO_URL_UPDATE] Failed to retrieve order config:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to retrieve client configuration',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
+    }
+
+    // Update or create order config with logo URL
+    try {
+      if (orderConfig) {
+        orderConfig = await prisma.client_order_configs.update({
+          where: { clientId: client.id },
+          data: {
+            logoUrl: logoUrl || null,
+            displayLogoOnWaybill: displayLogoOnWaybill,
+            logoEnabledCouriers: logoEnabledCouriers || '[]'
+          }
+        });
+        console.log('✅ [LOGO_URL_UPDATE] Updated existing order config with URL');
+      } else {
+        orderConfig = await prisma.client_order_configs.create({
+          data: {
+            id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            clientId: client.id,
+            // Default values
+            defaultProductDescription: 'ARTIFICAL JEWELLERY',
+            defaultPackageValue: 5000,
+            defaultWeight: 100,
+            defaultTotalItems: 1,
+            codEnabledByDefault: false,
+            defaultCodAmount: null,
+            minPackageValue: 100,
+            maxPackageValue: 100000,
+            minWeight: 1,
+            maxWeight: 50000,
+            minTotalItems: 1,
+            maxTotalItems: 100,
+            requireProductDescription: true,
+            requirePackageValue: true,
+            requireWeight: true,
+            requireTotalItems: true,
+            enableResellerFallback: true,
+            enableThermalPrint: false,
+            enableReferencePrefix: true,
+            enableAltMobileNumber: false,
+            // Logo settings
+            logoUrl: logoUrl || null,
+            displayLogoOnWaybill: displayLogoOnWaybill,
+            logoEnabledCouriers: logoEnabledCouriers || '[]'
+          }
+        });
+        console.log('✅ [LOGO_URL_UPDATE] Created new order config with URL');
+      }
+    } catch (error) {
+      console.error('❌ [LOGO_URL_UPDATE] Failed to update/create order config:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to save logo URL to database',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
+    }
+
+    console.log('✅ [LOGO_URL_UPDATE] Logo URL updated successfully:', {
+      clientId: client.id,
+      logoUrl: logoUrl,
+      displayLogoOnWaybill: displayLogoOnWaybill
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Logo URL updated successfully',
+      logo: {
+        logoUrl: logoUrl,
+        displayLogoOnWaybill: displayLogoOnWaybill,
+        logoEnabledCouriers: logoEnabledCouriers || '[]'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [LOGO_URL_UPDATE] Error updating logo URL:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Apply security middleware
@@ -314,31 +485,61 @@ export async function GET(request: NextRequest) {
       'API_LOGO_GET'
     );
 
-    if (!orderConfig || !orderConfig.logoFileName) {
-      console.log('🔍 [API_LOGO_GET] No logo found for client:', client.id);
+    if (!orderConfig) {
+      console.log('🔍 [API_LOGO_GET] No order config found for client:', client.id);
       return NextResponse.json({
         success: true,
         logo: null
       });
     }
 
-    console.log('🔍 [API_LOGO_GET] Logo found:', {
-      fileName: orderConfig.logoFileName,
-      fileSize: orderConfig.logoFileSize,
-      fileType: orderConfig.logoFileType,
-      displayLogoOnWaybill: orderConfig.displayLogoOnWaybill
-    });
-
-    return NextResponse.json({
-      success: true,
-      logo: {
+    // Check for uploaded logo file first
+    if (orderConfig.logoFileName) {
+      console.log('🔍 [API_LOGO_GET] Uploaded logo found:', {
         fileName: orderConfig.logoFileName,
         fileSize: orderConfig.logoFileSize,
         fileType: orderConfig.logoFileType,
-        displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
-        logoEnabledCouriers: orderConfig.logoEnabledCouriers || '[]',
-        url: `/images/uploads/logos/${orderConfig.logoFileName}`
-      }
+        displayLogoOnWaybill: orderConfig.displayLogoOnWaybill
+      });
+
+      return NextResponse.json({
+        success: true,
+        logo: {
+          fileName: orderConfig.logoFileName,
+          fileSize: orderConfig.logoFileSize,
+          fileType: orderConfig.logoFileType,
+          displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
+          logoEnabledCouriers: orderConfig.logoEnabledCouriers || '[]',
+          url: `/images/uploads/logos/${orderConfig.logoFileName}`,
+          type: 'uploaded'
+        }
+      });
+    }
+
+    // Fallback to logo URL if no uploaded file
+    if (orderConfig.logoUrl) {
+      console.log('🔍 [API_LOGO_GET] Logo URL found as fallback:', {
+        logoUrl: orderConfig.logoUrl,
+        displayLogoOnWaybill: orderConfig.displayLogoOnWaybill
+      });
+
+      return NextResponse.json({
+        success: true,
+        logo: {
+          logoUrl: orderConfig.logoUrl,
+          displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
+          logoEnabledCouriers: orderConfig.logoEnabledCouriers || '[]',
+          url: orderConfig.logoUrl,
+          type: 'url'
+        }
+      });
+    }
+
+    // No logo found (neither uploaded file nor URL)
+    console.log('🔍 [API_LOGO_GET] No logo found for client:', client.id);
+    return NextResponse.json({
+      success: true,
+      logo: null
     });
 
   } catch (error) {
@@ -366,88 +567,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
-  try {
-    // Apply security middleware
-    const securityResponse = await applySecurityMiddleware(
-      request,
-      new NextResponse(),
-      { rateLimit: 'api', cors: true, securityHeaders: true }
-    );
-    
-    if (securityResponse) {
-      securityHeaders(securityResponse);
-      return securityResponse;
-    }
-
-    // Authorize user
-    const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
-      requiredPermissions: [PermissionLevel.WRITE],
-      requireActiveUser: true,
-      requireActiveClient: true
-    });
-
-    if (authResult.response) {
-      securityHeaders(authResult.response);
-      return authResult.response;
-    }
-
-    const { client } = authResult.user!;
-
-    // Get the form data
-    const formData = await request.formData();
-    const displayLogoOnWaybill = formData.get('displayLogoOnWaybill') === 'true';
-    const logoEnabledCouriers = formData.get('logoEnabledCouriers') as string;
-
-    // Get or create client order config
-    let orderConfig = await safeDatabaseQuery(
-      () => prisma.client_order_configs.findUnique({
-        where: { clientId: client.id }
-      }),
-      'LOGO_UPDATE'
-    );
-
-    if (!orderConfig) {
-      return NextResponse.json({ error: 'No order configuration found' }, { status: 404 });
-    }
-
-    // Update order config with logo settings
-    orderConfig = await prisma.client_order_configs.update({
-      where: { clientId: client.id },
-      data: {
-        displayLogoOnWaybill: displayLogoOnWaybill,
-        logoEnabledCouriers: logoEnabledCouriers || '[]'
-      }
-    });
-
-    console.log('✅ [LOGO_UPDATE] Logo settings updated successfully:', {
-      clientId: client.id,
-      displayLogoOnWaybill: displayLogoOnWaybill,
-      logoEnabledCouriers: logoEnabledCouriers
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: 'Logo settings updated successfully',
-      logo: {
-        fileName: orderConfig.logoFileName,
-        fileSize: orderConfig.logoFileSize,
-        fileType: orderConfig.logoFileType,
-        displayLogoOnWaybill: displayLogoOnWaybill,
-        logoEnabledCouriers: logoEnabledCouriers || '[]',
-        url: orderConfig.logoFileName ? `/images/uploads/logos/${orderConfig.logoFileName}` : null
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ [LOGO_UPDATE] Error updating logo settings:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to update logo settings'
-    }, { status: 500 });
-  }
-}
 
 export async function DELETE(request: NextRequest) {
   try {
