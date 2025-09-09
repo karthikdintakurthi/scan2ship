@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
         console.log(`🚚 [API_PICKUP_REQUEST] Delhivery response for ${pickupLocation.label} - Status: ${delhiveryResponse.status}`);
         console.log(`🚚 [API_PICKUP_REQUEST] Delhivery response for ${pickupLocation.label}:`, delhiveryResult);
 
-        if (delhiveryResponse.ok && (delhiveryResult.success || delhiveryResult.request_id)) {
+        if (delhiveryResponse.ok && (delhiveryResult.success || delhiveryResult.request_id || delhiveryResult.pickup_id)) {
           // Save pickup request to database
           const pickupRequest = await prisma.pickup_requests.create({
             data: {
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
               special_instructions: '', // Empty since field was removed
               pickup_location: pickupLocation.value,
               expected_package_count: body.expected_package_count || 1,
-              delhivery_request_id: delhiveryResult.request_id || null,
+              delhivery_request_id: delhiveryResult.request_id || delhiveryResult.pickup_id || null,
               status: 'scheduled',
               created_at: new Date(),
               updated_at: new Date()
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
           results.push({
             pickup_location: pickupLocation.label,
             pickup_request_id: pickupRequest.id,
-            delhivery_request_id: delhiveryResult.request_id,
+            delhivery_request_id: delhiveryResult.request_id || delhiveryResult.pickup_id,
             status: 'success'
           });
         } else {
