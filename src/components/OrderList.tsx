@@ -4,6 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } fr
 import { getPickupLocations } from '@/lib/order-form-config'
 import { getActiveCourierServices } from '@/lib/courier-service-config'
 import ExcelJS from 'exceljs'
+import TrackingModal from './TrackingModal'
 
 interface Order {
   id: number
@@ -55,6 +56,7 @@ interface Order {
   fragile_shipment?: boolean
   seller_name?: string
   seller_address?: string
+  
   seller_gst?: string
   invoice_number?: string
   commodity_value?: number
@@ -103,6 +105,12 @@ export default function OrderList() {
   // Delete confirmation state
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  
+  // Tracking modal state
+  const [showTrackingModal, setShowTrackingModal] = useState(false)
+  const [selectedTrackingOrder, setSelectedTrackingOrder] = useState<Order | null>(null)
+  
+  
   
   // Dynamic configuration state
   const [pickupLocations, setPickupLocations] = useState<Array<{value: string, label: string}>>([])
@@ -1078,7 +1086,15 @@ export default function OrderList() {
       link.download = filename
       document.body.appendChild(link)
       link.click()
-      document.body.removeChild(link)
+      
+      // Safely remove the link element
+      try {
+        if (link.parentNode) {
+          link.parentNode.removeChild(link)
+        }
+      } catch (error) {
+        console.error('Error removing download link:', error)
+      }
       window.URL.revokeObjectURL(url)
       
       console.log(`✅ Exported ${ordersToExport.length} orders to ${filename}`)
@@ -1209,8 +1225,27 @@ export default function OrderList() {
     }
 
     tableContainer.addEventListener('scroll', handleScroll)
-    return () => tableContainer.removeEventListener('scroll', handleScroll)
+    return () => {
+      // Safely remove event listener
+      try {
+        if (tableContainer && tableContainer.removeEventListener) {
+          tableContainer.removeEventListener('scroll', handleScroll)
+        }
+      } catch (error) {
+        console.error('Error removing scroll event listener:', error)
+      }
+    }
   }, [])
+
+  // Helper function to get tracking number
+  const getTrackingNumber = (order: Order) => {
+    const trackingNumber = order.courier_service.toLowerCase() === 'delhivery' 
+      ? (order.delhivery_waybill_number || order.tracking_id)
+      : order.tracking_id
+
+    return trackingNumber || (order.courier_service.toLowerCase() === 'delhivery' ? 'Not assigned' : 'Not provided')
+  }
+
 
   // Memoize table body to prevent unnecessary re-renders
   const tableBody = useMemo(() => {
@@ -1249,15 +1284,29 @@ export default function OrderList() {
             <td className="px-6 py-4">
               <div className="space-y-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    {getCourierServiceLabel(order.courier_service)}
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {order.courier_service.toLowerCase() === 'delhivery' 
-                      ? (order.delhivery_waybill_number || order.tracking_id || 'Not assigned')
-                      : (order.tracking_id || 'Not provided')
-                    }
-                  </p>
+                  <div className="space-y-2">
+                    {(() => {
+                      const trackingNumber = getTrackingNumber(order)
+                      
+                      if (trackingNumber && trackingNumber !== 'Not assigned' && trackingNumber !== 'Not provided') {
+                        return (
+                          <button
+                            onClick={() => handleTrackingClick(order)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-sm"
+                            title="Click to track package"
+                          >
+                            {trackingNumber}
+                          </button>
+                        )
+                      }
+                      
+                      return (
+                        <span className="text-gray-500 text-sm">
+                          {trackingNumber}
+                        </span>
+                      )
+                    })()}
+                  </div>
                 </div>
                 {order.delhivery_api_error && (
                   <div className="text-xs text-red-600 max-w-xs">
@@ -1365,6 +1414,20 @@ export default function OrderList() {
       setDeleting(false)
     }
   }
+
+  const handleTrackingClick = (order: Order) => {
+    const trackingNumber = order.courier_service.toLowerCase() === 'delhivery' 
+      ? (order.delhivery_waybill_number || order.tracking_id)
+      : order.tracking_id
+
+    if (trackingNumber) {
+      setSelectedTrackingOrder(order)
+      setShowTrackingModal(true)
+    }
+  }
+
+
+
 
   if (loading) {
     return <div className="text-center py-8">Loading orders...</div>
@@ -1674,11 +1737,13 @@ export default function OrderList() {
               {(totalPages || 1) > 1 && ` (Page ${currentPage} of ${totalPages || 1})`}
             </p>
           </div>
-          {totalOrders > 0 && (
-            <div className="text-sm text-gray-600">
-              <span className="font-medium">Max Orders:</span> 1,500
-            </div>
-          )}
+          <div className="flex items-center space-x-4">
+            {totalOrders > 0 && (
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">Max Orders:</span> 1,500
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1721,7 +1786,7 @@ export default function OrderList() {
                     Courier
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
-                    Tracking Details
+                    Status & Tracking
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
                     Reference Number
@@ -2259,6 +2324,23 @@ export default function OrderList() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Tracking Modal */}
+      {selectedTrackingOrder && (
+        <TrackingModal
+          isOpen={showTrackingModal}
+          onClose={() => {
+            setShowTrackingModal(false)
+            setSelectedTrackingOrder(null)
+          }}
+          waybillNumber={
+            selectedTrackingOrder.courier_service.toLowerCase() === 'delhivery' 
+              ? (selectedTrackingOrder.delhivery_waybill_number || selectedTrackingOrder.tracking_id || '')
+              : (selectedTrackingOrder.tracking_id || '')
+          }
+          courierService={selectedTrackingOrder.courier_service}
+        />
       )}
     </div>
   )

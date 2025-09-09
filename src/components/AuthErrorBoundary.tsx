@@ -33,8 +33,12 @@ export default function AuthErrorBoundary({ children, fallback }: Props) {
       window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
       return () => {
-        window.removeEventListener('error', handleError);
-        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        try {
+          window.removeEventListener('error', handleError);
+          window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        } catch (error) {
+          console.warn('Error removing event listeners:', error);
+        }
       };
     }
   }, []);

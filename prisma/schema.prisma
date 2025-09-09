@@ -275,6 +275,7 @@ model orders {
   shopify_update_error     String?
   shopify_update_status    String?
   shopify_update_timestamp DateTime?             @db.Timestamp(6)
+  tracking_status          String?                @default("pending")
   credit_transactions      credit_transactions[]
   order_analytics          order_analytics?
   clients                  clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)

@@ -124,31 +124,35 @@ export function generatePWAManifest(client: Client | null): PWAManifest {
 }
 
 export function updatePWAHead(client: Client | null) {
-  const branding = getClientBranding(client);
-  
-  // Update favicon
-  const favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
-  if (favicon) {
-    favicon.href = branding.logo;
-  }
-  
-  // Update apple touch icon
-  const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement;
-  if (appleTouchIcon) {
-    appleTouchIcon.href = branding.logo;
-  }
-  
-  // Update theme color meta tag
-  const themeColor = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
-  if (themeColor) {
-    themeColor.content = branding.themeColor;
-  }
-  
-  // Update manifest link
-  const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
-  if (manifestLink) {
-    // Generate a unique manifest URL for the client
-    const manifestUrl = `/api/pwa/manifest?client=${client?.id || 'default'}`;
-    manifestLink.href = manifestUrl;
+  try {
+    const branding = getClientBranding(client);
+    
+    // Update favicon
+    const favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
+    if (favicon) {
+      favicon.href = branding.logo;
+    }
+    
+    // Update apple touch icon
+    const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement;
+    if (appleTouchIcon) {
+      appleTouchIcon.href = branding.logo;
+    }
+    
+    // Update theme color meta tag
+    const themeColor = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
+    if (themeColor) {
+      themeColor.content = branding.themeColor;
+    }
+    
+    // Update manifest link
+    const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+    if (manifestLink) {
+      // Generate a unique manifest URL for the client
+      const manifestUrl = `/api/pwa/manifest?client=${client?.id || 'default'}`;
+      manifestLink.href = manifestUrl;
+    }
+  } catch (error) {
+    console.warn('Error updating PWA head elements:', error);
   }
 }

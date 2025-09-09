@@ -54,24 +54,19 @@ export default function PWAScript() {
     if (typeof window === 'undefined') return;
     
     if (currentClient) {
-      // Update the manifest link to trigger a refresh
-      const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
-      if (manifestLink) {
-        const manifestUrl = `/api/pwa/manifest?client=${currentClient.id}`;
-        manifestLink.href = manifestUrl;
-        
-        // Force manifest refresh by removing and re-adding the link
-        const newManifestLink = document.createElement('link');
-        newManifestLink.rel = 'manifest';
-        newManifestLink.href = manifestUrl;
-        document.head.removeChild(manifestLink);
-        document.head.appendChild(newManifestLink);
-      }
+      // Use a timeout to avoid race conditions with other components
+      const timeoutId = setTimeout(() => {
+        try {
+          // Update PWA head elements based on client branding
+          import('@/lib/pwa-config').then(({ updatePWAHead }) => {
+            updatePWAHead(currentClient);
+          }).catch(console.error);
+        } catch (error) {
+          console.error('Error updating PWA branding:', error);
+        }
+      }, 100); // Small delay to avoid race conditions
 
-      // Update PWA head elements based on client branding
-      import('@/lib/pwa-config').then(({ updatePWAHead }) => {
-        updatePWAHead(currentClient);
-      }).catch(console.error);
+      return () => clearTimeout(timeoutId);
     }
   }, [currentClient]);
 
