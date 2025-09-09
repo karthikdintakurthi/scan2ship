@@ -130,7 +130,13 @@ export async function POST(request: NextRequest) {
         console.log(`🚚 [API_PICKUP_REQUEST] Delhivery response for ${pickupLocation.label} - Status: ${delhiveryResponse.status}`);
         console.log(`🚚 [API_PICKUP_REQUEST] Delhivery response for ${pickupLocation.label}:`, delhiveryResult);
 
-        if (delhiveryResponse.ok && delhiveryResult.success) {
+        // Check for success: either success: true OR (201 status with pickup_id and no error)
+        const isSuccess = delhiveryResponse.ok && (
+          delhiveryResult.success === true || 
+          (delhiveryResponse.status === 201 && delhiveryResult.pickup_id && !delhiveryResult.error)
+        );
+        
+        if (isSuccess) {
           // Save pickup request to database
           const pickupRequest = await prisma.pickup_requests.create({
             data: {
