@@ -281,7 +281,7 @@ export async function authorizeUser(
     };
   }
 
-  // Check subscription validity
+  // Check subscription validity - Fixed syntax error
   if (requireValidSubscription && !hasValidSubscription(user)) {
     return {
       user: null,
