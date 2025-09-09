@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
               special_instructions: '', // Empty since field was removed
               pickup_location: pickupLocation.value,
               expected_package_count: body.expected_package_count || 1,
-              delhivery_request_id: delhiveryResult.request_id || delhiveryResult.pickup_id || null,
+              delhivery_request_id: delhiveryResult.request_id || (delhiveryResult.pickup_id ? String(delhiveryResult.pickup_id) : null),
               status: 'scheduled',
               created_at: new Date(),
               updated_at: new Date()
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
           results.push({
             pickup_location: pickupLocation.label,
             pickup_request_id: pickupRequest.id,
-            delhivery_request_id: delhiveryResult.request_id || delhiveryResult.pickup_id,
+            delhivery_request_id: delhiveryResult.request_id || (delhiveryResult.pickup_id ? String(delhiveryResult.pickup_id) : null),
             status: 'success'
           });
         } else {

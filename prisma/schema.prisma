@@ -141,6 +141,7 @@ model clients {
   order_analytics       order_analytics[]
   orders                orders[]
   pickup_locations      pickup_locations[]
+  pickup_requests       pickup_requests[]
   sessions              sessions[]
   users                 users[]
 }
@@ -290,6 +291,31 @@ model pickup_locations {
   @@unique([label, clientId])
 }
 
+model pickup_requests {
+  id                     String   @id
+  clientId               String
+  userId                 String
+  pickup_date            String
+  pickup_time            String
+  pickup_address         String
+  contact_person         String
+  contact_phone          String
+  special_instructions   String?
+  pickup_location        String
+  expected_package_count Int      @default(1)
+  delhivery_request_id   String?
+  status                 String   @default("scheduled")
+  created_at             DateTime @default(now())
+  updated_at             DateTime
+  clients                clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users                  users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([status])
+  @@index([pickup_date])
+}
+
 model rate_limits {
   id          Int      @id @default(autoincrement())
   identifier  String
@@ -352,6 +378,7 @@ model users {
   analytics_events    analytics_events[]
   credit_transactions credit_transactions[]
   order_analytics     order_analytics[]
+  pickup_requests     pickup_requests[]
   sessions            sessions[]
   clients             clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
