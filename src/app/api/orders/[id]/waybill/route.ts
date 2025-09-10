@@ -187,15 +187,12 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             </div>
         </div>
         
-        ${order.courier_service.toLowerCase() !== 'india_post' && 
-          !(order.courier_service.toLowerCase() === 'dtdc' && (!order.tracking_id || order.tracking_id.trim() === '')) ? `
+        ${barcodeDataURL ? `
         <div class="waybill-section">
             <div class="waybill-label">Tracking Number:</div>
-            ${barcodeDataURL ? `
             <div class="barcode-image">
                 <img src="${barcodeDataURL}" alt="Barcode" />
             </div>
-            ` : ''}
         </div>
         ` : ''}
         
@@ -303,28 +300,25 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    // Determine tracking number to use
-    let trackingNumber = order.tracking_id || order.reference_number || `ORDER-${order.id}`
-    
-    // For Delhivery orders, use waybill number if available
-    if (order.courier_service.toLowerCase() === 'delhivery' && order.delhivery_waybill_number) {
-      trackingNumber = order.delhivery_waybill_number
-    }
-
-    // Generate barcode only if there's a valid tracking number
+    // Generate barcode only if there's a valid tracking_id (not reference_number)
     let barcodeDataURL = '';
-    if (order.courier_service.toLowerCase() !== 'india_post') {
-      // For DTDC orders, only generate barcode if tracking_id exists (not empty)
-      if (order.courier_service.toLowerCase() === 'dtdc') {
-        if (order.tracking_id && order.tracking_id.trim() !== '') {
-          barcodeDataURL = await generateBarcode(order.tracking_id);
-        }
-        // For DTDC, use tracking_id for display, fallback to reference_number if no tracking_id
-        trackingNumber = order.tracking_id && order.tracking_id.trim() !== '' ? order.tracking_id : order.reference_number || `ORDER-${order.id}`;
-      } else {
-        // For other couriers (Delhivery, etc.), generate barcode normally
-        barcodeDataURL = await generateBarcode(trackingNumber);
-      }
+    
+    // For ALL courier services, only generate barcode if tracking_id exists (not empty or "null")
+    if (order.tracking_id && order.tracking_id.trim() !== '' && order.tracking_id !== 'null') {
+      barcodeDataURL = await generateBarcode(order.tracking_id);
+    }
+    
+    // Determine tracking number for display
+    let trackingNumber;
+    if (order.tracking_id && order.tracking_id.trim() !== '' && order.tracking_id !== 'null') {
+      // For ALL couriers, use tracking_id if available
+      trackingNumber = order.tracking_id;
+    } else if (order.courier_service.toLowerCase() === 'delhivery' && order.delhivery_waybill_number) {
+      // For Delhivery, fallback to waybill number if no tracking_id
+      trackingNumber = order.delhivery_waybill_number;
+    } else {
+      // No fallback - don't generate barcode if no tracking_id
+      trackingNumber = '';
     }
 
     // Check if logo should be displayed for this courier service
