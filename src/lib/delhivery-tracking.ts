@@ -168,10 +168,35 @@ export class DelhiveryTrackingService {
             // Use the proper status mapping function
             let finalStatus = this.mapStatusToInternal(status);
             
-            // Additional check: If status is generic "success" but we have DeliveryDate, override to delivered
-            if ((status === 'success' || status === 'Success') && shipment.DeliveryDate) {
-              console.log(`📦 [DELHIVERY_BULK_${batchId}] Overriding status to 'delivered' due to DeliveryDate: ${shipment.DeliveryDate}`);
-              finalStatus = 'delivered';
+            // Additional checks for delivered status when status is generic "success"
+            if (status === 'success' || status === 'Success') {
+              // Check for delivery date
+              if (shipment.DeliveryDate) {
+                console.log(`📦 [DELHIVERY_BULK_${batchId}] Overriding status to 'delivered' due to DeliveryDate: ${shipment.DeliveryDate}`);
+                finalStatus = 'delivered';
+              }
+              // Check for delivered status in instructions
+              else if (shipment.Status?.Instructions && 
+                      (shipment.Status.Instructions.toLowerCase().includes('delivered') || 
+                       shipment.Status.Instructions.toLowerCase().includes('delivery'))) {
+                console.log(`📦 [DELHIVERY_BULK_${batchId}] Overriding status to 'delivered' due to Instructions: ${shipment.Status.Instructions}`);
+                finalStatus = 'delivered';
+              }
+              // Check for delivered status in status description
+              else if (statusDescription && 
+                      (statusDescription.toLowerCase().includes('delivered') || 
+                       statusDescription.toLowerCase().includes('delivery'))) {
+                console.log(`📦 [DELHIVERY_BULK_${batchId}] Overriding status to 'delivered' due to StatusDescription: ${statusDescription}`);
+                finalStatus = 'delivered';
+              }
+              else {
+                console.log(`📦 [DELHIVERY_BULK_${batchId}] Status remains 'in_transit' for success status - no delivery indicators found`);
+                console.log(`📦 [DELHIVERY_BULK_${batchId}] Debug info:`, {
+                  deliveryDate: shipment.DeliveryDate,
+                  instructions: shipment.Status?.Instructions,
+                  statusDescription: statusDescription
+                });
+              }
             }
             
             const processedResult = {
