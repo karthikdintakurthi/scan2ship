@@ -83,6 +83,16 @@ export default function OrderList() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [tableLoading, setTableLoading] = useState(false)
   const [refreshingStatuses, setRefreshingStatuses] = useState(false)
+  const [refreshProgress, setRefreshProgress] = useState<{
+    isRunning: boolean
+    totalOrders: number
+    processedOrders: number
+    updatedOrders: number
+    errors: number
+    callsMade: number
+    totalCallsNeeded: number
+    currentCall: number
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [retrying, setRetrying] = useState<number | null>(null)
@@ -272,6 +282,7 @@ export default function OrderList() {
   }, [searchTerm, selectedPickupLocation, selectedCourierService, selectedTrackingStatus])
 
   // Refresh all order statuses
+  // Smart refresh all order statuses - processes ALL orders automatically
   const handleRefreshAllStatuses = useCallback(async () => {
     if (!currentClient?.id) {
       setError('Client information not available. Please refresh the page.')
@@ -279,8 +290,22 @@ export default function OrderList() {
     }
     
     setRefreshingStatuses(true)
+    setRefreshProgress({
+      isRunning: true,
+      totalOrders: 0,
+      processedOrders: 0,
+      updatedOrders: 0,
+      errors: 0,
+      callsMade: 0,
+      totalCallsNeeded: 0,
+      currentCall: 0
+    })
+    setError(null)
+    
     try {
-      const response = await fetch('/api/cron/update-tracking-optimized', {
+      console.log('🚀 Starting smart refresh for client:', currentClient.id)
+      
+      const response = await fetch('/api/cron/smart-refresh', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -290,15 +315,41 @@ export default function OrderList() {
       })
       
       if (response.ok) {
+        const data = await response.json()
+        console.log('✅ Smart refresh completed:', data)
+        
+        // Update progress with final results
+        setRefreshProgress({
+          isRunning: false,
+          totalOrders: data.stats.totalOrders,
+          processedOrders: data.stats.processedOrders,
+          updatedOrders: data.stats.updatedOrders,
+          errors: data.stats.errors,
+          callsMade: data.stats.callsMade,
+          totalCallsNeeded: data.stats.totalCallsNeeded,
+          currentCall: data.stats.callsMade
+        })
+        
         // Refresh the current page to show updated statuses
         fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+        
+        // Clear progress after 5 seconds
+        setTimeout(() => {
+          setRefreshProgress(null)
+        }, 5000)
+        
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || 'Failed to refresh statuses')
+        setRefreshProgress(null)
       }
-    } catch (error) {
-      console.error('Failed to refresh statuses:', error)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh statuses')
+      setRefreshProgress(null)
     } finally {
       setRefreshingStatuses(false)
     }
-  }, [currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService])
+  }, [currentClient?.id, currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService])
 
   // Clear date filters
   const clearDateFilters = () => {
