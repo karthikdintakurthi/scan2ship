@@ -2,7 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { delhiveryTrackingService } from '@/lib/delhivery-tracking';
 
+export async function GET(request: NextRequest) {
+  // Handle GET requests from Vercel cron jobs
+  return await handleCronRequest(request, 'scheduled');
+}
+
 export async function POST(request: NextRequest) {
+  // Handle POST requests (manual triggers)
+  return await handleCronRequest(request, 'manual');
+}
+
+async function handleCronRequest(request: NextRequest, defaultTriggerType: 'scheduled' | 'manual') {
   const startTime = Date.now();
   const jobId = Math.random().toString(36).substring(7);
   const MAX_EXECUTION_TIME = 25000; // 25 seconds max (leaving 5s buffer for response)
@@ -16,31 +26,38 @@ export async function POST(request: NextRequest) {
     // Check if this is a client-specific request
     let body;
     let specificClientId: string | null = null;
-    let triggerType: 'scheduled' | 'manual' = 'scheduled';
+    let triggerType: 'scheduled' | 'manual' = defaultTriggerType;
     
     try {
       body = await request.json();
       specificClientId = body.clientId || null;
-      triggerType = body.triggerType || (isScheduledCron ? 'scheduled' : 'manual');
+      triggerType = body.triggerType || defaultTriggerType;
     } catch (error) {
-      // No body or invalid JSON, check if it's a scheduled cron
-      triggerType = isScheduledCron ? 'scheduled' : 'manual';
+      // No body or invalid JSON, use default trigger type
+      triggerType = defaultTriggerType;
     }
     
     console.log(`🔄 [CRON_TRACKING_OPT_${jobId}] Starting optimized tracking update job...`);
     console.log(`🕐 [CRON_TRACKING_OPT_${jobId}] Start time: ${new Date().toISOString()}`);
     console.log(`🎯 [CRON_TRACKING_OPT_${jobId}] Trigger type: ${triggerType.toUpperCase()}`);
     console.log(`🔐 [CRON_TRACKING_OPT_${jobId}] Auth header present: ${!!authHeader}`);
+    console.log(`🌐 [CRON_TRACKING_OPT_${jobId}] Request method: ${request.method}`);
     
-    // Verify this is a legitimate request
-    if (!isScheduledCron && !authHeader) {
-      console.log(`🚫 [CRON_TRACKING_OPT_${jobId}] Unauthorized request - no auth header`);
+    // For Vercel cron jobs, we'll be more permissive with GET requests
+    // For manual POST requests, require proper authorization
+    if (request.method === 'POST' && !isScheduledCron && !authHeader) {
+      console.log(`🚫 [CRON_TRACKING_OPT_${jobId}] Unauthorized POST request - no auth header`);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    if (isScheduledCron && authHeader !== `Bearer ${cronSecret}`) {
-      console.log(`🚫 [CRON_TRACKING_OPT_${jobId}] Unauthorized scheduled cron request`);
+    if (request.method === 'POST' && isScheduledCron && authHeader !== `Bearer ${cronSecret}`) {
+      console.log(`🚫 [CRON_TRACKING_OPT_${jobId}] Unauthorized scheduled cron POST request`);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    // For GET requests (Vercel cron), allow without auth header but log it
+    if (request.method === 'GET' && !authHeader) {
+      console.log(`⚠️ [CRON_TRACKING_OPT_${jobId}] GET request without auth header - allowing for Vercel cron`);
     }
 
     // Get clients with their pickup locations
