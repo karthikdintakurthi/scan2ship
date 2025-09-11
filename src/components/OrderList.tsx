@@ -94,6 +94,54 @@ export default function OrderList() {
     currentCall: number
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Helper function to convert database status to UI label
+  const getTrackingStatusLabel = (status: string) => {
+    const lowerStatus = status.toLowerCase();
+    
+    if (lowerStatus === 'delivered') {
+      return '✅ Delivered';
+    }
+    
+    if (lowerStatus === 'manifested' || lowerStatus === 'not picked' || lowerStatus === 'null') {
+      return '⏳ Not Dispatched';
+    }
+    
+    if (lowerStatus === 'returned') {
+      return '↩️ Returned';
+    }
+    
+    if (lowerStatus === 'failed') {
+      return '❌ Failed';
+    }
+    
+    if (lowerStatus === 'pending') {
+      return '⏳ Pending';
+    }
+    
+    // Everything else (in_transit, dispatched, success, etc.) → In Transit
+    return '🚚 In Transit';
+  };
+
+  // Helper function to convert UI label back to database values for filtering
+  const getTrackingStatusDbValue = (uiLabel: string) => {
+    switch (uiLabel) {
+      case '⏳ Not Dispatched':
+        return 'null'; // Use null to match both null and manifested in database
+      case '🚚 In Transit':
+        return 'in_transit'; // Use in_transit to match in_transit, dispatched, success, etc.
+      case '✅ Delivered':
+        return 'delivered';
+      case '↩️ Returned':
+        return 'returned';
+      case '❌ Failed':
+        return 'failed';
+      case '⏳ Pending':
+        return 'pending';
+      default:
+        return uiLabel; // Return as-is if it's already a database value
+    }
+  };
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [retrying, setRetrying] = useState<number | null>(null)
   const [isFulfilling, setIsFulfilling] = useState(false)
@@ -423,7 +471,9 @@ export default function OrderList() {
       }
 
       if (trackingStatus) {
-        params.append('trackingStatus', trackingStatus)
+        // Convert UI label to database value for API filtering
+        const dbValue = getTrackingStatusDbValue(trackingStatus)
+        params.append('trackingStatus', dbValue)
       }
       
       console.log('🔍 [FETCH_ORDERS] Fetching orders with params:', params.toString())
@@ -1657,14 +1707,12 @@ export default function OrderList() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               >
                 <option value="">All Tracking Statuses</option>
-                <option value="null">Not Dispatched</option>
-                <option value="manifested">Manifested</option>
-                <option value="in_transit">In Transit</option>
-                <option value="delivered">Delivered</option>
-                <option value="returned">Returned</option>
-                <option value="failed">Failed</option>
-                <option value="pending">Pending</option>
-                <option value="dispatched">Dispatched</option>
+                <option value="⏳ Not Dispatched">⏳ Not Dispatched</option>
+                <option value="🚚 In Transit">🚚 In Transit</option>
+                <option value="✅ Delivered">✅ Delivered</option>
+                <option value="↩️ Returned">↩️ Returned</option>
+                <option value="❌ Failed">❌ Failed</option>
+                <option value="⏳ Pending">⏳ Pending</option>
               </select>
             </div>
           </div>
@@ -1776,7 +1824,7 @@ export default function OrderList() {
             )}
             {selectedTrackingStatus && (
               <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-md">
-                📊 {selectedTrackingStatus === 'null' ? 'Not Dispatched' : selectedTrackingStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                📊 {selectedTrackingStatus}
               </span>
             )}
             {fromDate && toDate && (
