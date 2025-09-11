@@ -1,7 +1,7 @@
 {
   "name": "Order Tracking Update",
-  "description": "Updates order tracking status by calling Delhivery APIs every minute",
-  "schedule": "* * * * *",
+  "description": "Updates order tracking status by calling Delhivery APIs every 1 hour",
+  "schedule": "0 * * * *",
   "endpoint": "/api/cron/update-tracking-optimized",
   "method": "POST",
   "headers": {
@@ -16,7 +16,7 @@
       "cron_jobs": [
         {
           "path": "/api/cron/update-tracking-optimized",
-          "schedule": "* * * * *"
+          "schedule": "0 * * * *"
         }
       ]
     },
@@ -24,7 +24,7 @@
         "cron_jobs": [
           {
             "command": "curl -X POST https://your-app.railway.app/api/cron/update-tracking-optimized -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE'",
-            "schedule": "* * * * *"
+            "schedule": "0 * * * *"
           }
         ]
       },
@@ -33,7 +33,7 @@
         "scheduler_jobs": [
           {
             "command": "curl -X POST https://your-app.herokuapp.com/api/cron/update-tracking-optimized -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE'",
-            "schedule": "* * * * *"
+            "schedule": "0 * * * *"
           }
         ]
       },

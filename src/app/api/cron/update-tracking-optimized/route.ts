@@ -118,9 +118,9 @@ async function handleCronRequest(request: NextRequest, defaultTriggerType: 'sche
         ]
       };
 
-      // INCREASED LIMIT: Process 50 orders per client per minute for better throughput
+      // INCREASED LIMIT: Process 50 orders per client per hour for better throughput
       // EXCLUDE recently processed orders to avoid duplicates
-      const recentlyProcessedCutoff = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
+      const recentlyProcessedCutoff = new Date(Date.now() - 3 * 60 * 60 * 1000); // 3 hours ago
       
       // First, get a larger pool of orders to choose from
       const allEligibleOrders = await prisma.orders.findMany({
@@ -149,7 +149,7 @@ async function handleCronRequest(request: NextRequest, defaultTriggerType: 'sche
         ]
       });
 
-      // Filter out recently processed orders (within last 1 hour)
+      // Filter out recently processed orders (within last 3 hours)
       const recentlyProcessed = allEligibleOrders.filter(order => 
         order.updated_at && order.updated_at > recentlyProcessedCutoff
       );
@@ -157,7 +157,7 @@ async function handleCronRequest(request: NextRequest, defaultTriggerType: 'sche
       // Take the next batch of unprocessed orders
       const orders = allEligibleOrders
         .filter(order => !recentlyProcessed.some(recent => recent.id === order.id))
-        .slice(0, 50); // Take 50 orders per client per minute
+        .slice(0, 50); // Take 50 orders per client per hour
 
       console.log(`📦 [CRON_TRACKING_OPT_${jobId}] Found ${orders.length} orders to process for client: ${client.companyName}`);
       console.log(`📊 [CRON_TRACKING_OPT_${jobId}] Total eligible: ${allEligibleOrders.length}, Recently processed: ${recentlyProcessed.length}, Selected: ${orders.length}`);
