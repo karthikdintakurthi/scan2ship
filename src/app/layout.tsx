@@ -3,10 +3,6 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import AuthWrapper from '@/components/AuthWrapper';
-import AuthErrorBoundary from '@/components/AuthErrorBoundary';
-import PWAScript from '@/components/PWAScript';
-import DynamicPWAHead from '@/components/DynamicPWAHead';
-import CacheManager from '@/components/CacheManager';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -108,17 +104,11 @@ export default function RootLayout({
         <meta name="application-name" content="Scan2Ship" />
       </head>
       <body className={inter.className}>
-        <CacheManager>
-          <AuthErrorBoundary>
-            <AuthProvider>
-              <DynamicPWAHead />
-              <AuthWrapper>
-                {children}
-              </AuthWrapper>
-              <PWAScript />
-            </AuthProvider>
-          </AuthErrorBoundary>
-        </CacheManager>
+        <AuthProvider>
+          <AuthWrapper>
+            {children}
+          </AuthWrapper>
+        </AuthProvider>
       </body>
     </html>
   );

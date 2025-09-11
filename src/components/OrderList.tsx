@@ -5,6 +5,7 @@ import { getPickupLocations } from '@/lib/order-form-config'
 import { getActiveCourierServices } from '@/lib/courier-service-config'
 import ExcelJS from 'exceljs'
 import TrackingModal from './TrackingModal'
+import TrackingStatusLabel from './TrackingStatusLabel'
 
 interface Order {
   id: number
@@ -78,6 +79,7 @@ export default function OrderList() {
   const [loading, setLoading] = useState(true)
   const [searchLoading, setSearchLoading] = useState(false)
   const [tableLoading, setTableLoading] = useState(false)
+  const [refreshingStatuses, setRefreshingStatuses] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [retrying, setRetrying] = useState<number | null>(null)
@@ -257,6 +259,29 @@ export default function OrderList() {
     setCurrentPage(1) // Reset to first page when filtering
     fetchOrders(1, searchTerm, from, to, selectedPickupLocation, selectedCourierService)
   }, [searchTerm, selectedPickupLocation, selectedCourierService])
+
+  // Refresh all order statuses
+  const handleRefreshAllStatuses = useCallback(async () => {
+    setRefreshingStatuses(true)
+    try {
+      const response = await fetch('/api/cron/update-tracking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer default-cron-secret'
+        }
+      })
+      
+      if (response.ok) {
+        // Refresh the current page to show updated statuses
+        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+      }
+    } catch (error) {
+      console.error('Failed to refresh statuses:', error)
+    } finally {
+      setRefreshingStatuses(false)
+    }
+  }, [currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService])
 
   // Clear date filters
   const clearDateFilters = () => {
@@ -1290,20 +1315,32 @@ export default function OrderList() {
                       
                       if (trackingNumber && trackingNumber !== 'Not assigned' && trackingNumber !== 'Not provided') {
                         return (
-                          <button
-                            onClick={() => handleTrackingClick(order)}
-                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-sm"
-                            title="Click to track package"
-                          >
-                            {trackingNumber}
-                          </button>
+                          <div className="space-y-2">
+                            <button
+                              onClick={() => handleTrackingClick(order)}
+                              className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-sm block"
+                              title="Click to track package"
+                            >
+                              {trackingNumber}
+                            </button>
+                            <TrackingStatusLabel 
+                              status={order.delhivery_api_status || order.shopify_status} 
+                              className="text-xs"
+                            />
+                          </div>
                         )
                       }
                       
                       return (
-                        <span className="text-gray-500 text-sm">
-                          {trackingNumber}
-                        </span>
+                        <div className="space-y-2">
+                          <span className="text-gray-500 text-sm">
+                            {trackingNumber}
+                          </span>
+                          <TrackingStatusLabel 
+                            status={order.delhivery_api_status || order.shopify_status} 
+                            className="text-xs"
+                          />
+                        </div>
                       )
                     })()}
                   </div>
@@ -1574,6 +1611,28 @@ export default function OrderList() {
                 Clear All Filters
               </button>
             )}
+            <button
+              onClick={handleRefreshAllStatuses}
+              disabled={refreshingStatuses}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              {refreshingStatuses ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Statuses
+                </>
+              )}
+            </button>
             {/* Export Orders Button - Only show when there are orders and filters are applied */}
             {orders.length > 0 && (searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService) && (
               <button
@@ -2170,7 +2229,15 @@ export default function OrderList() {
                           <div><span className="font-medium">COD Amount:</span> {formatCurrency(selectedOrder.cod_amount)}</div>
                         )}
                         {selectedOrder.tracking_id && (
-                          <div><span className="font-medium">Tracking ID:</span> {selectedOrder.tracking_id}</div>
+                          <div className="space-y-2">
+                            <div><span className="font-medium">Tracking ID:</span> {selectedOrder.tracking_id}</div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">Status:</span>
+                              <TrackingStatusLabel 
+                                status={selectedOrder.delhivery_api_status || selectedOrder.shopify_status} 
+                              />
+                            </div>
+                          </div>
                         )}
                         {selectedOrder.reference_number && (
                           <div><span className="font-medium">Reference:</span> {selectedOrder.reference_number}</div>

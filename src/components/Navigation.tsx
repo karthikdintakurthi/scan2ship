@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,8 +10,27 @@ import { getClientBranding } from '@/lib/pwa-config';
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const pathname = usePathname();
   const { currentUser, currentClient, logout } = useAuth();
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isUserMenuOpen]);
 
   // Get dynamic branding based on current client
   const branding = getClientBranding(currentClient);
@@ -30,6 +49,7 @@ export default function Navigation() {
       { name: 'Master Dashboard', href: '/admin', current: pathname === '/admin' },
       { name: 'System Settings', href: '/admin/settings', current: pathname === '/admin/settings' },
       { name: 'Credit Management', href: '/admin/credits', current: pathname === '/admin/credits' },
+      { name: 'Cron Management', href: '/admin/cron', current: pathname === '/admin/cron' },
     ];
     clientDropdownItems = [
       { name: 'Client Management', href: '/admin/clients', current: pathname === '/admin/clients' },
@@ -48,6 +68,7 @@ export default function Navigation() {
       { name: 'Dashboard', href: '/', current: pathname === '/' },
       { name: 'Create Order', href: '/orders', current: pathname === '/orders' },
       { name: 'View Orders', href: '/view-orders', current: pathname === '/view-orders' },
+      { name: 'Reports', href: '/reports', current: pathname === '/reports' },
       { name: 'Wallet', href: '/credits', current: pathname === '/credits' },
     ];
   }
@@ -106,23 +127,47 @@ export default function Navigation() {
                     <CreditWallet />
                   )}
                   
-                  {/* User Info */}
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">
-                      {currentUser?.name || 'User'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {currentUser?.role || 'user'} • {currentUser?.email}
-                    </p>
+                  {/* User Dropdown Menu */}
+                  <div className="relative" ref={userMenuRef}>
+                    <button
+                      onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                      className="flex items-center space-x-2 text-sm font-medium text-gray-900 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-3 py-2"
+                    >
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-900">
+                          {currentUser?.name || 'User'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {currentUser?.role || 'user'} • {currentUser?.email}
+                        </p>
+                      </div>
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {isUserMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                        <Link
+                          href="/profile"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          My Profile
+                        </Link>
+                        <button
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            handleLogout();
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  
-                  {/* Logout Button */}
-                  <button
-                    onClick={handleLogout}
-                    className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                  >
-                    Logout
-                  </button>
                 </div>
               </div>
             </div>
@@ -189,12 +234,21 @@ export default function Navigation() {
                 </p>
               )}
               
-              <button
-                onClick={handleLogout}
-                className="mt-2 w-full bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-              >
-                Logout
-              </button>
+              <div className="mt-3 space-y-2">
+                <Link
+                  href="/profile"
+                  className="block w-full text-center bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  My Profile
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         </div>

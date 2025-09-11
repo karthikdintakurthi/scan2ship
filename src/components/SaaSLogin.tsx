@@ -105,6 +105,31 @@ export default function SaaSLogin({ onLoginSuccess }: SaaSLoginProps) {
           </form>
         </div>
 
+        {/* Terms and Conditions Disclaimer */}
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <p className="text-xs text-gray-600 text-center leading-relaxed">
+            By logging in, you agree to our{' '}
+            <a 
+              href="https://www.scan2ship.in/terms-and-conditions" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              Terms and Conditions
+            </a>
+            {' '}and{' '}
+            <a 
+              href="https://www.scan2ship.in/privacy-policy" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              Privacy Policy
+            </a>
+            . Please review these documents before proceeding.
+          </p>
+        </div>
+
         {/* Footer */}
         <div className="text-center text-sm text-gray-600 mt-6">
           <p>© 2024 Scan2Ship. All rights reserved.</p>

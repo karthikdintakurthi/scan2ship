@@ -8,10 +8,10 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   // SWC minification is enabled by default in Next.js 13+
-  experimental: {
-    // Ensure SWC is used for font loading
-    forceSwcTransforms: true,
-  },
+  // experimental: {
+  //   // Ensure SWC is used for font loading
+  //   forceSwcTransforms: true,
+  // },
   // Cache busting and asset optimization
   generateBuildId: async () => {
     // Generate a unique build ID based on timestamp and git commit
@@ -85,14 +85,18 @@ const nextConfig: NextConfig = {
     ];
   },
   // Webpack configuration for better cache busting
-  webpack: (config, { buildId, dev, isServer }) => {
-    // Add build ID to all chunks for better cache busting
-    if (!dev && !isServer) {
-      config.output.filename = `static/chunks/[name]-${buildId}.js`;
-      config.output.chunkFilename = `static/chunks/[name]-${buildId}.js`;
-    }
-    return config;
-  },
+  // webpack: (config, { buildId, dev, isServer }) => {
+  //   // Add build ID to all chunks for better cache busting
+  //   if (!dev && !isServer) {
+  //     if (config.output && config.output.filename) {
+  //       config.output.filename = `static/chunks/[name]-${buildId}.js`;
+  //     }
+  //     if (config.output && config.output.chunkFilename) {
+  //       config.output.chunkFilename = `static/chunks/[name]-${buildId}.js`;
+  //     }
+  //   }
+  //   return config;
+  // },
 };
 
 export default nextConfig;
