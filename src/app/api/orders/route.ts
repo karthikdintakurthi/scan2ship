@@ -427,7 +427,10 @@ export async function GET(request: NextRequest) {
     
     if (trackingStatus) {
       if (trackingStatus === 'null') {
-        whereClause.delhivery_tracking_status = null;
+        // Handle "Not Dispatched" case - match null, manifested, not picked, and pending
+        whereClause.delhivery_tracking_status = {
+          in: [null, 'manifested', 'not picked', 'pending']
+        };
       } else {
         whereClause.delhivery_tracking_status = trackingStatus;
       }
