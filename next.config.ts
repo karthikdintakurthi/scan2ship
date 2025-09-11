@@ -7,8 +7,7 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Use SWC for production builds, Babel only for Jest testing
-  swcMinify: true,
+  // SWC minification is enabled by default in Next.js 13+
   experimental: {
     // Ensure SWC is used for font loading
     forceSwcTransforms: true,

@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "rm -rf node_modules/.prisma && prisma generate && node scripts/cache-bust.js && next build",
+    "build": "rm -rf node_modules/.prisma && prisma generate && next build",
+    "build:local": "rm -rf node_modules/.prisma && prisma generate && node scripts/cache-bust.js && next build",
     "start": "next start",
     "prestart": "node scripts/validate-environment.js && node scripts/validate-security-config.js",
     "postinstall": "rm -rf node_modules/.prisma && prisma generate",

@@ -1,5 +1,6 @@
 // Generate cache name with timestamp for better cache busting
-const CACHE_VERSION = 'build-mff04g9j-local';
+// Use a combination of build time and random string for uniqueness
+const CACHE_VERSION = 'build-mff07qnu-local';
 const CACHE_NAME = `scan2ship-dynamic-v${CACHE_VERSION}`;
 const urlsToCache = [
   '/',
