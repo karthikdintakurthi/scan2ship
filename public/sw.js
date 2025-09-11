@@ -1,4 +1,6 @@
-const CACHE_NAME = 'scan2ship-dynamic-v1';
+// Generate cache name with timestamp for better cache busting
+const CACHE_VERSION = 'build-mff04g9j-local';
+const CACHE_NAME = `scan2ship-dynamic-v${CACHE_VERSION}`;
 const urlsToCache = [
   '/',
   '/orders',
@@ -17,10 +19,11 @@ const dynamicAssets = [
 
 // Install event - cache resources
 self.addEventListener('install', (event) => {
+  console.log('Service Worker installing with cache version:', CACHE_VERSION);
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
+        console.log('Opened cache:', CACHE_NAME);
         // Cache static assets
         return cache.addAll(urlsToCache);
       })
@@ -36,13 +39,26 @@ self.addEventListener('install', (event) => {
           );
         });
       })
+      .then(() => {
+        // Skip waiting to activate immediately
+        return self.skipWaiting();
+      })
   );
 });
 
 // Fetch event - serve from cache when offline
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  const url = new URL(request.url);
   
+  // Skip caching for API requests and external resources
+  if (url.pathname.startsWith('/api/') || 
+      url.origin !== location.origin ||
+      request.method !== 'GET') {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   // Handle manifest requests dynamically
   if (request.url.includes('/api/pwa/manifest')) {
     event.respondWith(
@@ -54,15 +70,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle image requests
-  if (request.destination === 'image') {
+  // Handle static assets with cache busting
+  if (url.pathname.startsWith('/_next/static/') || 
+      url.pathname.startsWith('/_next/image/') ||
+      request.destination === 'image') {
     event.respondWith(
       caches.match(request).then((response) => {
         if (response) {
           return response;
         }
         return fetch(request).then((fetchResponse) => {
-          // Cache new images
+          // Cache new assets
           if (fetchResponse.ok) {
             const responseClone = fetchResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
@@ -76,26 +94,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Default caching strategy
+  // For HTML pages, always try network first with cache fallback
   event.respondWith(
-    caches.match(request).then((response) => {
-      // Return cached version or fetch from network
-      return response || fetch(request).then((fetchResponse) => {
-        // Cache successful responses for HTML pages
-        if (fetchResponse.ok && request.destination === 'document') {
-          const responseClone = fetchResponse.clone();
+    fetch(request)
+      .then((response) => {
+        // If successful, cache the response
+        if (response.ok) {
+          const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(request, responseClone);
           });
         }
-        return fetchResponse;
-      });
-    })
+        return response;
+      })
+      .catch(() => {
+        // If network fails, try cache
+        return caches.match(request);
+      })
   );
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
+  console.log('Service Worker activating with cache version:', CACHE_VERSION);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -106,6 +127,9 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
+    }).then(() => {
+      // Take control of all clients immediately
+      return self.clients.claim();
     })
   );
 });
