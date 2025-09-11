@@ -428,9 +428,23 @@ export async function GET(request: NextRequest) {
     if (trackingStatus) {
       if (trackingStatus === 'null') {
         // Handle "Not Dispatched" case - match null, manifested, not picked, and pending
-        whereClause.delhivery_tracking_status = {
-          in: [null, 'manifested', 'not picked', 'pending']
-        };
+        const notDispatchedConditions = [
+          { delhivery_tracking_status: null },
+          { delhivery_tracking_status: 'manifested' },
+          { delhivery_tracking_status: 'not picked' },
+          { delhivery_tracking_status: 'pending' }
+        ];
+        
+        if (whereClause.OR) {
+          // If there's already an OR condition (from search), we need to combine them
+          whereClause.AND = [
+            { OR: whereClause.OR },
+            { OR: notDispatchedConditions }
+          ];
+          delete whereClause.OR;
+        } else {
+          whereClause.OR = notDispatchedConditions;
+        }
       } else {
         whereClause.delhivery_tracking_status = trackingStatus;
       }
