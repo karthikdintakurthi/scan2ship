@@ -239,7 +239,7 @@ async function handleCronRequest(request: NextRequest, defaultTriggerType: 'sche
                 const rawStatus = trackingResult.data.current_status || trackingResult.data.status;
                 const newStatus = delhiveryTrackingService.mapStatusToInternal(rawStatus);
 
-                // Only update if status has changed
+                // Always update the order to mark it as processed (even if status didn't change)
                 if (order.delhivery_tracking_status !== newStatus) {
                   console.log(`📝 [CRON_TRACKING_OPT_${jobId}] Updating order ${order.id}: ${order.delhivery_tracking_status} → ${newStatus}`);
                   
@@ -253,6 +253,16 @@ async function handleCronRequest(request: NextRequest, defaultTriggerType: 'sche
                   });
 
                   totalUpdated++;
+                } else {
+                  // Status didn't change, but still update the timestamp to mark as processed
+                  console.log(`🔄 [CRON_TRACKING_OPT_${jobId}] Order ${order.id} status unchanged (${newStatus}), updating timestamp`);
+                  
+                  await prisma.orders.update({
+                    where: { id: order.id },
+                    data: {
+                      updated_at: new Date()
+                    }
+                  });
                 }
               } else {
                 // Update order with error status
