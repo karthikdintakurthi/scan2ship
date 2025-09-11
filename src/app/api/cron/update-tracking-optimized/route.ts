@@ -305,8 +305,3 @@ async function handleCronRequest(request: NextRequest, defaultTriggerType: 'sche
     );
   }
 }
-
-// Also support GET for manual testing
-export async function GET(request: NextRequest) {
-  return POST(request);
-}
