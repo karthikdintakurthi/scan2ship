@@ -90,6 +90,7 @@ export default function OrderList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPickupLocation, setSelectedPickupLocation] = useState('')
   const [selectedCourierService, setSelectedCourierService] = useState('')
+  const [selectedTrackingStatus, setSelectedTrackingStatus] = useState('')
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set())
   const headerCheckboxRef = useRef<HTMLInputElement>(null)
   const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -190,7 +191,7 @@ export default function OrderList() {
 
   // Initial load - only run once
   useEffect(() => {
-    fetchOrders(1, '', '', '', '', '')
+    fetchOrders(1, '', '', '', '', '', '')
   }, [])
 
   // Debounced search with proper implementation
@@ -243,23 +244,30 @@ export default function OrderList() {
   const handlePickupLocationChange = useCallback((pickupLocation: string) => {
     setSelectedPickupLocation(pickupLocation)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, fromDate, toDate, pickupLocation, selectedCourierService)
-  }, [searchTerm, fromDate, toDate, selectedCourierService])
+    fetchOrders(1, searchTerm, fromDate, toDate, pickupLocation, selectedCourierService, selectedTrackingStatus)
+  }, [searchTerm, fromDate, toDate, selectedCourierService, selectedTrackingStatus])
 
   // Handle courier service change
   const handleCourierServiceChange = useCallback((courierService: string) => {
     setSelectedCourierService(courierService)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, courierService)
-  }, [searchTerm, fromDate, toDate, selectedPickupLocation])
+    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, courierService, selectedTrackingStatus)
+  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedTrackingStatus])
+
+  // Handle tracking status change
+  const handleTrackingStatusChange = useCallback((trackingStatus: string) => {
+    setSelectedTrackingStatus(trackingStatus)
+    setCurrentPage(1) // Reset to first page when filtering
+    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, trackingStatus)
+  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService])
 
   // Handle date range changes
   const handleDateRangeChange = useCallback((from: string, to: string) => {
     setFromDate(from)
     setToDate(to)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, from, to, selectedPickupLocation, selectedCourierService)
-  }, [searchTerm, selectedPickupLocation, selectedCourierService])
+    fetchOrders(1, searchTerm, from, to, selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
+  }, [searchTerm, selectedPickupLocation, selectedCourierService, selectedTrackingStatus])
 
   // Refresh all order statuses
   const handleRefreshAllStatuses = useCallback(async () => {
@@ -289,7 +297,7 @@ export default function OrderList() {
     setFromDate('')
     setToDate('')
     setCurrentPage(1)
-    fetchOrders(1, searchTerm, '', '', selectedPickupLocation, selectedCourierService)
+    fetchOrders(1, searchTerm, '', '', selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
   }
 
   // Clear all filters
@@ -299,31 +307,32 @@ export default function OrderList() {
     setToDate('')
     setSelectedPickupLocation('')
     setSelectedCourierService('')
+    setSelectedTrackingStatus('')
     setCurrentPage(1)
-    fetchOrders(1, '', '', '', '', '')
+    fetchOrders(1, '', '', '', '', '', '')
   }
 
   // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchOrders(page, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+    fetchOrders(page, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
   }
 
   // Handle page size change
   const handlePageSizeChange = (newPageSize: number) => {
     setCurrentPage(1) // Reset to first page
-    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
   }
 
 
 
-  const fetchOrders = async (page = 1, search = '', fromDate = '', toDate = '', pickupLocation = '', courierService = '') => {
+  const fetchOrders = async (page = 1, search = '', fromDate = '', toDate = '', pickupLocation = '', courierService = '', trackingStatus = '') => {
     try {
       // Store current scroll position
       scrollPositionRef.current = tableContainerRef.current?.scrollTop || 0
       
       // Only show main loading on initial load, not on search/filter changes
-      if (page === 1 && !search && !fromDate && !toDate && !pickupLocation && !courierService) {
+      if (page === 1 && !search && !fromDate && !toDate && !pickupLocation && !courierService && !trackingStatus) {
         setLoading(true)
       } else {
         // Show table loading for search/filter/pagination changes
@@ -352,6 +361,10 @@ export default function OrderList() {
 
       if (courierService) {
         params.append('courierService', courierService)
+      }
+
+      if (trackingStatus) {
+        params.append('trackingStatus', trackingStatus)
       }
       
       console.log('🔍 [FETCH_ORDERS] Fetching orders with params:', params.toString())
@@ -1003,7 +1016,7 @@ export default function OrderList() {
         productDescription: order.product_description || '',
         delhiveryWaybill: order.delhivery_waybill_number || '',
         delhiveryOrderId: order.delhivery_order_id || '',
-        delhiveryStatus: order.delhivery_tracking_status || order.delhivery_api_status || '',
+        delhiveryStatus: order.delhivery_tracking_status || '',
         shipmentLength: order.shipment_length || '',
         shipmentBreadth: order.shipment_breadth || '',
         shipmentHeight: order.shipment_height || '',
@@ -1161,7 +1174,7 @@ export default function OrderList() {
       return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Success</span>
     }
 
-    const status = order.delhivery_tracking_status || order.delhivery_api_status;
+    const status = order.delhivery_tracking_status || null;
     switch (status) {
       case 'delivered':
         return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Delivered</span>
@@ -1181,8 +1194,11 @@ export default function OrderList() {
         return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Success</span>
       case 'not_applicable':
         return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">ℹ️ Not Applicable</span>
+      case null:
+      case undefined:
+        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">📦 Not Dispatched</span>
       default:
-        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">Unknown</span>
+        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">📦 Not Dispatched</span>
     }
   }
 
@@ -1336,7 +1352,7 @@ export default function OrderList() {
                               {trackingNumber}
                             </button>
                             <TrackingStatusLabel 
-                              status={order.delhivery_tracking_status || order.delhivery_api_status || order.shopify_status} 
+                              status={order.delhivery_tracking_status || order.shopify_status} 
                               className="text-xs"
                             />
                           </div>
@@ -1349,7 +1365,7 @@ export default function OrderList() {
                             {trackingNumber}
                           </span>
                           <TrackingStatusLabel 
-                            status={order.delhivery_tracking_status || order.delhivery_api_status || order.shopify_status} 
+                            status={order.delhivery_tracking_status || order.shopify_status} 
                             className="text-xs"
                           />
                         </div>
@@ -1488,9 +1504,9 @@ export default function OrderList() {
       
       {/* Search Filter */}
       <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Row 1 - Search and Filters */}
-          <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search Input */}
             <div>
               <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
@@ -1569,10 +1585,33 @@ export default function OrderList() {
                 ))}
               </select>
             </div>
+
+            {/* Tracking Status Filter */}
+            <div>
+              <label htmlFor="trackingStatus" className="block text-sm font-medium text-gray-700 mb-2">
+                Tracking Status
+              </label>
+              <select
+                id="trackingStatus"
+                value={selectedTrackingStatus}
+                onChange={(e) => handleTrackingStatusChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+              >
+                <option value="">All Tracking Statuses</option>
+                <option value="null">Not Dispatched</option>
+                <option value="manifested">Manifested</option>
+                <option value="in_transit">In Transit</option>
+                <option value="delivered">Delivered</option>
+                <option value="returned">Returned</option>
+                <option value="failed">Failed</option>
+                <option value="pending">Pending</option>
+                <option value="dispatched">Dispatched</option>
+              </select>
+            </div>
           </div>
 
           {/* Row 2 - Date Range (Compact) */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-4">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <label htmlFor="fromDate" className="text-sm font-medium text-gray-700 whitespace-nowrap">
@@ -1615,7 +1654,7 @@ export default function OrderList() {
         {/* Filter Actions */}
         <div className="mt-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            {(searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService) && (
+            {(searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService || selectedTrackingStatus) && (
               <button
                 onClick={clearAllFilters}
                 className="px-4 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
@@ -1646,7 +1685,7 @@ export default function OrderList() {
               )}
             </button>
             {/* Export Orders Button - Only show when there are orders and filters are applied */}
-            {orders.length > 0 && (searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService) && (
+            {orders.length > 0 && (searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService || selectedTrackingStatus) && (
               <button
                 onClick={exportOrders}
                 className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center space-x-2"
@@ -1674,6 +1713,11 @@ export default function OrderList() {
             {selectedCourierService && (
               <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-md">
                 🚚 {courierServices.find(service => service.value === selectedCourierService)?.label}
+              </span>
+            )}
+            {selectedTrackingStatus && (
+              <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-md">
+                📊 {selectedTrackingStatus === 'null' ? 'Not Dispatched' : selectedTrackingStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </span>
             )}
             {fromDate && toDate && (
@@ -2246,7 +2290,7 @@ export default function OrderList() {
                             <div className="flex items-center space-x-2">
                               <span className="font-medium">Status:</span>
                               <TrackingStatusLabel 
-                                status={selectedOrder.delhivery_tracking_status || selectedOrder.delhivery_api_status || selectedOrder.shopify_status} 
+                                status={selectedOrder.delhivery_tracking_status || selectedOrder.shopify_status} 
                               />
                             </div>
                           </div>

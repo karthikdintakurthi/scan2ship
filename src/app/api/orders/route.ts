@@ -382,8 +382,9 @@ export async function GET(request: NextRequest) {
     const toDate = searchParams.get('toDate') || '';
     const pickupLocation = searchParams.get('pickupLocation') || '';
     const courierService = searchParams.get('courierService') || '';
+    const trackingStatus = searchParams.get('trackingStatus') || '';
     
-    console.log('🔍 [API_ORDERS_GET] Request parameters:', { page, limit, search, fromDate, toDate, pickupLocation, courierService, clientId: client.id });
+    console.log('🔍 [API_ORDERS_GET] Request parameters:', { page, limit, search, fromDate, toDate, pickupLocation, courierService, trackingStatus, clientId: client.id });
     
     const skip = (page - 1) * limit;
     
@@ -422,6 +423,14 @@ export async function GET(request: NextRequest) {
     
     if (courierService) {
       whereClause.courier_service = courierService;
+    }
+    
+    if (trackingStatus) {
+      if (trackingStatus === 'null') {
+        whereClause.delhivery_tracking_status = null;
+      } else {
+        whereClause.delhivery_tracking_status = trackingStatus;
+      }
     }
     
     // Get orders with pagination
