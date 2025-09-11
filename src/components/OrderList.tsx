@@ -3,6 +3,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { getPickupLocations } from '@/lib/order-form-config'
 import { getActiveCourierServices } from '@/lib/courier-service-config'
+import { useAuth } from '@/contexts/AuthContext'
 import ExcelJS from 'exceljs'
 import TrackingModal from './TrackingModal'
 import TrackingStatusLabel from './TrackingStatusLabel'
@@ -76,6 +77,7 @@ interface Order {
 }
 
 export default function OrderList() {
+  const { currentUser, currentClient } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [searchLoading, setSearchLoading] = useState(false)
@@ -271,6 +273,11 @@ export default function OrderList() {
 
   // Refresh all order statuses
   const handleRefreshAllStatuses = useCallback(async () => {
+    if (!currentClient?.id) {
+      setError('Client information not available. Please refresh the page.')
+      return
+    }
+    
     setRefreshingStatuses(true)
     try {
       const response = await fetch('/api/cron/update-tracking-optimized', {
@@ -279,7 +286,7 @@ export default function OrderList() {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer default-cron-secret'
         },
-        body: JSON.stringify({ clientId: currentUser?.clientId })
+        body: JSON.stringify({ clientId: currentClient.id })
       })
       
       if (response.ok) {
