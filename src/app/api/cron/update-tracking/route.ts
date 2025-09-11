@@ -93,18 +93,13 @@ export async function POST(request: NextRequest) {
       const orderWhereClause = {
         clientId: client.id,
         tracking_id: { not: null },
-        // Only process orders that are not in final states
+        // Process orders that are not in final states (delivered, returned, failed)
         OR: [
-          { delhivery_api_status: { not: 'delivered' } },
-          { delhivery_api_status: null },
-          { delhivery_api_status: 'pending' },
-          { delhivery_api_status: 'dispatched' }
-        ],
-        // Exclude orders that are already delivered, returned, or failed
-        AND: [
-          { delhivery_api_status: { not: 'delivered' } },
-          { delhivery_api_status: { not: 'returned' } },
-          { delhivery_api_status: { not: 'failed' } }
+          { delhivery_tracking_status: null }, // No tracking status set yet
+          { delhivery_tracking_status: 'pending' },
+          { delhivery_tracking_status: 'dispatched' },
+          { delhivery_tracking_status: 'manifested' },
+          { delhivery_tracking_status: 'in_transit' }
         ]
       };
 
@@ -115,7 +110,7 @@ export async function POST(request: NextRequest) {
         select: {
           id: true,
           tracking_id: true,
-          delhivery_api_status: true,
+          delhivery_tracking_status: true,
           created_at: true
         },
         take: 200 // Limit to 200 orders per client per run (4 batches of 50 waybills each)
@@ -125,7 +120,7 @@ export async function POST(request: NextRequest) {
       console.log(`📋 [CRON_TRACKING_${jobId}] Sample orders:`, orders.slice(0, 3).map(order => ({
         id: order.id,
         tracking_id: order.tracking_id,
-        current_status: order.delhivery_api_status
+        current_status: order.delhivery_tracking_status
       })));
 
       if (orders.length === 0) {
@@ -208,20 +203,20 @@ export async function POST(request: NextRequest) {
               console.log(`🔄 [CRON_TRACKING_${jobId}] Status mapping: "${rawStatus}" → "${newStatus}"`);
 
               // Only update if status has changed
-              if (order.delhivery_api_status !== newStatus) {
-                console.log(`📝 [CRON_TRACKING_${jobId}] Updating order ${order.id}: ${order.delhivery_api_status} → ${newStatus}`);
+              if (order.delhivery_tracking_status !== newStatus) {
+                console.log(`📝 [CRON_TRACKING_${jobId}] Updating order ${order.id}: ${order.delhivery_tracking_status} → ${newStatus}`);
                 
                 await prisma.orders.update({
                   where: { id: order.id },
                   data: {
-                    delhivery_api_status: newStatus,
+                    delhivery_tracking_status: newStatus,
                     delhivery_api_error: null, // Clear any previous errors
                     updated_at: new Date()
                   }
                 });
 
                 totalUpdated++;
-                console.log(`✅ [CRON_TRACKING_${jobId}] Successfully updated order ${order.id}: ${order.delhivery_api_status} → ${newStatus}`);
+                console.log(`✅ [CRON_TRACKING_${jobId}] Successfully updated order ${order.id}: ${order.delhivery_tracking_status} → ${newStatus}`);
               } else {
                 console.log(`ℹ️ [CRON_TRACKING_${jobId}] Order ${order.id} status unchanged: ${newStatus}`);
               }

@@ -174,6 +174,7 @@ export async function POST(request: NextRequest) {
             delhivery_waybill_number: delhiveryResponse.waybill_number,
             delhivery_order_id: delhiveryResponse.order_id,
             delhivery_api_status: 'success',
+            delhivery_tracking_status: 'manifested',
             tracking_id: delhiveryResponse.waybill_number,
             last_delhivery_attempt: new Date()
           }

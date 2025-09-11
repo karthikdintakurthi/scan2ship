@@ -34,6 +34,7 @@ interface Order {
   delhivery_waybill_number?: string
   delhivery_order_id?: string
   delhivery_api_status?: string
+  delhivery_tracking_status?: string
   delhivery_api_error?: string
   delhivery_retry_count?: number
   last_delhivery_attempt?: string
@@ -1002,7 +1003,7 @@ export default function OrderList() {
         productDescription: order.product_description || '',
         delhiveryWaybill: order.delhivery_waybill_number || '',
         delhiveryOrderId: order.delhivery_order_id || '',
-        delhiveryStatus: order.delhivery_api_status || '',
+        delhiveryStatus: order.delhivery_tracking_status || order.delhivery_api_status || '',
         shipmentLength: order.shipment_length || '',
         shipmentBreadth: order.shipment_breadth || '',
         shipmentHeight: order.shipment_height || '',
@@ -1160,13 +1161,24 @@ export default function OrderList() {
       return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Success</span>
     }
 
-    switch (order.delhivery_api_status) {
-      case 'success':
-        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Success</span>
+    const status = order.delhivery_tracking_status || order.delhivery_api_status;
+    switch (status) {
+      case 'delivered':
+        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Delivered</span>
+      case 'returned':
+        return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">↩️ Returned</span>
       case 'failed':
         return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">✗ Failed</span>
+      case 'manifested':
+        return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">📦 Manifested</span>
+      case 'in_transit':
+        return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">🚚 In Transit</span>
       case 'pending':
         return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">⏳ Pending</span>
+      case 'dispatched':
+        return <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded">🚀 Dispatched</span>
+      case 'success':
+        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Success</span>
       case 'not_applicable':
         return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">ℹ️ Not Applicable</span>
       default:
@@ -1324,7 +1336,7 @@ export default function OrderList() {
                               {trackingNumber}
                             </button>
                             <TrackingStatusLabel 
-                              status={order.delhivery_api_status || order.shopify_status} 
+                              status={order.delhivery_tracking_status || order.delhivery_api_status || order.shopify_status} 
                               className="text-xs"
                             />
                           </div>
@@ -1337,7 +1349,7 @@ export default function OrderList() {
                             {trackingNumber}
                           </span>
                           <TrackingStatusLabel 
-                            status={order.delhivery_api_status || order.shopify_status} 
+                            status={order.delhivery_tracking_status || order.delhivery_api_status || order.shopify_status} 
                             className="text-xs"
                           />
                         </div>
@@ -2234,7 +2246,7 @@ export default function OrderList() {
                             <div className="flex items-center space-x-2">
                               <span className="font-medium">Status:</span>
                               <TrackingStatusLabel 
-                                status={selectedOrder.delhivery_api_status || selectedOrder.shopify_status} 
+                                status={selectedOrder.delhivery_tracking_status || selectedOrder.delhivery_api_status || selectedOrder.shopify_status} 
                               />
                             </div>
                           </div>

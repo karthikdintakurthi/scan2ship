@@ -237,6 +237,7 @@ model orders {
   delhivery_waybill_number String?
   delhivery_order_id       String?
   delhivery_api_status     String?
+  delhivery_tracking_status String?
   delhivery_api_error      String?
   delhivery_retry_count    Int                   @default(0)
   last_delhivery_attempt   DateTime?
