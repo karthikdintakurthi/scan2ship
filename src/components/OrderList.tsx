@@ -359,7 +359,10 @@ export default function OrderList() {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer default-cron-secret'
         },
-        body: JSON.stringify({ clientId: currentClient.id })
+        body: JSON.stringify({ 
+          clientId: currentClient.id,
+          triggerType: 'manual'
+        })
       })
       
       if (response.ok) {

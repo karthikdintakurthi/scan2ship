@@ -8,30 +8,39 @@ export async function POST(request: NextRequest) {
   const MAX_EXECUTION_TIME = 25000; // 25 seconds max per call
   
   try {
-    console.log(`🔄 [SMART_REFRESH_${jobId}] Starting smart refresh job...`);
-    console.log(`🕐 [SMART_REFRESH_${jobId}] Start time: ${new Date().toISOString()}`);
-    
-    // Verify this is a legitimate cron request
+    // Determine trigger type based on request headers and body
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET || 'default-cron-secret';
+    const isScheduledCron = authHeader === `Bearer ${cronSecret}`;
     
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      console.log(`🚫 [SMART_REFRESH_${jobId}] Unauthorized request`);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Get client ID from request body
+    // Get request body to determine trigger type
     let body;
     let clientId: string | null = null;
+    let triggerType: 'scheduled' | 'manual' = 'scheduled';
     
     try {
       body = await request.json();
       clientId = body.clientId || null;
+      triggerType = body.triggerType || (isScheduledCron ? 'scheduled' : 'manual');
     } catch (error) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid request body. clientId is required.' 
-      }, { status: 400 });
+      // If no body, check if it's a scheduled cron
+      triggerType = isScheduledCron ? 'scheduled' : 'manual';
+    }
+    
+    console.log(`🔄 [SMART_REFRESH_${jobId}] Starting smart refresh job...`);
+    console.log(`🕐 [SMART_REFRESH_${jobId}] Start time: ${new Date().toISOString()}`);
+    console.log(`🎯 [SMART_REFRESH_${jobId}] Trigger type: ${triggerType.toUpperCase()}`);
+    console.log(`🔐 [SMART_REFRESH_${jobId}] Auth header present: ${!!authHeader}`);
+    
+    // Verify this is a legitimate request
+    if (!isScheduledCron && !authHeader) {
+      console.log(`🚫 [SMART_REFRESH_${jobId}] Unauthorized request - no auth header`);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    if (isScheduledCron && authHeader !== `Bearer ${cronSecret}`) {
+      console.log(`🚫 [SMART_REFRESH_${jobId}] Unauthorized scheduled cron request`);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     if (!clientId) {
@@ -98,8 +107,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Calculate optimal batch size and number of calls needed
-    const BATCH_SIZE = 25; // Smaller batches for better reliability
+    // Calculate optimal batch size and number of calls needed for minute-based execution
+    const BATCH_SIZE = 5; // Very small batches for minute-based execution
     const totalCallsNeeded = Math.ceil(totalOrdersCount / BATCH_SIZE);
     
     console.log(`📦 [SMART_REFRESH_${jobId}] Will make ${totalCallsNeeded} calls with batch size ${BATCH_SIZE}`);
@@ -267,11 +276,12 @@ export async function POST(request: NextRequest) {
         durationSeconds: Math.round(duration / 1000),
         clientId: client.id,
         clientName: client.companyName,
+        triggerType: triggerType,
         timestamp: new Date().toISOString()
       }
     };
 
-    console.log(`✅ [SMART_REFRESH_${jobId}] Smart refresh completed:`, result.stats);
+    console.log(`✅ [SMART_REFRESH_${jobId}] Smart refresh completed (${triggerType.toUpperCase()}):`, result.stats);
     return NextResponse.json(result);
 
   } catch (error) {

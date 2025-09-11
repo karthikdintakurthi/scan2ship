@@ -7,6 +7,12 @@
       "maxDuration": 30
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/update-tracking-optimized",
+      "schedule": "* * * * *"
+    }
+  ],
   "env": {
     "PRISMA_GENERATE_DATAPROXY": "true"
   },

@@ -8,27 +8,39 @@ export async function POST(request: NextRequest) {
   const MAX_EXECUTION_TIME = 25000; // 25 seconds max (leaving 5s buffer for response)
   
   try {
-    console.log(`🔄 [CRON_TRACKING_OPT_${jobId}] Starting optimized tracking update job...`);
-    console.log(`🕐 [CRON_TRACKING_OPT_${jobId}] Start time: ${new Date().toISOString()}`);
-    
-    // Verify this is a legitimate cron request
+    // Determine trigger type based on request headers and body
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET || 'default-cron-secret';
+    const isScheduledCron = authHeader === `Bearer ${cronSecret}`;
     
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      console.log(`🚫 [CRON_TRACKING_OPT_${jobId}] Unauthorized cron request`);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     // Check if this is a client-specific request
     let body;
     let specificClientId: string | null = null;
+    let triggerType: 'scheduled' | 'manual' = 'scheduled';
     
     try {
       body = await request.json();
       specificClientId = body.clientId || null;
+      triggerType = body.triggerType || (isScheduledCron ? 'scheduled' : 'manual');
     } catch (error) {
-      // No body or invalid JSON, continue with all clients
+      // No body or invalid JSON, check if it's a scheduled cron
+      triggerType = isScheduledCron ? 'scheduled' : 'manual';
+    }
+    
+    console.log(`🔄 [CRON_TRACKING_OPT_${jobId}] Starting optimized tracking update job...`);
+    console.log(`🕐 [CRON_TRACKING_OPT_${jobId}] Start time: ${new Date().toISOString()}`);
+    console.log(`🎯 [CRON_TRACKING_OPT_${jobId}] Trigger type: ${triggerType.toUpperCase()}`);
+    console.log(`🔐 [CRON_TRACKING_OPT_${jobId}] Auth header present: ${!!authHeader}`);
+    
+    // Verify this is a legitimate request
+    if (!isScheduledCron && !authHeader) {
+      console.log(`🚫 [CRON_TRACKING_OPT_${jobId}] Unauthorized request - no auth header`);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    if (isScheduledCron && authHeader !== `Bearer ${cronSecret}`) {
+      console.log(`🚫 [CRON_TRACKING_OPT_${jobId}] Unauthorized scheduled cron request`);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get clients with their pickup locations
@@ -89,7 +101,7 @@ export async function POST(request: NextRequest) {
         ]
       };
 
-      // REDUCED LIMIT: Only process 50 orders per client to prevent timeout
+      // MINUTE-BASED LIMIT: Only process 10 orders per client per minute to prevent overload
       const orders = await prisma.orders.findMany({
         where: orderWhereClause,
         select: {
@@ -98,7 +110,7 @@ export async function POST(request: NextRequest) {
           delhivery_tracking_status: true,
           created_at: true
         },
-        take: 50, // REDUCED from 200 to 50
+        take: 10, // REDUCED from 50 to 10 for minute-based execution
         orderBy: {
           created_at: 'asc' // Process oldest orders first
         }
@@ -151,8 +163,8 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          // REDUCED BATCH SIZE: Process only 25 tracking IDs at a time
-          const batchSize = 25;
+          // MINUTE-BASED BATCH SIZE: Process only 5 tracking IDs at a time for frequent execution
+          const batchSize = 5;
           const batches = [];
           for (let i = 0; i < trackingIds.length; i += batchSize) {
             batches.push(trackingIds.slice(i, i + batchSize));
@@ -247,6 +259,7 @@ export async function POST(request: NextRequest) {
         clientsProcessed,
         totalClients: clients.length,
         specificClient: specificClientId || null,
+        triggerType: triggerType,
         durationMs: duration,
         durationSeconds: Math.round(duration / 1000),
         timeoutPrevented: duration > MAX_EXECUTION_TIME,
@@ -254,7 +267,7 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    console.log(`✅ [CRON_TRACKING_OPT_${jobId}] Optimized tracking update completed:`, result.stats);
+    console.log(`✅ [CRON_TRACKING_OPT_${jobId}] Optimized tracking update completed (${triggerType.toUpperCase()}):`, result.stats);
     return NextResponse.json(result);
 
   } catch (error) {
