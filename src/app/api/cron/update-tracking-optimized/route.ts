@@ -118,22 +118,49 @@ async function handleCronRequest(request: NextRequest, defaultTriggerType: 'sche
         ]
       };
 
-      // MINUTE-BASED LIMIT: Only process 10 orders per client per minute to prevent overload
-      const orders = await prisma.orders.findMany({
-        where: orderWhereClause,
+      // INCREASED LIMIT: Process 50 orders per client per minute for better throughput
+      // EXCLUDE recently processed orders to avoid duplicates
+      const recentlyProcessedCutoff = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes ago
+      
+      // First, get a larger pool of orders to choose from
+      const allEligibleOrders = await prisma.orders.findMany({
+        where: {
+          clientId: client.id,
+          tracking_id: { not: null },
+          courier_service: 'delhivery',
+          OR: [
+            { delhivery_tracking_status: null },
+            { delhivery_tracking_status: 'pending' },
+            { delhivery_tracking_status: 'dispatched' },
+            { delhivery_tracking_status: 'manifested' },
+            { delhivery_tracking_status: 'in_transit' }
+          ]
+        },
         select: {
           id: true,
           tracking_id: true,
           delhivery_tracking_status: true,
-          created_at: true
+          created_at: true,
+          updated_at: true
         },
-        take: 10, // REDUCED from 50 to 10 for minute-based execution
-        orderBy: {
-          created_at: 'asc' // Process oldest orders first
-        }
+        orderBy: [
+          { updated_at: 'asc' }, // Process least recently updated orders first
+          { created_at: 'asc' }  // Then by creation date
+        ]
       });
 
+      // Filter out recently processed orders (within last 5 minutes)
+      const recentlyProcessed = allEligibleOrders.filter(order => 
+        order.updated_at && order.updated_at > recentlyProcessedCutoff
+      );
+
+      // Take the next batch of unprocessed orders
+      const orders = allEligibleOrders
+        .filter(order => !recentlyProcessed.some(recent => recent.id === order.id))
+        .slice(0, 50); // Take 50 orders per client per minute
+
       console.log(`📦 [CRON_TRACKING_OPT_${jobId}] Found ${orders.length} orders to process for client: ${client.companyName}`);
+      console.log(`📊 [CRON_TRACKING_OPT_${jobId}] Total eligible: ${allEligibleOrders.length}, Recently processed: ${recentlyProcessed.length}, Selected: ${orders.length}`);
 
       if (orders.length === 0) {
         clientsProcessed++;
@@ -180,8 +207,8 @@ async function handleCronRequest(request: NextRequest, defaultTriggerType: 'sche
             continue;
           }
 
-          // MINUTE-BASED BATCH SIZE: Process only 5 tracking IDs at a time for frequent execution
-          const batchSize = 5;
+          // INCREASED BATCH SIZE: Process 50 tracking IDs at a time for better efficiency
+          const batchSize = 50;
           const batches = [];
           for (let i = 0; i < trackingIds.length; i += batchSize) {
             batches.push(trackingIds.slice(i, i + batchSize));

@@ -107,8 +107,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Calculate optimal batch size and number of calls needed for minute-based execution
-    const BATCH_SIZE = 5; // Very small batches for minute-based execution
+    // Calculate optimal batch size and number of calls needed
+    const BATCH_SIZE = 50; // Increased batch size for better efficiency
     const totalCallsNeeded = Math.ceil(totalOrdersCount / BATCH_SIZE);
     
     console.log(`📦 [SMART_REFRESH_${jobId}] Will make ${totalCallsNeeded} calls with batch size ${BATCH_SIZE}`);
