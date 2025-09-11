@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { delhiveryService } from '@/lib/delhivery';
 
 export async function GET(
   request: NextRequest,
@@ -127,7 +128,6 @@ export async function PUT(
     if (authResult.user?.client) {
       console.log('👤 [API_ORDERS_PUT] Client Information:');
       console.log('  Client ID:', authResult.user.client.id);
-      console.log('  Client Name:', authResult.user.client.companyName || authResult.user.client.name);
       console.log('  User ID:', authResult.user.id);
       console.log('  User Email:', authResult.user.email);
     }
@@ -190,11 +190,62 @@ export async function DELETE(
 
     const { id } = await params
     const orderId = parseInt(id)
+    
+    // First, fetch the order to check if it's a Delhivery order and get necessary details
+    const order = await prisma.orders.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        courier_service: true,
+        tracking_id: true,
+        pickup_location: true,
+        clientId: true
+      }
+    });
+
+    if (!order) {
+      return NextResponse.json(
+        { error: 'Order not found' },
+        { status: 404 }
+      );
+    }
+
+    // If it's a Delhivery order and has a tracking_id (waybill), cancel it in Delhivery first
+    let delhiveryCancelResult = null;
+    if (order.courier_service?.toLowerCase() === 'delhivery' && order.tracking_id) {
+      try {
+        console.log('🚫 [API_ORDERS_DELETE] Cancelling Delhivery order before deletion:', order.tracking_id);
+        delhiveryCancelResult = await delhiveryService.cancelOrder(
+          order.tracking_id,
+          order.pickup_location || '',
+          order.clientId ? parseInt(order.clientId) : undefined
+        );
+        
+        if (delhiveryCancelResult.success) {
+          console.log('✅ [API_ORDERS_DELETE] Delhivery order cancelled successfully');
+        } else {
+          console.warn('⚠️ [API_ORDERS_DELETE] Failed to cancel Delhivery order:', delhiveryCancelResult.error);
+        }
+      } catch (delhiveryError) {
+        console.error('❌ [API_ORDERS_DELETE] Error cancelling Delhivery order:', delhiveryError);
+        // Continue with deletion even if Delhivery cancellation fails
+      }
+    }
+
+    // Delete the order from database
     await prisma.orders.delete({
       where: { id: orderId }
-    })
+    });
 
-    return NextResponse.json({ message: 'Order deleted successfully' })
+    console.log(`✅ [API_ORDERS_DELETE] Order ${orderId} deleted successfully`);
+
+    return NextResponse.json({ 
+      message: 'Order deleted successfully',
+      delhiveryCancellation: delhiveryCancelResult ? {
+        success: delhiveryCancelResult.success,
+        message: delhiveryCancelResult.message || delhiveryCancelResult.error
+      } : null
+    })
   } catch (error) {
     console.error('Error deleting order:', error)
     return NextResponse.json(

@@ -436,6 +436,63 @@ export class DelhiveryService {
       };
     }
   }
+
+  async cancelOrder(waybill: string, pickupLocation: string, clientId?: number): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      console.log('🚫 [DELHIVERY_CANCEL] Cancelling order with waybill:', waybill);
+      
+      // Get API key from pickup location configuration
+      const { getDelhiveryApiKey } = await import('./pickup-location-config');
+      
+      const apiKey = await getDelhiveryApiKey(pickupLocation, clientId);
+      
+      if (!apiKey) {
+        throw new Error(`No Delhivery API key found for pickup location: ${pickupLocation}${clientId ? ` and client: ${clientId}` : ''}. Please configure the API key in the client settings for this pickup location.`);
+      }
+      
+      console.log('🔑 [DELHIVERY_CANCEL] Using Delhivery API key for pickup location:', pickupLocation);
+      
+      // Use production Delhivery API URL for cancellation
+      const delhiveryUrl = 'https://track.delhivery.com/api/p/edit';
+      
+      // Prepare cancellation payload according to Delhivery documentation
+      const cancelPayload = {
+        waybill: waybill,
+        cancellation: "true"
+      };
+      
+      console.log('📦 [DELHIVERY_CANCEL] Calling Delhivery Production API:', delhiveryUrl);
+      console.log('📦 [DELHIVERY_CANCEL] Cancellation payload:', cancelPayload);
+      
+      const response = await this.makeRequest(
+        '/api/p/edit',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Token ${apiKey}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(cancelPayload)
+        },
+        apiKey
+      );
+      
+      console.log('✅ [DELHIVERY_CANCEL] Order cancelled successfully in Delhivery:', response);
+      
+      return {
+        success: true,
+        message: 'Order cancelled successfully in Delhivery'
+      };
+      
+    } catch (error) {
+      console.error('❌ [DELHIVERY_CANCEL] Error cancelling order:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to cancel order in Delhivery'
+      };
+    }
+  }
 }
 
 export const delhiveryService = new DelhiveryService();

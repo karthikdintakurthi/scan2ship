@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const { client, user } = auth;
     const orderData = await request.json();
 
-    console.log('📦 [API_ORDERS_POST] Creating order for client:', client.companyName);
+    console.log('📦 [API_ORDERS_POST] Creating order for client ID:', client.id);
 
     // Check if client has sufficient credits for order creation
     const orderCreditCost = CreditService.getCreditCost('ORDER');
@@ -304,9 +304,9 @@ export async function POST(request: NextRequest) {
         },
         client: {
           id: client.id,
-          companyName: client.companyName,
-          name: client.name,
-          email: client.email
+          companyName: client.id, // Using client ID as company name fallback
+          name: client.id, // Using client ID as name fallback
+          email: user.email // Using user email as fallback
         }
       };
 
@@ -436,7 +436,7 @@ export async function GET(request: NextRequest) {
     
     const totalPages = Math.ceil(totalCount / limit);
     
-    console.log(`✅ [API_ORDERS_GET] Found ${orders.length} orders out of ${totalCount} total for client: ${client.companyName}`);
+    console.log(`✅ [API_ORDERS_GET] Found ${orders.length} orders out of ${totalCount} total for client ID: ${client.id}`);
     
     return NextResponse.json({
       orders,
@@ -492,7 +492,7 @@ export async function DELETE(request: NextRequest) {
     const { client } = auth;
     const { orderIds } = await request.json();
 
-    console.log('🗑️ [API_ORDERS_DELETE] Bulk delete request for client:', client.companyName, 'Order IDs:', orderIds);
+    console.log('🗑️ [API_ORDERS_DELETE] Bulk delete request for client ID:', client.id, 'Order IDs:', orderIds);
 
     // Validate input
     if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
@@ -516,12 +516,19 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if all orders belong to the authenticated client (security check)
+    // Also fetch courier service and tracking details for Delhivery cancellation
     const existingOrders = await prisma.orders.findMany({
       where: {
         id: { in: validOrderIds },
         clientId: client.id // Ensure client isolation
       },
-      select: { id: true }
+      select: { 
+        id: true,
+        courier_service: true,
+        tracking_id: true,
+        pickup_location: true,
+        clientId: true
+      }
     });
 
     if (existingOrders.length !== validOrderIds.length) {
@@ -529,6 +536,42 @@ export async function DELETE(request: NextRequest) {
         { error: 'Some orders not found or do not belong to your client' },
         { status: 404 }
       );
+    }
+
+    // Cancel Delhivery orders before deletion
+    const delhiveryCancelResults = [];
+    for (const order of existingOrders) {
+      if (order.courier_service?.toLowerCase() === 'delhivery' && order.tracking_id) {
+        try {
+          console.log('🚫 [API_ORDERS_DELETE] Cancelling Delhivery order before deletion:', order.tracking_id);
+          const cancelResult = await delhiveryService.cancelOrder(
+            order.tracking_id,
+            order.pickup_location || '',
+            order.clientId
+          );
+          
+          delhiveryCancelResults.push({
+            orderId: order.id,
+            waybill: order.tracking_id,
+            success: cancelResult.success,
+            message: cancelResult.message || cancelResult.error
+          });
+          
+          if (cancelResult.success) {
+            console.log('✅ [API_ORDERS_DELETE] Delhivery order cancelled successfully:', order.tracking_id);
+          } else {
+            console.warn('⚠️ [API_ORDERS_DELETE] Failed to cancel Delhivery order:', order.tracking_id, cancelResult.error);
+          }
+        } catch (delhiveryError) {
+          console.error('❌ [API_ORDERS_DELETE] Error cancelling Delhivery order:', order.tracking_id, delhiveryError);
+          delhiveryCancelResults.push({
+            orderId: order.id,
+            waybill: order.tracking_id,
+            success: false,
+            message: 'Error cancelling Delhivery order'
+          });
+        }
+      }
     }
 
     // Delete all orders in a transaction
@@ -545,7 +588,7 @@ export async function DELETE(request: NextRequest) {
       return deletedOrders;
     });
 
-    console.log(`✅ [API_ORDERS_DELETE] Successfully deleted ${deleteResult.length} orders for client: ${client.companyName}`);
+    console.log(`✅ [API_ORDERS_DELETE] Successfully deleted ${deleteResult.length} orders for client ID: ${client.id}`);
 
     return NextResponse.json({
       success: true,
@@ -556,7 +599,8 @@ export async function DELETE(request: NextRequest) {
         name: order.name,
         mobile: order.mobile,
         tracking_id: order.tracking_id
-      }))
+      })),
+      delhiveryCancellations: delhiveryCancelResults
     });
 
   } catch (error) {
