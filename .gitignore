@@ -116,3 +116,4 @@ prod_backup_2025-09-08T22-41-49-200Z/users.json
 prod_backup_2025-09-08T22-41-49-200Z/webhook_logs.json
 prod_backup_2025-09-08T22-41-49-200Z/webhooks.json
 prod_backup_20250908_184116.backup
+add-tracking-status.sql
