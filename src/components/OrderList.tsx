@@ -273,12 +273,13 @@ export default function OrderList() {
   const handleRefreshAllStatuses = useCallback(async () => {
     setRefreshingStatuses(true)
     try {
-      const response = await fetch('/api/cron/update-tracking', {
+      const response = await fetch('/api/cron/update-tracking-optimized', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer default-cron-secret'
-        }
+        },
+        body: JSON.stringify({ clientId: currentUser?.clientId })
       })
       
       if (response.ok) {

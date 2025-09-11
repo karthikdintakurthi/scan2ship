@@ -90,9 +90,11 @@ export async function POST(request: NextRequest) {
       })));
       
       // Get all non-final orders for this client
+      // CRITICAL FIX: Only process Delhivery orders
       const orderWhereClause = {
         clientId: client.id,
         tracking_id: { not: null },
+        courier_service: 'delhivery', // ONLY process Delhivery orders
         // Process orders that are not in final states (delivered, returned, failed)
         OR: [
           { delhivery_tracking_status: null }, // No tracking status set yet
