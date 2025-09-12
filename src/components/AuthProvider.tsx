@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * AuthProvider - Provides authentication context to the app
  */
