@@ -2,7 +2,7 @@
   "name": "Order Tracking Update",
   "description": "Updates order tracking status by calling Delhivery APIs every 5 minutes",
   "schedule": "*/5 * * * *",
-  "endpoint": "/api/cron/update-tracking-optimized",
+  "endpoint": "/api/cron/scalable-update-tracking",
   "method": "POST",
   "headers": {
     "Authorization": "Bearer YOUR_CRON_SECRET_HERE",
@@ -15,7 +15,7 @@
     "vercel": {
       "cron_jobs": [
         {
-          "path": "/api/cron/update-tracking-optimized",
+          "path": "/api/cron/scalable-update-tracking",
           "schedule": "*/5 * * * *"
         }
       ]
@@ -23,7 +23,7 @@
       "railway": {
         "cron_jobs": [
           {
-            "command": "curl -X POST https://your-app.railway.app/api/cron/update-tracking-optimized -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE'",
+            "command": "curl -X POST https://your-app.railway.app/api/cron/scalable-update-tracking -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE'",
             "schedule": "*/5 * * * *"
           }
         ]
@@ -32,17 +32,17 @@
         "addons": ["scheduler:standard"],
         "scheduler_jobs": [
           {
-            "command": "curl -X POST https://your-app.herokuapp.com/api/cron/update-tracking-optimized -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE'",
+            "command": "curl -X POST https://your-app.herokuapp.com/api/cron/scalable-update-tracking -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE'",
             "schedule": "*/5 * * * *"
           }
         ]
       },
       "custom_server": {
-        "crontab_entry": "*/5 * * * * curl -X POST https://your-domain.com/api/cron/update-tracking-optimized -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE' >/dev/null 2>&1"
+        "crontab_entry": "*/5 * * * * curl -X POST https://your-domain.com/api/cron/scalable-update-tracking -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE' >/dev/null 2>&1"
       }
   },
   "monitoring": {
-    "health_check_endpoint": "/api/cron/update-tracking-optimized",
+    "health_check_endpoint": "/api/cron/scalable-update-tracking",
     "expected_response": {
       "success": true,
       "message": "Tracking update completed"

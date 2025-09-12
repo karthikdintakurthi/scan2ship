@@ -9,7 +9,7 @@
   },
   "crons": [
     {
-      "path": "/api/cron/update-tracking-optimized",
+      "path": "/api/cron/scalable-update-tracking",
         "schedule": "*/5 * * * *"
     }
   ],
