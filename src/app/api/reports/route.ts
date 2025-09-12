@@ -76,13 +76,14 @@ export async function GET(request: NextRequest) {
 
     console.log('📅 [API_REPORTS] Date range:', { startDate: startDate.toISOString(), endDate: endDate.toISOString() });
 
-    // Fetch orders for the client within date range
-    console.log('🔍 [API_REPORTS] Querying orders for client:', auth.user.clientId);
+    // Fetch orders for the client within date range - ONLY DELHIVERY ORDERS
+    console.log('🔍 [API_REPORTS] Querying Delhivery orders for client:', auth.user.clientId);
     let orders;
     try {
       orders = await prisma.orders.findMany({
         where: {
           clientId: auth.user.clientId,
+          courier_service: 'delhivery', // Only Delhivery orders
           created_at: {
             gte: startDate,
             lte: endDate
@@ -92,6 +93,7 @@ export async function GET(request: NextRequest) {
           id: true,
           created_at: true,
           tracking_id: true,
+          courier_service: true, // Include courier service for verification
           delhivery_api_status: true,
           delhivery_tracking_status: true,
           shopify_status: true
@@ -100,7 +102,7 @@ export async function GET(request: NextRequest) {
           created_at: 'desc'
         }
       });
-      console.log('📦 [API_REPORTS] Found orders:', orders.length);
+      console.log('📦 [API_REPORTS] Found Delhivery orders:', orders.length);
     } catch (dbError) {
       console.error('❌ [API_REPORTS] Database query error:', dbError);
       return NextResponse.json({ error: 'Database query failed' }, { status: 500 });
@@ -160,15 +162,24 @@ export async function GET(request: NextRequest) {
 
     // Debug logging for accuracy verification
     console.log('📊 [API_REPORTS] Status breakdown calculated:', statusCounts);
-    console.log('📊 [API_REPORTS] Sample orders with status mapping:', 
+    console.log('📊 [API_REPORTS] Sample Delhivery orders with status mapping:', 
       orders.slice(0, 5).map(order => ({
         id: order.id,
+        courier_service: order.courier_service,
         delhivery_tracking_status: order.delhivery_tracking_status,
         delhivery_api_status: order.delhivery_api_status,
         tracking_id: order.tracking_id,
         mapped_status: getOrderStatus(order)
       }))
     );
+    
+    // Verify all orders are Delhivery
+    const nonDelhiveryOrders = orders.filter(order => order.courier_service !== 'delhivery');
+    if (nonDelhiveryOrders.length > 0) {
+      console.warn('⚠️ [API_REPORTS] Found non-Delhivery orders in results:', nonDelhiveryOrders.length);
+    } else {
+      console.log('✅ [API_REPORTS] All orders are Delhivery orders');
+    }
 
     // Calculate monthly breakdown
     const monthlyData = new Map();

@@ -229,7 +229,8 @@ export default function ReportsPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Delhivery Order Reports</h1>
-          <p className="mt-2 text-gray-600">Track your order status and performance metrics</p>
+          <p className="mt-2 text-gray-600">Track your Delhivery order status and performance metrics</p>
+          <p className="mt-1 text-sm text-blue-600 font-medium">📊 Only Delhivery courier orders are included in these reports</p>
           {reportData && (
             <p className="mt-2 text-sm text-gray-500">
               Data from {new Date(reportData.dateRange.start).toLocaleDateString()} to {new Date(reportData.dateRange.end).toLocaleDateString()}
