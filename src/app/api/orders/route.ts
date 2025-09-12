@@ -143,13 +143,14 @@ export async function POST(request: NextRequest) {
     // Remove fields that are not in the database schema
     delete processedOrderData.waybill;
     delete processedOrderData.creationPattern;
+    delete processedOrderData.skip_tracking;
     
     // Log the processed data for debugging
     console.log('🔍 [API_ORDERS_POST] Processed order data:', processedOrderData);
 
-    // Handle Delhivery API call first if courier service is Delhivery (case-insensitive)
+    // Handle Delhivery API call first if courier service is Delhivery (case-insensitive) and skip_tracking is not enabled
     let delhiveryResponse = null;
-    if (orderData.courier_service.toLowerCase() === 'delhivery') {
+    if (orderData.courier_service.toLowerCase() === 'delhivery' && !orderData.skip_tracking) {
       try {
         console.log('🚚 [API_ORDERS_POST] Calling Delhivery API before creating order');
         console.log('🚚 [API_ORDERS_POST] Order data being sent to Delhivery:', JSON.stringify(processedOrderData, null, 2));
@@ -190,7 +191,11 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
     } else {
-      console.log('📝 [API_ORDERS_POST] Skipping Delhivery API for courier service:', orderData.courier_service);
+      if (orderData.courier_service.toLowerCase() === 'delhivery' && orderData.skip_tracking) {
+        console.log('📝 [API_ORDERS_POST] Skipping Delhivery API - skip_tracking enabled for Delhivery order');
+      } else {
+        console.log('📝 [API_ORDERS_POST] Skipping Delhivery API for courier service:', orderData.courier_service);
+      }
     }
 
     // Create order with client ID (only if Delhivery succeeded or not required)

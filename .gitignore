@@ -117,3 +117,10 @@ prod_backup_2025-09-08T22-41-49-200Z/webhook_logs.json
 prod_backup_2025-09-08T22-41-49-200Z/webhooks.json
 prod_backup_20250908_184116.backup
 add-tracking-status.sql
+playwright.config.ts
+playwright-report/data/04a1456e14b9bf0fdc4058bea52e412e417ce7da.md
+playwright-report/data/c70f172d2fb0a8f5d8ff03f92357caf16588e885.md
+playwright-report/data/d67705cfac57b56b0c3fdebb5da181445149f366.md
+playwright-report/index.html
+/test-results
+/tests

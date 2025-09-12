@@ -605,11 +605,25 @@ export default function OrderList() {
         }
       } else {
         const error = await response.json()
-        alert(`Failed to fulfill order: ${error.error || error.message}`)
+        console.error('Fulfill order error response:', error)
+        
+        // Show more detailed error message
+        let errorMessage = 'Failed to fulfill order'
+        if (error.error) {
+          errorMessage += `: ${error.error}`
+        } else if (error.message) {
+          errorMessage += `: ${error.message}`
+        }
+        
+        if (error.details) {
+          errorMessage += ` (Error code: ${error.details})`
+        }
+        
+        alert(errorMessage)
       }
     } catch (error) {
-      alert('Error fulfilling order')
       console.error('Error fulfilling order:', error)
+      alert(`Error fulfilling order: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsFulfilling(false)
     }
@@ -1408,7 +1422,7 @@ export default function OrderList() {
       ? (order.delhivery_waybill_number || order.tracking_id)
       : order.tracking_id
 
-    return trackingNumber || (order.courier_service.toLowerCase() === 'delhivery' ? 'Not assigned' : 'Not provided')
+    return trackingNumber || 'Not assigned'
   }
 
 
@@ -1453,9 +1467,9 @@ export default function OrderList() {
                     {(() => {
                       const trackingNumber = getTrackingNumber(order)
                       
-                      if (trackingNumber && trackingNumber !== 'Not assigned' && trackingNumber !== 'Not provided') {
-                        return (
-                          <div className="space-y-2">
+                      return (
+                        <div className="space-y-2">
+                          {trackingNumber && trackingNumber !== 'Not assigned' ? (
                             <button
                               onClick={() => handleTrackingClick(order)}
                               className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-sm block"
@@ -1463,19 +1477,11 @@ export default function OrderList() {
                             >
                               {trackingNumber}
                             </button>
-                            <TrackingStatusLabel 
-                              status={order.delhivery_tracking_status || order.shopify_status} 
-                              className="text-xs"
-                            />
-                          </div>
-                        )
-                      }
-                      
-                      return (
-                        <div className="space-y-2">
-                          <span className="text-gray-500 text-sm">
-                            {trackingNumber}
-                          </span>
+                          ) : (
+                            <span className="text-gray-500 text-sm">
+                              {trackingNumber}
+                            </span>
+                          )}
                           <TrackingStatusLabel 
                             status={order.delhivery_tracking_status || order.shopify_status} 
                             className="text-xs"

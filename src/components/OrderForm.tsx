@@ -31,6 +31,7 @@ interface AddressFormData {
   cod_amount: string
   pickup_location: string
   product_description: string
+  skip_tracking: boolean
 }
 
 export default function OrderForm() {
@@ -68,7 +69,8 @@ export default function OrderForm() {
     is_cod: false,
     cod_amount: '',
     pickup_location: '', // Will be set by the hook
-    product_description: ''
+    product_description: '',
+    skip_tracking: false
   })
   const [orderNumber, setOrderNumber] = useState<string | null>(null)
   
@@ -665,6 +667,7 @@ export default function OrderForm() {
       tracking_number: '', // Only reset tracking number
       reseller_name: '',
       reseller_mobile: '',
+      skip_tracking: false, // Reset skip tracking
       // Keep Order Details fields unchanged (courier_service, package_value, weight, total_items, is_cod, cod_amount, product_description)
       // Keep pickup_location unchanged
     }))
@@ -840,6 +843,7 @@ export default function OrderForm() {
         product_description: formData.product_description,
         waybill: formData.tracking_number,
         reference_number: formData.reference_number,
+        skip_tracking: formData.skip_tracking,
         creationPattern // Add creation pattern to order data
       }
 
@@ -910,6 +914,7 @@ export default function OrderForm() {
         reference_number: '', // Reset reference number
           reseller_name: '',
           reseller_mobile: '',
+          skip_tracking: false, // Reset skip tracking
           // Keep Order Details fields unchanged (courier_service, package_value, weight, total_items, is_cod, cod_amount, product_description)
           // Keep pickup_location unchanged
         }))
@@ -971,6 +976,7 @@ export default function OrderForm() {
         reference_number: '', // Reset reference number
       reseller_name: '',
       reseller_mobile: '',
+      skip_tracking: false, // Reset skip tracking
       // Keep Order Details fields unchanged (package_value, weight, total_items, is_cod, cod_amount, product_description)
       // Keep pickup_location and courier_service unchanged (part of pickup location configuration)
     }))
@@ -1091,6 +1097,26 @@ export default function OrderForm() {
                   Get next available
                 </button>
               </div>
+            )}
+            
+            {/* Skip Tracking Checkbox */}
+            <div className="mt-3 flex items-center">
+              <input
+                type="checkbox"
+                id="skip_tracking"
+                checked={formData.skip_tracking}
+                onChange={(e) => handleInputChange('skip_tracking', e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="skip_tracking" className="ml-2 text-sm text-gray-700">
+                Don't assign tracking
+                <span className="text-xs text-gray-500 ml-1">(Skip Delhivery API call)</span>
+              </label>
+            </div>
+            {formData.skip_tracking && (
+              <p className="text-xs text-amber-600 mt-1 bg-amber-50 px-2 py-1 rounded">
+                ⚠️ Order will be saved in Scan2Ship database only. No tracking will be assigned via Delhivery API.
+              </p>
             )}
           </div>
 

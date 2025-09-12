@@ -481,7 +481,7 @@ async function processOrderCreation(
       await prisma.shopify_orders.update({
         where: { id: shopifyOrderId },
         data: {
-          scan2shipOrderId: scan2shipOrder.id,
+          orderId: scan2shipOrder.id,
           status: 'synced',
           updatedAt: new Date()
         }
@@ -641,9 +641,9 @@ async function handleFulfillmentCreate(clientId: string, fulfillmentData: Shopif
     });
 
     // If we have a Scan2Ship order, update it with tracking information
-    if (shopifyOrder.scan2shipOrderId) {
+    if (shopifyOrder.orderId) {
       await updateScan2ShipOrderWithTracking(
-        shopifyOrder.scan2shipOrderId,
+        shopifyOrder.orderId,
         trackingNumber,
         trackingCompany,
         trackingUrl
@@ -689,7 +689,7 @@ async function handleFulfillmentCreate(clientId: string, fulfillmentData: Shopif
           await prisma.shopify_orders.update({
             where: { id: shopifyOrder.id },
             data: {
-              scan2shipOrderId: scan2shipOrder.id,
+              orderId: scan2shipOrder.id,
               updatedAt: new Date()
             }
           });
@@ -760,9 +760,9 @@ async function handleFulfillmentUpdate(clientId: string, fulfillmentData: Shopif
     });
 
     // If we have a Scan2Ship order and tracking info, update it
-    if (shopifyOrder.scan2shipOrderId && trackingNumber) {
+    if (shopifyOrder.orderId && trackingNumber) {
       await updateScan2ShipOrderWithTracking(
-        shopifyOrder.scan2shipOrderId,
+        shopifyOrder.orderId,
         trackingNumber,
         trackingCompany,
         trackingUrl
@@ -780,36 +780,36 @@ async function handleFulfillmentUpdate(clientId: string, fulfillmentData: Shopif
  * Update Scan2Ship order with tracking information from Shopify fulfillment
  */
 async function updateScan2ShipOrderWithTracking(
-  scan2shipOrderId: number,
+  orderId: number,
   trackingNumber: string,
   trackingCompany?: string,
   trackingUrl?: string
 ): Promise<void> {
   try {
-    console.log(`🔄 [SCAN2SHIP_UPDATE] Updating Scan2Ship order ${scan2shipOrderId} with tracking: ${trackingNumber}`);
+    console.log(`🔄 [SCAN2SHIP_UPDATE] Updating Scan2Ship order ${orderId} with tracking: ${trackingNumber}`);
 
     // Update the Scan2Ship order with tracking information
     await prisma.orders.update({
-      where: { id: scan2shipOrderId },
+      where: { id: orderId },
       data: {
         tracking_id: trackingNumber,
         updated_at: new Date()
       }
     });
 
-    console.log(`✅ [SCAN2SHIP_UPDATE] Successfully updated Scan2Ship order ${scan2shipOrderId} with tracking ${trackingNumber}`);
+    console.log(`✅ [SCAN2SHIP_UPDATE] Successfully updated Scan2Ship order ${orderId} with tracking ${trackingNumber}`);
 
     // Trigger webhooks for tracking update
     await WebhookService.triggerWebhooks('order.tracking_updated', {
-      order: { id: scan2shipOrderId, trackingId: trackingNumber },
-      client: { id: scan2shipOrderId }, // This should be the actual client ID
+      order: { id: orderId, trackingId: trackingNumber },
+      client: { id: orderId }, // This should be the actual client ID
       source: 'shopify_fulfillment',
       tracking: {
         number: trackingNumber,
         company: trackingCompany,
         url: trackingUrl
       }
-    }, 'a2977c64-362e-4f50-8c9c-32660b1f5b5a', scan2shipOrderId);
+    }, 'a2977c64-362e-4f50-8c9c-32660b1f5b5a', orderId);
 
   } catch (error) {
     console.error('❌ [SCAN2SHIP_UPDATE] Error updating Scan2Ship order:', error);

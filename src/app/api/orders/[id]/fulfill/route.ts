@@ -34,12 +34,19 @@ export async function POST(
     console.log(`🚀 [FULFILL_ORDER] Starting fulfillment process for order ${orderId}`);
 
     // Get the order details
-    const order = await prisma.orders.findUnique({
-      where: { id: orderId },
-      include: {
-        clients: true
-      }
-    });
+    let order;
+    try {
+      order = await prisma.orders.findUnique({
+        where: { id: orderId },
+        include: {
+          clients: true
+        }
+      });
+      console.log(`🔍 [FULFILL_ORDER] Order query successful, order found:`, !!order);
+    } catch (dbQueryError) {
+      console.error(`❌ [FULFILL_ORDER] Database query failed:`, dbQueryError);
+      throw new Error(`Failed to fetch order from database: ${dbQueryError instanceof Error ? dbQueryError.message : 'Unknown database error'}`);
+    }
 
     if (!order) {
       return NextResponse.json({
@@ -69,7 +76,29 @@ export async function POST(
     // Call Delhivery API to create waybill
     console.log(`🚚 [FULFILL_ORDER] Calling Delhivery API for order ${orderId}...`);
     
-    const delhiveryResponse = await delhiveryService.createOrder(order);
+    let delhiveryResponse;
+    try {
+      delhiveryResponse = await delhiveryService.createOrder(order);
+    } catch (delhiveryError) {
+      console.error(`❌ [FULFILL_ORDER] Delhivery API exception:`, delhiveryError);
+      
+      // Update order with error status
+      await prisma.orders.update({
+        where: { id: orderId },
+        data: {
+          delhivery_api_status: 'failed',
+          delhivery_api_error: delhiveryError instanceof Error ? delhiveryError.message : 'Unknown Delhivery API error',
+          last_delhivery_attempt: new Date(),
+          updated_at: new Date()
+        }
+      });
+
+      return NextResponse.json({
+        success: false,
+        message: 'Failed to create waybill',
+        error: delhiveryError instanceof Error ? delhiveryError.message : 'Unknown Delhivery API error'
+      }, { status: 500 });
+    }
     
     if (!delhiveryResponse.success) {
       console.error(`❌ [FULFILL_ORDER] Delhivery API failed:`, delhiveryResponse.error);
@@ -98,26 +127,31 @@ export async function POST(
     });
 
     // Update order with Delhivery data
-    await prisma.orders.update({
-      where: { id: orderId },
-      data: {
-        tracking_id: delhiveryResponse.waybill_number,
-        delhivery_waybill_number: delhiveryResponse.waybill_number,
-        delhivery_order_id: delhiveryResponse.order_id,
-        delhivery_api_status: 'success',
-        delhivery_tracking_status: 'manifested',
-        last_delhivery_attempt: new Date(),
-        shopify_status: 'pending', // Will be updated after Shopify call
-        updated_at: new Date()
-      }
-    });
+    try {
+      await prisma.orders.update({
+        where: { id: orderId },
+        data: {
+          tracking_id: delhiveryResponse.waybill_number,
+          delhivery_waybill_number: delhiveryResponse.waybill_number,
+          delhivery_order_id: delhiveryResponse.order_id,
+          delhivery_api_status: 'success',
+          delhivery_tracking_status: 'manifested',
+          last_delhivery_attempt: new Date(),
+          shopify_status: 'pending', // Will be updated after Shopify call
+          updated_at: new Date()
+        }
+      });
+    } catch (dbError) {
+      console.error(`❌ [FULFILL_ORDER] Database update failed:`, dbError);
+      throw new Error(`Failed to update order in database: ${dbError instanceof Error ? dbError.message : 'Unknown database error'}`);
+    }
 
     console.log(`✅ [FULFILL_ORDER] Updated order ${orderId} with tracking: ${delhiveryResponse.waybill_number}`);
 
     // Find the corresponding Shopify order
     const shopifyOrder = await prisma.shopify_orders.findFirst({
       where: {
-        scan2shipOrderId: orderId
+        orderId: orderId
       }
     });
 
@@ -137,39 +171,51 @@ export async function POST(
         console.log(`✅ [FULFILL_ORDER] Successfully updated Shopify order with tracking`);
         
         // Update Shopify order status
-        await prisma.shopify_orders.update({
-          where: { id: shopifyOrder.id },
-          data: {
-            status: 'fulfilled',
-            updatedAt: new Date()
-          }
-        });
+        try {
+          await prisma.shopify_orders.update({
+            where: { id: shopifyOrder.id },
+            data: {
+              status: 'fulfilled',
+              updatedAt: new Date()
+            }
+          });
+        } catch (shopifyDbError) {
+          console.error(`❌ [FULFILL_ORDER] Failed to update Shopify order in database:`, shopifyDbError);
+        }
 
         // Update order with Shopify success status
-        await prisma.orders.update({
-          where: { id: orderId },
-          data: {
-            shopify_status: 'fulfilled',
-            shopify_tracking_number: delhiveryResponse.waybill_number,
-            shopify_api_status: 'success',
-            last_shopify_attempt: new Date(),
-            updated_at: new Date()
-          }
-        });
+        try {
+          await prisma.orders.update({
+            where: { id: orderId },
+            data: {
+              shopify_status: 'fulfilled',
+              shopify_tracking_number: delhiveryResponse.waybill_number,
+              shopify_api_status: 'success',
+              last_shopify_attempt: new Date(),
+              updated_at: new Date()
+            }
+          });
+        } catch (orderDbError) {
+          console.error(`❌ [FULFILL_ORDER] Failed to update order with Shopify status:`, orderDbError);
+        }
       } else {
         console.warn(`⚠️ [FULFILL_ORDER] Failed to update Shopify order:`, shopifyUpdateResult.error);
         
         // Update order with Shopify error status
-        await prisma.orders.update({
-          where: { id: orderId },
-          data: {
-            shopify_status: 'error',
-            shopify_api_status: 'failed',
-            shopify_api_error: shopifyUpdateResult.error,
-            last_shopify_attempt: new Date(),
-            updated_at: new Date()
-          }
-        });
+        try {
+          await prisma.orders.update({
+            where: { id: orderId },
+            data: {
+              shopify_status: 'error',
+              shopify_api_status: 'failed',
+              shopify_api_error: shopifyUpdateResult.error,
+              last_shopify_attempt: new Date(),
+              updated_at: new Date()
+            }
+          });
+        } catch (shopifyErrorDbError) {
+          console.error(`❌ [FULFILL_ORDER] Failed to update order with Shopify error status:`, shopifyErrorDbError);
+        }
       }
     } else {
       console.log(`⚠️ [FULFILL_ORDER] No Shopify order found for Scan2Ship order ${orderId}`);
@@ -204,10 +250,31 @@ export async function POST(
   } catch (error) {
     console.error('❌ [FULFILL_ORDER] Error:', error);
     
+    // Handle Prisma errors specifically
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as any;
+      console.error('❌ [FULFILL_ORDER] Prisma error details:', {
+        code: prismaError.code,
+        message: prismaError.message,
+        meta: prismaError.meta
+      });
+      
+      return NextResponse.json({
+        success: false,
+        message: 'Database error occurred',
+        error: `Database error: ${prismaError.message}`,
+        details: prismaError.code
+      }, { status: 500 });
+    }
+    
+    // Handle other errors
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('❌ [FULFILL_ORDER] General error:', errorMessage);
+    
     return NextResponse.json({
       success: false,
-      message: 'Internal server error',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      message: 'Failed to fulfill order',
+      error: errorMessage
     }, { status: 500 });
   }
 }
