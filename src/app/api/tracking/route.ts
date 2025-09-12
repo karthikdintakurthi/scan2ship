@@ -31,13 +31,14 @@ export async function POST(request: NextRequest) {
     console.log('🔍 [TRACKING_API] Searching for orders with mobile:', searchMobile);
 
     // Fetch orders grouped by client
-    // Use raw query to avoid Prisma client issues with missing tracking_status column
+    // Search by both customer mobile and reseller mobile
     const orders = await prisma.$queryRaw`
       SELECT 
         o.id,
         o."clientId",
         o.name,
         o.mobile,
+        o.reseller_mobile,
         o.address,
         o.city,
         o.state,
@@ -53,10 +54,14 @@ export async function POST(request: NextRequest) {
         o.created_at,
         c.id as "client_id",
         c.name as "client_name",
-        c."companyName" as "client_company_name"
+        c."companyName" as "client_company_name",
+        CASE 
+          WHEN o.mobile = ${searchMobile} THEN 'customer'
+          WHEN o.reseller_mobile = ${searchMobile} THEN 'reseller'
+        END as "search_type"
       FROM orders o
       LEFT JOIN clients c ON o."clientId" = c.id
-      WHERE o.mobile = ${searchMobile}
+      WHERE o.mobile = ${searchMobile} OR o.reseller_mobile = ${searchMobile}
       ORDER BY o.created_at DESC
     ` as any[];
 
@@ -79,6 +84,8 @@ export async function POST(request: NextRequest) {
         id: order.id,
         name: order.name,
         mobile: order.mobile,
+        reseller_mobile: order.reseller_mobile,
+        search_type: order.search_type,
         tracking_id: order.tracking_id,
         courier_service: order.courier_service,
         created_at: order.created_at,

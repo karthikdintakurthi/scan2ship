@@ -6,6 +6,8 @@ interface Order {
   id: number
   name: string
   mobile: string
+  reseller_mobile?: string | null
+  search_type?: 'customer' | 'reseller'
   tracking_id: string | null
   courier_service: string
   created_at: string
@@ -140,7 +142,11 @@ export default function TrackingPage() {
             Track Your Orders
           </h2>
           <p className="text-gray-600">
-            Enter your mobile number to view all your orders across different merchants
+            Enter your mobile number to view all your orders across different merchants.
+            <br />
+            <span className="text-sm text-gray-500">
+              Search works for both customer mobile numbers and reseller mobile numbers.
+            </span>
           </p>
         </div>
 
@@ -256,9 +262,36 @@ export default function TrackingPage() {
               <p className="text-gray-600 mb-2">
                 Orders for mobile number: <span className="font-medium">{trackingData.mobile}</span>
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 mb-3">
                 Showing orders from: <span className="font-medium">{getSelectedClientOrders()?.clientName}</span>
               </p>
+              
+              {/* Search Type Summary */}
+              {getSelectedClientOrders() && (
+                <div className="flex gap-4 text-sm">
+                  {(() => {
+                    const customerOrders = getSelectedClientOrders()?.orders.filter(o => o.search_type === 'customer').length || 0;
+                    const resellerOrders = getSelectedClientOrders()?.orders.filter(o => o.search_type === 'reseller').length || 0;
+                    
+                    return (
+                      <>
+                        {customerOrders > 0 && (
+                          <span className="flex items-center gap-1 text-blue-600">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            {customerOrders} as Customer
+                          </span>
+                        )}
+                        {resellerOrders > 0 && (
+                          <span className="flex items-center gap-1 text-green-600">
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                            {resellerOrders} as Reseller
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Orders List */}
@@ -285,6 +318,15 @@ export default function TrackingPage() {
                             <span className="text-sm text-gray-500">
                               Order #{order.id}
                             </span>
+                            {order.search_type && (
+                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                order.search_type === 'customer' 
+                                  ? 'bg-blue-100 text-blue-700' 
+                                  : 'bg-green-100 text-green-700'
+                              }`}>
+                                {order.search_type === 'customer' ? '👤 Customer' : '🏪 Reseller'}
+                              </span>
+                            )}
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -407,7 +449,10 @@ export default function TrackingPage() {
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Orders Found</h3>
             <p className="text-gray-600">
               No orders were found for mobile number <span className="font-medium">{trackingData.mobile}</span>.
-              Please check your mobile number and try again.
+              <br />
+              <span className="text-sm text-gray-500">
+                This searches both customer orders and reseller orders. Please check your mobile number and try again.
+              </span>
             </p>
           </div>
         )}
