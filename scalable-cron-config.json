@@ -1,0 +1,46 @@
+{
+  "name": "Scalable Order Tracking Update",
+  "description": "Scalable cron job that processes all orders in batches to avoid timeout limits",
+  "schedule": "*/10 * * * *",
+  "endpoint": "/api/cron/scalable-update-tracking",
+  "method": "POST",
+  "headers": {
+    "Authorization": "Bearer YOUR_CRON_SECRET_HERE",
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "batchNumber": 1,
+    "totalBatches": 10
+  },
+  "batch_processing": {
+    "clients_per_batch": 5,
+    "orders_per_client": 100,
+    "api_batch_size": 50,
+    "max_execution_time": "25 minutes"
+  },
+  "deployment_options": {
+    "vercel": {
+      "cron_jobs": [
+        {
+          "path": "/api/cron/scalable-update-tracking",
+          "schedule": "*/10 * * * *"
+        }
+      ]
+    },
+    "railway": {
+      "cron_jobs": [
+        {
+          "command": "curl -X POST https://www.scan2ship.in/api/cron/scalable-update-tracking -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE' -H 'Content-Type: application/json' -d '{\"batchNumber\":1,\"totalBatches\":10}'",
+          "schedule": "*/10 * * * *"
+        }
+      ]
+    }
+  },
+  "monitoring": {
+    "health_check_endpoint": "/api/cron/scalable-update-tracking",
+    "expected_response": {
+      "success": true,
+      "message": "Batch completed"
+    }
+  }
+}
