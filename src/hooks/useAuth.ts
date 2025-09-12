@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * useAuth Hook - Provides authentication state and methods
  */

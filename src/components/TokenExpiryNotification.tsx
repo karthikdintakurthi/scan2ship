@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * TokenExpiryNotification - Shows notification when token is about to expire
  */
