@@ -224,7 +224,7 @@ export default function CronAdminPage() {
             <div className="border border-gray-200 rounded-lg p-4">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Full Tracking Update</h2>
               <p className="text-sm text-gray-600 mb-4">
-                Run the full tracking update for all non-delivered orders. This is the same as the hourly cron job.
+                Run the full tracking update for all non-delivered orders. This is the same as the 5-minute cron job.
               </p>
               <button
                 onClick={runFullTracking}
@@ -271,7 +271,7 @@ export default function CronAdminPage() {
               <div className="text-sm text-blue-800 space-y-2">
                 <p>1. Set the <code className="bg-blue-100 px-1 rounded">CRON_SECRET</code> environment variable</p>
                 <p>2. Configure your cron job to call: <code className="bg-blue-100 px-1 rounded">POST /api/cron/update-tracking-optimized</code></p>
-                <p>3. Schedule: <code className="bg-blue-100 px-1 rounded">0 * * * *</code> (every 1 hour)</p>
+                <p>3. Schedule: <code className="bg-blue-100 px-1 rounded">*/5 * * * *</code> (every 5 minutes)</p>
                 <p>4. Include Authorization header: <code className="bg-blue-100 px-1 rounded">Bearer YOUR_CRON_SECRET</code></p>
               </div>
             </div>

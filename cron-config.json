@@ -1,7 +1,7 @@
 {
   "name": "Order Tracking Update",
-  "description": "Updates order tracking status by calling Delhivery APIs every 1 hour",
-  "schedule": "0 * * * *",
+  "description": "Updates order tracking status by calling Delhivery APIs every 5 minutes",
+  "schedule": "*/5 * * * *",
   "endpoint": "/api/cron/update-tracking-optimized",
   "method": "POST",
   "headers": {
@@ -16,7 +16,7 @@
       "cron_jobs": [
         {
           "path": "/api/cron/update-tracking-optimized",
-          "schedule": "0 * * * *"
+          "schedule": "*/5 * * * *"
         }
       ]
     },
@@ -24,7 +24,7 @@
         "cron_jobs": [
           {
             "command": "curl -X POST https://your-app.railway.app/api/cron/update-tracking-optimized -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE'",
-            "schedule": "0 * * * *"
+            "schedule": "*/5 * * * *"
           }
         ]
       },
@@ -33,12 +33,12 @@
         "scheduler_jobs": [
           {
             "command": "curl -X POST https://your-app.herokuapp.com/api/cron/update-tracking-optimized -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE'",
-            "schedule": "0 * * * *"
+            "schedule": "*/5 * * * *"
           }
         ]
       },
       "custom_server": {
-        "crontab_entry": "* * * * * curl -X POST https://your-domain.com/api/cron/update-tracking-optimized -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE' >/dev/null 2>&1"
+        "crontab_entry": "*/5 * * * * curl -X POST https://your-domain.com/api/cron/update-tracking-optimized -H 'Authorization: Bearer YOUR_CRON_SECRET_HERE' >/dev/null 2>&1"
       }
   },
   "monitoring": {
