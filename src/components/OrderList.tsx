@@ -1463,29 +1463,33 @@ export default function OrderList() {
             <td className="px-6 py-4">
               <div className="space-y-2">
                 <div>
-                  <div className="space-y-2">
+                  <div>
                     {(() => {
                       const trackingNumber = getTrackingNumber(order)
                       
                       return (
-                        <div className="space-y-2">
-                          {trackingNumber && trackingNumber !== 'Not assigned' ? (
-                            <button
-                              onClick={() => handleTrackingClick(order)}
-                              className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-sm block"
-                              title="Click to track package"
-                            >
-                              {trackingNumber}
-                            </button>
-                          ) : (
-                            <span className="text-gray-500 text-sm">
-                              {trackingNumber}
-                            </span>
-                          )}
-                          <TrackingStatusLabel 
-                            status={order.delhivery_tracking_status || order.shopify_status} 
-                            className="text-xs"
-                          />
+                        <div>
+                          <div className="mb-2">
+                            {trackingNumber && trackingNumber !== 'Not assigned' ? (
+                              <button
+                                onClick={() => handleTrackingClick(order)}
+                                className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-sm block"
+                                title="Click to track package"
+                              >
+                                {trackingNumber}
+                              </button>
+                            ) : (
+                              <span className="text-gray-500 text-sm block">
+                                {trackingNumber}
+                              </span>
+                            )}
+                          </div>
+                          <div className="block">
+                            <TrackingStatusLabel 
+                              status={order.delhivery_tracking_status || order.shopify_status} 
+                              className="text-xs"
+                            />
+                          </div>
                         </div>
                       )
                     })()}

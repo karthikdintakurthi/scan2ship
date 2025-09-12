@@ -87,7 +87,16 @@ export default function TrackingStatusLabel({
       };
     }
     
-    // Everything else (in_transit, success, dispatched, pending, etc.) → In Transit
+    if (lowerStatus === 'pending') {
+      return {
+        label: 'Pending',
+        bgColor: 'bg-orange-100',
+        textColor: 'text-orange-800',
+        icon: '⏳'
+      };
+    }
+    
+    // Everything else (in_transit, success, dispatched, etc.) → In Transit
     return {
       label: 'In Transit',
       bgColor: 'bg-blue-100',

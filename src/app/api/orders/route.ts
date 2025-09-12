@@ -199,8 +199,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Create order with client ID (only if Delhivery succeeded or not required)
+    // Set delhivery_tracking_status to 'pending' if no tracking ID is assigned
+    const orderDataToCreate = {
+      ...processedOrderData,
+      delhivery_tracking_status: processedOrderData.tracking_id ? null : 'pending'
+    };
+    
     const order = await prisma.orders.create({
-      data: processedOrderData
+      data: orderDataToCreate
     });
 
     console.log('✅ [API_ORDERS_POST] Order created successfully:', order.id);
@@ -432,12 +438,37 @@ export async function GET(request: NextRequest) {
     
     if (trackingStatus) {
       if (trackingStatus === 'null') {
-        // Handle "Not Dispatched" case - match null, manifested, not picked, and pending
+        // Handle "Not Dispatched" case - orders that have been processed by Delhivery 
+        // but are in early stages (manifested, not picked, pending) AND have a tracking number assigned
         const notDispatchedConditions = [
-          { delhivery_tracking_status: null },
-          { delhivery_tracking_status: 'manifested' },
-          { delhivery_tracking_status: 'not picked' },
-          { delhivery_tracking_status: 'pending' }
+          { 
+            AND: [
+              { delhivery_tracking_status: null },
+              { tracking_id: { not: null } },
+              { tracking_id: { not: '' } }
+            ]
+          },
+          { 
+            AND: [
+              { delhivery_tracking_status: 'manifested' },
+              { tracking_id: { not: null } },
+              { tracking_id: { not: '' } }
+            ]
+          },
+          { 
+            AND: [
+              { delhivery_tracking_status: 'not picked' },
+              { tracking_id: { not: null } },
+              { tracking_id: { not: '' } }
+            ]
+          },
+          { 
+            AND: [
+              { delhivery_tracking_status: 'pending' },
+              { tracking_id: { not: null } },
+              { tracking_id: { not: '' } }
+            ]
+          }
         ];
         
         if (whereClause.OR) {
@@ -449,6 +480,25 @@ export async function GET(request: NextRequest) {
           delete whereClause.OR;
         } else {
           whereClause.OR = notDispatchedConditions;
+        }
+      } else if (trackingStatus === 'pending') {
+        // Handle "Pending" case - match pending delhivery status OR "Not assigned" tracking status OR no tracking number
+        const pendingConditions = [
+          { delhivery_tracking_status: 'pending' },
+          { tracking_status: 'Not assigned' },
+          { tracking_id: null },
+          { tracking_id: '' }
+        ];
+        
+        if (whereClause.OR) {
+          // If there's already an OR condition (from search), we need to combine them
+          whereClause.AND = [
+            { OR: whereClause.OR },
+            { OR: pendingConditions }
+          ];
+          delete whereClause.OR;
+        } else {
+          whereClause.OR = pendingConditions;
         }
       } else {
         whereClause.delhivery_tracking_status = trackingStatus;
