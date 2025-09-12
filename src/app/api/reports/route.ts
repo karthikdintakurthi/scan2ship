@@ -93,8 +93,8 @@ export async function GET(request: NextRequest) {
           created_at: true,
           tracking_id: true,
           delhivery_api_status: true,
+          delhivery_tracking_status: true,
           shopify_status: true
-          // Note: tracking_status field is commented out in schema
         },
         orderBy: {
           created_at: 'desc'
@@ -108,21 +108,21 @@ export async function GET(request: NextRequest) {
 
     // Map database status to report status using the same logic as TrackingStatusLabel
     const getOrderStatus = (order: any) => {
-      // Use delhivery_api_status as the primary source
-      if (order.delhivery_api_status) {
-        const status = order.delhivery_api_status.toLowerCase();
+      // Use delhivery_tracking_status as the primary source (this is updated by cron job)
+      if (order.delhivery_tracking_status) {
+        const status = order.delhivery_tracking_status.toLowerCase();
         
-        // Map to report statuses
+        // Map to report statuses (matching UI logic)
         if (status === 'delivered') {
           return 'delivered';
-        } else if (status === 'manifested' || status === 'not picked') {
+        } else if (status === 'manifested' || status === 'not picked' || status === 'pending') {
           return 'pending'; // Not Dispatched
         } else if (status === 'returned') {
           return 'returned';
         } else if (status === 'failed') {
           return 'failed';
         } else {
-          return 'dispatched'; // in_transit, success, etc. → In Transit
+          return 'dispatched'; // in_transit, dispatched, success, etc. → In Transit
         }
       }
       
@@ -157,6 +157,18 @@ export async function GET(request: NextRequest) {
         statusCounts[status as keyof typeof statusCounts]++;
       }
     });
+
+    // Debug logging for accuracy verification
+    console.log('📊 [API_REPORTS] Status breakdown calculated:', statusCounts);
+    console.log('📊 [API_REPORTS] Sample orders with status mapping:', 
+      orders.slice(0, 5).map(order => ({
+        id: order.id,
+        delhivery_tracking_status: order.delhivery_tracking_status,
+        delhivery_api_status: order.delhivery_api_status,
+        tracking_id: order.tracking_id,
+        mapped_status: getOrderStatus(order)
+      }))
+    );
 
     // Calculate monthly breakdown
     const monthlyData = new Map();
