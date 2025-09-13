@@ -80,10 +80,15 @@ export async function POST(request: NextRequest) {
       console.log(`🏢 [SCALABLE_CRON_${jobId}] Processing client: ${client.companyName} (${client.id})`);
       
       // Get orders for this client with intelligent batching
+      // Exclude orders updated within the last hour to avoid unnecessary API calls
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
+      console.log(`⏰ [SCALABLE_CRON_${jobId}] Excluding orders updated after: ${oneHourAgo.toISOString()}`);
+      
       const orderWhereClause = {
         clientId: client.id,
         tracking_id: { not: null },
         courier_service: 'delhivery',
+        updated_at: { lt: oneHourAgo }, // Only process orders not updated in the last hour
         OR: [
           { delhivery_tracking_status: null },
           { delhivery_tracking_status: 'pending' },
@@ -110,7 +115,25 @@ export async function POST(request: NextRequest) {
         take: 100 // Process 100 orders per client per batch
       });
 
+      // Get count of total eligible orders (including recently updated ones) for comparison
+      const totalEligibleOrders = await prisma.orders.count({
+        where: {
+          clientId: client.id,
+          tracking_id: { not: null },
+          courier_service: 'delhivery',
+          OR: [
+            { delhivery_tracking_status: null },
+            { delhivery_tracking_status: 'pending' },
+            { delhivery_tracking_status: 'dispatched' },
+            { delhivery_tracking_status: 'manifested' },
+            { delhivery_tracking_status: 'in_transit' }
+          ]
+        }
+      });
+
+      const excludedCount = totalEligibleOrders - orders.length;
       console.log(`📦 [SCALABLE_CRON_${jobId}] Found ${orders.length} orders to process for client: ${client.companyName}`);
+      console.log(`⏭️ [SCALABLE_CRON_${jobId}] Excluded ${excludedCount} orders updated within last hour (${totalEligibleOrders} total eligible)`);
 
       if (orders.length === 0) {
         clientsProcessed++;
