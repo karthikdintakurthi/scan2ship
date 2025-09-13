@@ -83,6 +83,7 @@ export default function OrderList() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [tableLoading, setTableLoading] = useState(false)
   const [refreshingStatuses, setRefreshingStatuses] = useState(false)
+  const [manualRefreshing, setManualRefreshing] = useState(false)
   const [refreshProgress, setRefreshProgress] = useState<{
     isRunning: boolean
     totalOrders: number
@@ -1602,6 +1603,54 @@ export default function OrderList() {
     }
   }
 
+  const refreshSelectedOrderStatuses = async () => {
+    if (selectedOrders.size === 0) return
+    
+    setManualRefreshing(true)
+    try {
+      const orderIds = Array.from(selectedOrders)
+      const token = localStorage.getItem('authToken')
+      if (!token) {
+        alert('Authentication token not found. Please log in again.')
+        return
+      }
+
+      console.log(`🔄 Refreshing statuses for ${orderIds.length} selected orders`)
+
+      const response = await fetch('/api/orders/refresh-statuses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ orderIds }),
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        console.log('✅ Manual refresh completed:', result)
+        
+        // Refresh the orders list to show updated statuses
+        await fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
+        
+        // Clear selection
+        setSelectedOrders(new Set())
+        
+        // Show success message with details
+        const { totalProcessed, totalUpdated, totalErrors } = result.stats
+        alert(`✅ Status refresh completed!\n\n📊 Results:\n• ${totalProcessed} orders processed\n• ${totalUpdated} statuses updated\n• ${totalErrors} errors encountered`)
+      } else {
+        const errorData = await response.json()
+        alert(`Failed to refresh statuses: ${errorData.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error refreshing order statuses:', error)
+      alert('Failed to refresh order statuses. Please try again.')
+    } finally {
+      setManualRefreshing(false)
+    }
+  }
+
   const handleTrackingClick = (order: Order) => {
     const trackingNumber = order.courier_service.toLowerCase() === 'delhivery' 
       ? (order.delhivery_waybill_number || order.tracking_id)
@@ -1782,6 +1831,8 @@ export default function OrderList() {
                 Clear All Filters
               </button>
             )}
+            {/* Refresh Statuses button hidden as requested */}
+            {/* 
             <button
               onClick={handleRefreshAllStatuses}
               disabled={refreshingStatuses}
@@ -1804,6 +1855,7 @@ export default function OrderList() {
                 </>
               )}
             </button>
+            */}
             {/* Export Orders Button - Only show when there are orders and filters are applied */}
             {orders.length > 0 && (searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService || selectedTrackingStatus) && (
               <button
@@ -1917,6 +1969,28 @@ export default function OrderList() {
               </span>
             </div>
             <div className="flex items-center space-x-3">
+              <button
+                onClick={refreshSelectedOrderStatuses}
+                disabled={manualRefreshing}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {manualRefreshing ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Refreshing Selected...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh Selected
+                  </>
+                )}
+              </button>
               {thermalPrintEnabled ? (
                 <button
                   onClick={() => downloadBulkLabels()}
