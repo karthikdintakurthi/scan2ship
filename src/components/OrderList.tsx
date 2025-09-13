@@ -165,7 +165,7 @@ export default function OrderList() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalOrders, setTotalOrders] = useState(0)
-  const [ordersPerPage] = useState(25)
+  const [ordersPerPage, setOrdersPerPage] = useState(25)
   
   // Delete confirmation state
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -431,6 +431,7 @@ export default function OrderList() {
 
   // Handle page size change
   const handlePageSizeChange = (newPageSize: number) => {
+    setOrdersPerPage(newPageSize) // Update page size
     setCurrentPage(1) // Reset to first page
     fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
   }
@@ -2025,7 +2026,7 @@ export default function OrderList() {
       
       {/* Orders Summary */}
       <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center justify-between">
+        <div>
           <div>
             <h3 className="text-lg font-medium text-gray-900">
               {searchTerm ? `Search Results for "${searchTerm}"` : 'All Orders'}
@@ -2041,15 +2042,144 @@ export default function OrderList() {
                 </span>
               )}
             </h3>
-            <p className="text-sm text-gray-600">
-              Showing {orders.length} of {totalOrders || 0} orders
-              {(totalPages || 1) > 1 && ` (Page ${currentPage} of ${totalPages || 1})`}
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            {totalOrders > 0 && (
-              <div className="text-sm text-gray-600">
-                <span className="font-medium">Max Orders:</span> 1,500
+            {/* Header pagination - matching footer structure exactly */}
+            {totalPages > 1 && (
+              <div className="bg-white py-3 flex items-center justify-between border-t border-gray-200 w-full">
+              <div className="flex-1 flex justify-between sm:hidden">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={!hasPrevPage}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={!hasNextPage}
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between px-4 sm:px-6">
+                <div className="flex items-center space-x-4">
+                  <p className="text-sm text-gray-700">
+                    {totalOrders > 0 ? (
+                      <>
+                        Showing <span className="font-medium">{((currentPage - 1) * ordersPerPage) + 1}</span> to{' '}
+                        <span className="font-medium">
+                          {Math.min(currentPage * ordersPerPage, totalOrders)}
+                        </span>{' '}
+                        of <span className="font-medium">{totalOrders}</span> results
+                      </>
+                    ) : (
+                      'No results found'
+                    )}
+                  </p>
+                  
+                  {/* Orders per page selector */}
+                  <div className="flex items-center space-x-2">
+                    <label htmlFor="ordersPerPageHeader" className="text-sm text-gray-700">
+                      Show:
+                    </label>
+                    <select
+                      id="ordersPerPageHeader"
+                      value={ordersPerPage}
+                      onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                      className="block w-20 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={200}>200</option>
+                      <option value={500}>500</option>
+                    </select>
+                    <span className="text-sm text-gray-700">per page</span>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={!hasPrevPage}
+                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="sr-only">Previous</span>
+                        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      
+                      {/* Page numbers */}
+                      {Array.from({ length: Math.min(5, totalPages || 1) }, (_, i) => {
+                        let pageNum
+                        if ((totalPages || 1) <= 5) {
+                          pageNum = i + 1
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1
+                        } else if (currentPage >= (totalPages || 1) - 2) {
+                          pageNum = (totalPages || 1) - 4 + i
+                        } else {
+                          pageNum = currentPage - 2 + i
+                        }
+                        
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => handlePageChange(pageNum)}
+                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                              pageNum === currentPage
+                                ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        )
+                      })}
+                      
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={!hasNextPage}
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="sr-only">Next</span>
+                        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </nav>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Fallback display when no pagination needed */}
+            {totalPages <= 1 && (
+              <div className="flex items-center justify-between w-full py-3">
+                <p className="text-sm text-gray-600">
+                  Showing {orders.length} of {totalOrders || 0} orders
+                </p>
+                
+                {/* Orders per page selector when no pagination */}
+                <div className="flex items-center space-x-2">
+                  <label htmlFor="ordersPerPageHeaderNoPagination" className="text-sm text-gray-600">
+                    Show:
+                  </label>
+                  <select
+                    id="ordersPerPageHeaderNoPagination"
+                    value={ordersPerPage}
+                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    className="block w-20 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={200}>200</option>
+                    <option value={500}>500</option>
+                  </select>
+                  <span className="text-sm text-gray-600">per page</span>
+                </div>
               </div>
             )}
           </div>
@@ -2114,7 +2244,7 @@ export default function OrderList() {
           
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div className="bg-white py-3 flex items-center justify-between border-t border-gray-200 w-full">
               <div className="flex-1 flex justify-between sm:hidden">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
@@ -2131,8 +2261,8 @@ export default function OrderList() {
                   Next
                 </button>
               </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
+              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between px-4 sm:px-6">
+                <div className="flex items-center space-x-4">
                   <p className="text-sm text-gray-700">
                     {totalOrders > 0 ? (
                       <>
@@ -2146,8 +2276,28 @@ export default function OrderList() {
                       'No results found'
                     )}
                   </p>
+                  
+                  {/* Orders per page selector */}
+                  <div className="flex items-center space-x-2">
+                    <label htmlFor="ordersPerPage" className="text-sm text-gray-700">
+                      Show:
+                    </label>
+                    <select
+                      id="ordersPerPage"
+                      value={ordersPerPage}
+                      onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                      className="block w-20 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={200}>200</option>
+                      <option value={500}>500</option>
+                    </select>
+                    <span className="text-sm text-gray-700">per page</span>
+                  </div>
                 </div>
-                <div>
+                <div className="flex justify-end">
                   <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                     <button
                       onClick={() => handlePageChange(currentPage - 1)}
