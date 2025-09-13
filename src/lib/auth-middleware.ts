@@ -87,6 +87,20 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
 
     const token = authHeader.substring(7);
     
+    // Validate token format before verification
+    if (!token || token.trim() === '') {
+      console.error('🚨 JWT ERROR: Empty or null token');
+      return null;
+    }
+    
+    // Check if token has proper JWT format (3 parts separated by dots)
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      console.error('🚨 JWT ERROR: Invalid token format - expected 3 parts, got:', tokenParts.length);
+      console.error('Token preview:', token.substring(0, 20) + '...');
+      return null;
+    }
+    
     // Use basic JWT verification to match the login endpoint
     const jwt = require('jsonwebtoken');
     let decoded;
@@ -104,7 +118,9 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
         algorithms: ['HS256']
       });
     } catch (error) {
-      console.error('JWT verification error:', error);
+      console.error('🚨 JWT verification error:', error);
+      console.error('Token preview:', token.substring(0, 50) + '...');
+      console.error('Token length:', token.length);
       return null;
     }
     

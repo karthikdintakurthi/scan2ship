@@ -6,6 +6,7 @@ import { getActiveCourierServices } from '@/lib/courier-service-config'
 import { useAuth } from '@/contexts/AuthContext'
 import ExcelJS from 'exceljs'
 import TrackingModal from './TrackingModal'
+
 import TrackingStatusLabel from './TrackingStatusLabel'
 
 interface Order {
@@ -95,6 +96,30 @@ export default function OrderList() {
     currentCall: number
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Helper function to get and validate auth token
+  const getAuthToken = () => {
+    const token = localStorage.getItem('authToken');
+    if (!token || token.trim() === '') {
+      console.warn('⚠️ No auth token found in localStorage - user may need to log in');
+      return null;
+    }
+    
+    // Basic JWT format validation (3 parts separated by dots)
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      console.error('🚨 Invalid token format in localStorage:', token.substring(0, 20) + '...');
+      localStorage.removeItem('authToken'); // Remove invalid token
+      return null;
+    }
+    
+    // Check if user is authenticated through context (optional check)
+    if (!currentUser || !currentClient) {
+      console.warn('⚠️ User context not available, but proceeding with token validation');
+    }
+    
+    return token;
+  };
 
   // Helper function to convert database status to UI label
   const getTrackingStatusLabel = (status: string) => {
@@ -430,13 +455,122 @@ export default function OrderList() {
   }
 
   // Handle page size change
-  const handlePageSizeChange = (newPageSize: number) => {
-    setOrdersPerPage(newPageSize) // Update page size
-    setCurrentPage(1) // Reset to first page
-    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
+  const handlePageSizeChange = useCallback((newPageSize: number) => {
+    // Prevent unnecessary re-renders by batching state updates
+    if (newPageSize === ordersPerPage) {
+      return; // No change needed
+    }
+    
+    setError(null); // Clear any existing errors
+    
+    // Batch state updates to prevent multiple re-renders
+    setOrdersPerPage(newPageSize);
+    setCurrentPage(1);
+    
+    // Fetch orders with the new page size immediately
+    fetchOrdersWithPageSize(1, newPageSize, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus);
+  }, [ordersPerPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus]);
+
+
+
+
+  // Fetch orders with specific page size (for page size changes)
+  const fetchOrdersWithPageSize = async (page = 1, pageSize = 25, search = '', fromDate = '', toDate = '', pickupLocation = '', courierService = '', trackingStatus = '') => {
+    try {
+      // Store current scroll position
+      const tableContainer = tableContainerRef.current
+      if (tableContainer) {
+        scrollPositionRef.current = tableContainer.scrollTop
+      }
+      
+      // Always use table loading for pagination changes to prevent page flickering
+      setTableLoading(true)
+      setError(null) // Clear any previous errors
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: pageSize.toString()
+      })
+      
+      if (search) {
+        params.append('search', search)
+      }
+      if (fromDate) {
+        params.append('fromDate', fromDate)
+      }
+      if (toDate) {
+        params.append('toDate', toDate)
+      }
+      if (pickupLocation) {
+        params.append('pickupLocation', pickupLocation)
+      }
+      if (courierService) {
+        params.append('courierService', courierService)
+      }
+      if (trackingStatus) {
+        params.append('trackingStatus', trackingStatus)
+      }
+
+      const token = getAuthToken();
+      if (!token) {
+        setError('Authentication token is invalid. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`/api/orders?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log('✅ [FETCH_ORDERS] Orders fetched successfully:', data)
+        const ordersData = data.orders || []
+        const currentPageData = data.pagination?.currentPage || 1
+        const totalPagesData = data.pagination?.totalPages || 1
+        const totalOrdersData = data.pagination?.totalCount || data.pagination?.totalOrders || 0
+        
+        console.log('📊 [FETCH_ORDERS] Pagination data:', {
+          currentPage: currentPageData,
+          totalPages: totalPagesData,
+          totalOrders: totalOrdersData,
+          ordersPerPage: pageSize
+        })
+        
+        setOrders(ordersData)
+        setCurrentPage(currentPageData)
+        setTotalPages(totalPagesData)
+        setTotalOrders(totalOrdersData)
+      } else {
+        const errorData = await response.json()
+        console.error('❌ [FETCH_ORDERS] Failed to fetch orders:', errorData)
+        setError(`Failed to fetch orders: ${errorData.error || 'Unknown error'}`)
+        // Reset pagination state on error
+        setOrders([])
+        setTotalOrders(0)
+        setTotalPages(1)
+        setCurrentPage(1)
+      }
+    } catch (error) {
+      console.error('❌ [FETCH_ORDERS] Error fetching orders:', error)
+      setError(`Error fetching orders: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      // Reset pagination state on error
+      setOrders([])
+      setTotalOrders(0)
+      setTotalPages(1)
+      setCurrentPage(1)
+    } finally {
+      setLoading(false)
+      setTableLoading(false)
+      
+      // Restore scroll position after a short delay
+      setTimeout(() => {
+        if (tableContainerRef.current && scrollPositionRef.current > 0) {
+          tableContainerRef.current.scrollTop = scrollPositionRef.current
+        }
+      }, 100)
+    }
   }
-
-
 
   const fetchOrders = async (page = 1, search = '', fromDate = '', toDate = '', pickupLocation = '', courierService = '', trackingStatus = '') => {
     try {
@@ -2191,15 +2325,15 @@ export default function OrderList() {
           {searchTerm ? `No orders found matching "${searchTerm}"` : 'No orders found'}
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden relative" ref={tableContainerRef}>
+        <div className="bg-white rounded-lg shadow overflow-hidden relative transition-opacity duration-200" ref={tableContainerRef}>
           {tableLoading && (
-            <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+            <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-10 transition-opacity duration-200">
               <div className="flex items-center space-x-2 text-gray-600">
                 <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                <span className="text-sm">Loading orders...</span>
+                <span className="text-sm">Updating...</span>
               </div>
             </div>
           )}
