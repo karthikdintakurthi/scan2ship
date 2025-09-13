@@ -68,7 +68,6 @@ export default function Navigation() {
       { name: 'Dashboard', href: '/', current: pathname === '/' },
       { name: 'Create Order', href: '/orders', current: pathname === '/orders' },
       { name: 'View Orders', href: '/view-orders', current: pathname === '/view-orders' },
-      { name: 'Reports', href: '/reports', current: pathname === '/reports' },
       { name: 'Wallet', href: '/credits', current: pathname === '/credits' },
     ];
   }

@@ -15,8 +15,6 @@ export default function Breadcrumb() {
       items.push({ name: 'View Orders', href: '/view-orders', current: true })
     } else if (pathname === '/profile') {
       items.push({ name: 'My Profile', href: '/profile', current: true })
-    } else if (pathname === '/reports') {
-      items.push({ name: 'Reports', href: '/reports', current: true })
     }
     
     return items

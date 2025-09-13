@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import ExcelJS from 'exceljs'
 import TrackingModal from './TrackingModal'
 
-import TrackingStatusLabel from './TrackingStatusLabel'
 
 interface Order {
   id: number
@@ -84,7 +83,6 @@ export default function OrderList() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [tableLoading, setTableLoading] = useState(false)
   const [refreshingStatuses, setRefreshingStatuses] = useState(false)
-  const [manualRefreshing, setManualRefreshing] = useState(false)
   const [refreshProgress, setRefreshProgress] = useState<{
     isRunning: boolean
     totalOrders: number
@@ -121,53 +119,6 @@ export default function OrderList() {
     return token;
   };
 
-  // Helper function to convert database status to UI label
-  const getTrackingStatusLabel = (status: string) => {
-    const lowerStatus = status.toLowerCase();
-    
-    if (lowerStatus === 'delivered') {
-      return '✅ Delivered';
-    }
-    
-    if (lowerStatus === 'manifested' || lowerStatus === 'not picked' || lowerStatus === 'null') {
-      return '⏳ Not Dispatched';
-    }
-    
-    if (lowerStatus === 'returned') {
-      return '↩️ Returned';
-    }
-    
-    if (lowerStatus === 'failed') {
-      return '❌ Failed';
-    }
-    
-    if (lowerStatus === 'pending') {
-      return '⏳ Pending';
-    }
-    
-    // Everything else (in_transit, dispatched, success, etc.) → In Transit
-    return '🚚 In Transit';
-  };
-
-  // Helper function to convert UI label back to database values for filtering
-  const getTrackingStatusDbValue = (uiLabel: string) => {
-    switch (uiLabel) {
-      case '⏳ Not Dispatched':
-        return 'null'; // Use null to match both null and manifested in database
-      case '🚚 In Transit':
-        return 'in_transit'; // Use in_transit to match in_transit, dispatched, success, etc.
-      case '✅ Delivered':
-        return 'delivered';
-      case '↩️ Returned':
-        return 'returned';
-      case '❌ Failed':
-        return 'failed';
-      case '⏳ Pending':
-        return 'pending';
-      default:
-        return uiLabel; // Return as-is if it's already a database value
-    }
-  };
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [retrying, setRetrying] = useState<number | null>(null)
   const [isFulfilling, setIsFulfilling] = useState(false)
@@ -176,7 +127,6 @@ export default function OrderList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPickupLocation, setSelectedPickupLocation] = useState('')
   const [selectedCourierService, setSelectedCourierService] = useState('')
-  const [selectedTrackingStatus, setSelectedTrackingStatus] = useState('')
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set())
   const headerCheckboxRef = useRef<HTMLInputElement>(null)
   const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -330,30 +280,24 @@ export default function OrderList() {
   const handlePickupLocationChange = useCallback((pickupLocation: string) => {
     setSelectedPickupLocation(pickupLocation)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, fromDate, toDate, pickupLocation, selectedCourierService, selectedTrackingStatus)
-  }, [searchTerm, fromDate, toDate, selectedCourierService, selectedTrackingStatus])
+    fetchOrders(1, searchTerm, fromDate, toDate, pickupLocation, selectedCourierService, '')
+  }, [searchTerm, fromDate, toDate, selectedCourierService])
 
   // Handle courier service change
   const handleCourierServiceChange = useCallback((courierService: string) => {
     setSelectedCourierService(courierService)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, courierService, selectedTrackingStatus)
-  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedTrackingStatus])
+    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, courierService, '')
+  }, [searchTerm, fromDate, toDate, selectedPickupLocation])
 
-  // Handle tracking status change
-  const handleTrackingStatusChange = useCallback((trackingStatus: string) => {
-    setSelectedTrackingStatus(trackingStatus)
-    setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, trackingStatus)
-  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService])
 
   // Handle date range changes
   const handleDateRangeChange = useCallback((from: string, to: string) => {
     setFromDate(from)
     setToDate(to)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, from, to, selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
-  }, [searchTerm, selectedPickupLocation, selectedCourierService, selectedTrackingStatus])
+    fetchOrders(1, searchTerm, from, to, selectedPickupLocation, selectedCourierService, '')
+  }, [searchTerm, selectedPickupLocation, selectedCourierService])
 
   // Refresh all order statuses
   // Smart refresh all order statuses - processes ALL orders automatically
@@ -433,7 +377,7 @@ export default function OrderList() {
     setFromDate('')
     setToDate('')
     setCurrentPage(1)
-    fetchOrders(1, searchTerm, '', '', selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
+    fetchOrders(1, searchTerm, '', '', selectedPickupLocation, selectedCourierService, '')
   }
 
   // Clear all filters
@@ -443,7 +387,6 @@ export default function OrderList() {
     setToDate('')
     setSelectedPickupLocation('')
     setSelectedCourierService('')
-    setSelectedTrackingStatus('')
     setCurrentPage(1)
     fetchOrders(1, '', '', '', '', '', '')
   }
@@ -451,7 +394,7 @@ export default function OrderList() {
   // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchOrders(page, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
+    fetchOrders(page, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '')
   }
 
   // Handle page size change
@@ -468,8 +411,8 @@ export default function OrderList() {
     setCurrentPage(1);
     
     // Fetch orders with the new page size immediately
-    fetchOrdersWithPageSize(1, newPageSize, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus);
-  }, [ordersPerPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus]);
+    fetchOrdersWithPageSize(1, newPageSize, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '');
+  }, [ordersPerPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService]);
 
 
 
@@ -505,9 +448,6 @@ export default function OrderList() {
       }
       if (courierService) {
         params.append('courierService', courierService)
-      }
-      if (trackingStatus) {
-        params.append('trackingStatus', trackingStatus)
       }
 
       const token = getAuthToken();
@@ -578,7 +518,7 @@ export default function OrderList() {
       scrollPositionRef.current = tableContainerRef.current?.scrollTop || 0
       
       // Only show main loading on initial load, not on search/filter changes
-      if (page === 1 && !search && !fromDate && !toDate && !pickupLocation && !courierService && !trackingStatus) {
+      if (page === 1 && !search && !fromDate && !toDate && !pickupLocation && !courierService) {
         setLoading(true)
       } else {
         // Show table loading for search/filter/pagination changes
@@ -609,11 +549,6 @@ export default function OrderList() {
         params.append('courierService', courierService)
       }
 
-      if (trackingStatus) {
-        // Convert UI label to database value for API filtering
-        const dbValue = getTrackingStatusDbValue(trackingStatus)
-        params.append('trackingStatus', dbValue)
-      }
       
       console.log('🔍 [FETCH_ORDERS] Fetching orders with params:', params.toString())
       
@@ -1431,38 +1366,6 @@ export default function OrderList() {
 
 
 
-  const getDelhiveryStatusBadge = (order: Order) => {
-    if (order.courier_service.toLowerCase() !== 'delhivery') {
-      return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Success</span>
-    }
-
-    const status = order.delhivery_tracking_status || null;
-    switch (status) {
-      case 'delivered':
-        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Delivered</span>
-      case 'returned':
-        return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">↩️ Returned</span>
-      case 'failed':
-        return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">✗ Failed</span>
-      case 'manifested':
-        return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">📦 Manifested</span>
-      case 'in_transit':
-        return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">🚚 In Transit</span>
-      case 'pending':
-        return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">⏳ Pending</span>
-      case 'dispatched':
-        return <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded">🚀 Dispatched</span>
-      case 'success':
-        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Success</span>
-      case 'not_applicable':
-        return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">ℹ️ Not Applicable</span>
-      case null:
-      case undefined:
-        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">📦 Not Dispatched</span>
-      default:
-        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">📦 Not Dispatched</span>
-    }
-  }
 
   const getShopifyStatusBadge = (order: Order) => {
     switch (order.shopify_status) {
@@ -1620,12 +1523,6 @@ export default function OrderList() {
                               </span>
                             )}
                           </div>
-                          <div className="block">
-                            <TrackingStatusLabel 
-                              status={order.delhivery_tracking_status || order.shopify_status} 
-                              className="text-xs"
-                            />
-                          </div>
                         </div>
                       )
                     })()}
@@ -1738,53 +1635,6 @@ export default function OrderList() {
     }
   }
 
-  const refreshSelectedOrderStatuses = async () => {
-    if (selectedOrders.size === 0) return
-    
-    setManualRefreshing(true)
-    try {
-      const orderIds = Array.from(selectedOrders)
-      const token = localStorage.getItem('authToken')
-      if (!token) {
-        alert('Authentication token not found. Please log in again.')
-        return
-      }
-
-      console.log(`🔄 Refreshing statuses for ${orderIds.length} selected orders`)
-
-      const response = await fetch('/api/orders/refresh-statuses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ orderIds }),
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-        console.log('✅ Manual refresh completed:', result)
-        
-        // Refresh the orders list to show updated statuses
-        await fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus)
-        
-        // Clear selection
-        setSelectedOrders(new Set())
-        
-        // Show success message with details
-        const { totalProcessed, totalUpdated, totalErrors } = result.stats
-        alert(`✅ Status refresh completed!\n\n📊 Results:\n• ${totalProcessed} orders processed\n• ${totalUpdated} statuses updated\n• ${totalErrors} errors encountered`)
-      } else {
-        const errorData = await response.json()
-        alert(`Failed to refresh statuses: ${errorData.error || 'Unknown error'}`)
-      }
-    } catch (error) {
-      console.error('Error refreshing order statuses:', error)
-      alert('Failed to refresh order statuses. Please try again.')
-    } finally {
-      setManualRefreshing(false)
-    }
-  }
 
   const handleTrackingClick = (order: Order) => {
     const trackingNumber = order.courier_service.toLowerCase() === 'delhivery' 
@@ -1809,12 +1659,12 @@ export default function OrderList() {
       <h2 className="text-2xl font-semibold text-gray-800">Order List</h2>
       
       {/* Search Filter */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="space-y-6">
           {/* Row 1 - Search and Filters */}
-          <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Search Input */}
-            <div>
+            <div className="lg:col-span-1">
               <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
                 Search Orders
               </label>
@@ -1822,10 +1672,10 @@ export default function OrderList() {
                 <input
                   type="text"
                   id="search"
-                  placeholder="Search by name, mobile, or order ID (min 2 chars)..."
+                  placeholder="Search by name, mobile, or order ID..."
                   value={searchTerm}
                   onChange={(e) => handleSearch(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 />
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   {searchLoading ? (
@@ -1853,7 +1703,7 @@ export default function OrderList() {
             </div>
 
             {/* Pickup Location Filter */}
-            <div>
+            <div className="lg:col-span-1">
               <label htmlFor="pickupLocation" className="block text-sm font-medium text-gray-700 mb-2">
                 Pickup Location
               </label>
@@ -1861,7 +1711,7 @@ export default function OrderList() {
                 id="pickupLocation"
                 value={selectedPickupLocation}
                 onChange={(e) => handlePickupLocationChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               >
                 <option value="">All Pickup Locations</option>
                 {pickupLocations.map((location) => (
@@ -1873,7 +1723,7 @@ export default function OrderList() {
             </div>
 
             {/* Courier Service Filter */}
-            <div>
+            <div className="lg:col-span-1">
               <label htmlFor="courierService" className="block text-sm font-medium text-gray-700 mb-2">
                 Courier Service
               </label>
@@ -1881,7 +1731,7 @@ export default function OrderList() {
                 id="courierService"
                 value={selectedCourierService}
                 onChange={(e) => handleCourierServiceChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               >
                 <option value="">All Courier Services</option>
                 {courierServices.map((service) => (
@@ -1891,62 +1741,43 @@ export default function OrderList() {
                 ))}
               </select>
             </div>
-
-            {/* Tracking Status Filter */}
-            <div>
-              <label htmlFor="trackingStatus" className="block text-sm font-medium text-gray-700 mb-2">
-                Tracking Status
-              </label>
-              <select
-                id="trackingStatus"
-                value={selectedTrackingStatus}
-                onChange={(e) => handleTrackingStatusChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-              >
-                <option value="">All Tracking Statuses</option>
-                <option value="⏳ Not Dispatched">⏳ Not Dispatched</option>
-                <option value="🚚 In Transit">🚚 In Transit</option>
-                <option value="✅ Delivered">✅ Delivered</option>
-                <option value="↩️ Returned">↩️ Returned</option>
-                <option value="❌ Failed">❌ Failed</option>
-                <option value="⏳ Pending">⏳ Pending</option>
-              </select>
-            </div>
           </div>
 
-          {/* Row 2 - Date Range (Compact) */}
-          <div className="md:col-span-4">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <label htmlFor="fromDate" className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                  From:
-                </label>
-                <input
-                  type="date"
-                  id="fromDate"
-                  value={fromDate}
-                  onChange={(e) => handleDateRangeChange(e.target.value, toDate)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm"
-                />
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <label htmlFor="toDate" className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                  To:
-                </label>
-                <input
-                  type="date"
-                  id="toDate"
-                  value={toDate}
-                  onChange={(e) => handleDateRangeChange(fromDate, e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm"
-                />
+          {/* Row 2 - Date Range */}
+          <div className="border-t border-gray-200 pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex items-center space-x-3">
+                  <label htmlFor="fromDate" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                    From:
+                  </label>
+                  <input
+                    type="date"
+                    id="fromDate"
+                    value={fromDate}
+                    onChange={(e) => handleDateRangeChange(e.target.value, toDate)}
+                    className="px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm"
+                  />
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <label htmlFor="toDate" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                    To:
+                  </label>
+                  <input
+                    type="date"
+                    id="toDate"
+                    value={toDate}
+                    onChange={(e) => handleDateRangeChange(fromDate, e.target.value)}
+                    className="px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm"
+                  />
+                </div>
               </div>
               
               {(fromDate || toDate) && (
                 <button
                   onClick={clearDateFilters}
-                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="px-4 py-2.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
                 >
                   Clear Dates
                 </button>
@@ -1958,7 +1789,7 @@ export default function OrderList() {
         {/* Filter Actions */}
         <div className="mt-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            {(searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService || selectedTrackingStatus) && (
+            {(searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService) && (
               <button
                 onClick={clearAllFilters}
                 className="px-4 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
@@ -1992,7 +1823,7 @@ export default function OrderList() {
             </button>
             */}
             {/* Export Orders Button - Only show when there are orders and filters are applied */}
-            {orders.length > 0 && (searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService || selectedTrackingStatus) && (
+            {orders.length > 0 && (searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService) && (
               <button
                 onClick={exportOrders}
                 className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center space-x-2"
@@ -2020,11 +1851,6 @@ export default function OrderList() {
             {selectedCourierService && (
               <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-md">
                 🚚 {courierServices.find(service => service.value === selectedCourierService)?.label}
-              </span>
-            )}
-            {selectedTrackingStatus && (
-              <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-md">
-                📊 {selectedTrackingStatus}
               </span>
             )}
             {fromDate && toDate && (
@@ -2104,28 +1930,6 @@ export default function OrderList() {
               </span>
             </div>
             <div className="flex items-center space-x-3">
-              <button
-                onClick={refreshSelectedOrderStatuses}
-                disabled={manualRefreshing}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {manualRefreshing ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Refreshing Selected...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh Selected
-                  </>
-                )}
-              </button>
               {thermalPrintEnabled ? (
                 <button
                   onClick={() => downloadBulkLabels()}
@@ -2765,12 +2569,6 @@ export default function OrderList() {
                         {selectedOrder.tracking_id && (
                           <div className="space-y-2">
                             <div><span className="font-medium">Tracking ID:</span> {selectedOrder.tracking_id}</div>
-                            <div className="flex items-center space-x-2">
-                              <span className="font-medium">Status:</span>
-                              <TrackingStatusLabel 
-                                status={selectedOrder.delhivery_tracking_status || selectedOrder.shopify_status} 
-                              />
-                            </div>
                           </div>
                         )}
                         {selectedOrder.reference_number && (
@@ -2788,7 +2586,6 @@ export default function OrderList() {
                   <h4 className="font-medium text-gray-900 mb-3">Delhivery API Status</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-900">
                     <div>
-                      <div><span className="font-medium">Status:</span> {getDelhiveryStatusBadge(selectedOrder)}</div>
                       <div><span className="font-medium">Waybill:</span> {selectedOrder.delhivery_waybill_number || 'Not assigned'}</div>
                       <div><span className="font-medium">Order ID:</span> {selectedOrder.delhivery_order_id || 'Not assigned'}</div>
                     </div>
