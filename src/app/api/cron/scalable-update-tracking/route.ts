@@ -82,7 +82,9 @@ export async function POST(request: NextRequest) {
       // Get orders for this client with intelligent batching
       // Exclude orders updated within the last hour to avoid unnecessary API calls
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
       console.log(`⏰ [SCALABLE_CRON_${jobId}] Excluding orders updated after: ${oneHourAgo.toISOString()}`);
+      console.log(`📅 [SCALABLE_CRON_${jobId}] Including delivered orders created after: ${twoDaysAgo.toISOString()}`);
       
       const orderWhereClause = {
         clientId: client.id,
@@ -90,11 +92,19 @@ export async function POST(request: NextRequest) {
         courier_service: 'delhivery',
         updated_at: { lt: oneHourAgo }, // Only process orders not updated in the last hour
         OR: [
+          // Standard statuses that need regular updates
           { delhivery_tracking_status: null },
           { delhivery_tracking_status: 'pending' },
           { delhivery_tracking_status: 'dispatched' },
           { delhivery_tracking_status: 'manifested' },
-          { delhivery_tracking_status: 'in_transit' }
+          { delhivery_tracking_status: 'in_transit' },
+          // Include delivered orders created within last 2 days for verification
+          {
+            AND: [
+              { delhivery_tracking_status: 'delivered' },
+              { created_at: { gte: twoDaysAgo } }
+            ]
+          }
         ]
       };
 
@@ -126,13 +136,33 @@ export async function POST(request: NextRequest) {
             { delhivery_tracking_status: 'pending' },
             { delhivery_tracking_status: 'dispatched' },
             { delhivery_tracking_status: 'manifested' },
-            { delhivery_tracking_status: 'in_transit' }
+            { delhivery_tracking_status: 'in_transit' },
+            // Include delivered orders created within last 2 days for verification
+            {
+              AND: [
+                { delhivery_tracking_status: 'delivered' },
+                { created_at: { gte: twoDaysAgo } }
+              ]
+            }
           ]
+        }
+      });
+
+      // Get count of delivered orders being processed for better visibility
+      const deliveredOrdersCount = await prisma.orders.count({
+        where: {
+          clientId: client.id,
+          tracking_id: { not: null },
+          courier_service: 'delhivery',
+          delhivery_tracking_status: 'delivered',
+          created_at: { gte: twoDaysAgo },
+          updated_at: { lt: oneHourAgo }
         }
       });
 
       const excludedCount = totalEligibleOrders - orders.length;
       console.log(`📦 [SCALABLE_CRON_${jobId}] Found ${orders.length} orders to process for client: ${client.companyName}`);
+      console.log(`📦 [SCALABLE_CRON_${jobId}] Including ${deliveredOrdersCount} delivered orders (created within last 2 days)`);
       console.log(`⏭️ [SCALABLE_CRON_${jobId}] Excluded ${excludedCount} orders updated within last hour (${totalEligibleOrders} total eligible)`);
 
       if (orders.length === 0) {
