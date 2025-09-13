@@ -49,7 +49,6 @@ export default function Navigation() {
       { name: 'Master Dashboard', href: '/admin', current: pathname === '/admin' },
       { name: 'System Settings', href: '/admin/settings', current: pathname === '/admin/settings' },
       { name: 'Credit Management', href: '/admin/credits', current: pathname === '/admin/credits' },
-      { name: 'Cron Management', href: '/admin/cron', current: pathname === '/admin/cron' },
     ];
     clientDropdownItems = [
       { name: 'Client Management', href: '/admin/clients', current: pathname === '/admin/clients' },

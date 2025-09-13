@@ -7,12 +7,6 @@
       "maxDuration": 30
     }
   },
-  "crons": [
-    {
-      "path": "/api/cron/scalable-update-tracking",
-        "schedule": "*/5 * * * *"
-    }
-  ],
   "env": {
     "PRISMA_GENERATE_DATAPROXY": "true"
   },
