@@ -1,9 +1,9 @@
 /**
- * Thermal Label Generator for 3-inch (76.2mm) thermal printers
- * Optimized for thermal printers with 80mm width and proper scaling
+ * A5 Label Generator for A5-friendly PDF generation
+ * Optimized for A5 paper size (148mm x 210mm) with proper scaling and layout
  */
 
-export interface ThermalLabelData {
+export interface A5LabelData {
   waybillNumber: string
   barcode?: string
   recipientName: string
@@ -27,17 +27,17 @@ export interface ThermalLabelData {
   }
 }
 
-export function generateThermalLabelHTML(data: ThermalLabelData): string {
+export function generateA5LabelHTML(data: A5LabelData): string {
   const html = `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Thermal Label - ${data.waybillNumber}</title>
+    <title>A5 Label - ${data.waybillNumber}</title>
     <style>
         @page {
-            size: 80mm auto;
-            margin: 0;
+            size: A5;
+            margin: 10mm;
         }
         
         * {
@@ -45,33 +45,33 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         }
         
         body {
-            font-family: 'Courier New', monospace;
+            font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 0;
-            width: 80mm;
-            max-width: 80mm;
+            width: 148mm;
+            max-width: 148mm;
             background-color: white;
-            font-size: 16px;
-            line-height: 1.2;
+            font-size: 12px;
+            line-height: 1.4;
             color: #000;
-            font-weight: bold;
         }
         
         .label-container {
-            width: 80mm;
-            max-width: 80mm;
-            padding: 0;
-            margin: 2mm;
+            width: 148mm;
+            max-width: 148mm;
+            padding: 5mm;
+            margin: 0;
             background-color: white;
-            border: 1px solid #000;
+            border: 2px solid #000;
+            min-height: 190mm;
         }
         
         /* Header Section */
         .header {
             text-align: center;
-            border-bottom: 1px solid #000;
-            padding-bottom: 2mm;
-            margin-bottom: 2mm;
+            border-bottom: 2px solid #000;
+            padding-bottom: 3mm;
+            margin-bottom: 3mm;
             position: relative;
         }
         
@@ -79,36 +79,36 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 2mm;
+            gap: 3mm;
             flex-wrap: wrap;
         }
         
         .logo-container {
             position: absolute;
-            left: 5px;
-            top: 0px;
+            left: 5mm;
+            top: 0;
         }
         
         .logo-container img {
-            max-height: 15mm;
-            max-width: 30mm;
+            max-height: 20mm;
+            max-width: 40mm;
             object-fit: contain;
         }
         
         .header-text {
             flex: 1;
-            min-width: 40mm;
+            min-width: 60mm;
         }
         
         .courier-name {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
             margin: 0;
             text-transform: uppercase;
         }
         
         .payment-info {
-            font-size: 16px;
+            font-size: 14px;
             margin: 1mm 0;
             color: #000;
             font-weight: bold;
@@ -117,64 +117,62 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         /* Barcode Section */
         .barcode-section {
             text-align: center;
-            margin: 2mm 0;
-            padding: 1mm;
+            margin: 3mm 0;
+            padding: 2mm;
             border: 1px solid #000;
         }
         
         .barcode-image {
             max-width: 100%;
             height: auto;
-            max-height: 25mm;
+            max-height: 30mm;
             display: block;
             margin: 0 auto;
         }
         
         /* Address Section */
         .address-section {
-            margin: 2mm 0;
-            border: 1px solid #000;
-            padding: 2mm;
+            margin: 3mm 0;
+            border: 2px solid #000;
+            padding: 3mm;
         }
         
         .section-title {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             text-transform: uppercase;
-            margin-bottom: 1mm;
+            margin-bottom: 2mm;
             border-bottom: 1px solid #000;
             padding-bottom: 1mm;
         }
         
         .address-details {
-            font-size: 16px;
-            line-height: 1.3;
+            font-size: 12px;
+            line-height: 1.5;
             color: #000;
-            font-weight: bold;
         }
         
         .address-line {
-            margin: 0.5mm 0;
+            margin: 1mm 0;
             word-wrap: break-word;
             color: #000;
-            font-weight: bold;
         }
         
         /* Sender Section */
         .sender-section {
-            margin: 2mm 0;
-            border: 1px solid #000;
-            padding: 2mm;
+            margin: 3mm 0;
+            border: 2px solid #000;
+            padding: 3mm;
             background-color: #f8f8f8;
         }
         
         /* Reference Section */
         .reference-section {
             text-align: center;
-            margin: 2mm 0;
-            padding: 1mm;
+            margin: 3mm 0;
+            padding: 2mm;
             border: 1px solid #000;
-            font-size: 16px;
+            font-size: 12px;
             color: #000;
             font-weight: bold;
         }
@@ -182,19 +180,18 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         /* Footer */
         .footer {
             text-align: center;
-            font-size: 16px;
-            margin-top: 2mm;
-            padding-top: 1mm;
+            font-size: 12px;
+            margin-top: 3mm;
+            padding-top: 2mm;
             border-top: 1px solid #000;
             color: #000;
-            font-weight: bold;
         }
         
         /* Utility classes */
-        .text-center { text-align: center; color: #000; font-weight: bold; }
+        .text-center { text-align: center; color: #000; }
         .text-bold { font-weight: bold; color: #000; }
-        .text-small { font-size: 16px; color: #000; font-weight: bold; }
-        .text-large { font-size: 20px; color: #000; font-weight: bold; }
+        .text-small { font-size: 10px; color: #000; }
+        .text-large { font-size: 16px; color: #000; }
         
         /* Print optimizations */
         @media print {
@@ -205,8 +202,8 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
             
             .label-container {
                 page-break-inside: avoid;
-                margin: 2mm;
-                padding: 0;
+                margin: 0;
+                padding: 5mm;
             }
         }
     </style>
@@ -216,67 +213,55 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         <!-- Header -->
         <div class="header">
             <div class="header-content">
-                ${data.logoInfo && data.logoInfo.displayLogoOnWaybill ? `
+                ${data.logoInfo?.displayLogoOnWaybill && data.logoInfo?.url ? `
                 <div class="logo-container">
                     <img src="${data.logoInfo.url}" alt="Company Logo" />
                 </div>
                 ` : ''}
                 <div class="header-text">
-                    <div class="courier-name">${data.courierService.toUpperCase()}</div>
-                    <div class="payment-info">Payment: ${data.paymentType}</div>
+                    <div class="courier-name">${data.courierService}</div>
+                    <div class="payment-info">${data.paymentType}</div>
                 </div>
             </div>
         </div>
         
         <!-- Barcode Section -->
+        ${data.barcode ? `
         <div class="barcode-section">
-            ${data.barcode ? `
-                <img src="${data.barcode}" alt="Barcode" class="barcode-image" />
-            ` : ''}
+            <img src="${data.barcode}" alt="Barcode" class="barcode-image" />
         </div>
+        ` : ''}
         
-        <!-- Recipient Address -->
+        <!-- Address Section -->
         <div class="address-section">
-            <div class="section-title">Ship To:</div>
+            <div class="section-title">To:</div>
             <div class="address-details">
                 <div class="address-line text-bold">${data.recipientName}</div>
                 <div class="address-line">${data.recipientAddress}</div>
-                <div class="address-line">${data.recipientCity}, ${data.recipientState}</div>
-                <div class="address-line">PIN: ${data.recipientPincode}</div>
-                <div class="address-line">Mobile: ${data.recipientMobile}</div>
+                <div class="address-line">${data.recipientCity}, ${data.recipientState} - ${data.recipientPincode}</div>
+                <div class="address-line text-bold">Mobile: ${data.recipientMobile}</div>
             </div>
         </div>
         
-        <!-- Sender Information -->
+        <!-- Sender Section -->
         ${data.senderName ? `
         <div class="sender-section">
             <div class="section-title">From:</div>
             <div class="address-details">
                 <div class="address-line text-bold">${data.senderName}</div>
                 ${data.senderAddress && data.courierService.toLowerCase() === 'india_post' ? `<div class="address-line">${data.senderAddress}</div>` : ''}
-                ${data.senderMobile ? `<div class="address-line">Mobile: ${data.senderMobile}</div>` : ''}
+                ${data.senderMobile ? `<div class="address-line text-bold">Mobile: ${data.senderMobile}</div>` : ''}
             </div>
         </div>
         ` : ''}
         
-        <!-- Reference -->
+        <!-- Reference Section -->
         ${data.referenceNumber ? `
         <div class="reference-section">
-            <div class="text-bold">Ref. No: ${data.referenceNumber}</div>
-        </div>
-        ` : ''}
-        
-        <!-- Package Details -->
-        ${data.quantity ? `
-        <div class="reference-section">
-            <div class="text-bold">Quantity: ${data.quantity} item${data.quantity > 1 ? 's' : ''}</div>
-        </div>
-        ` : ''}
-        
-        <!-- Date -->
-        ${data.date ? `
-        <div class="reference-section">
-            <div class="text-small">Date: ${data.date}</div>
+            <div>Reference: ${data.referenceNumber}</div>
+            ${data.packageValue ? `<div>Value: ₹${data.packageValue}</div>` : ''}
+            ${data.quantity ? `<div>Qty: ${data.quantity}</div>` : ''}
+            ${data.date ? `<div>Date: ${data.date}</div>` : ''}
         </div>
         ` : ''}
         
@@ -293,9 +278,9 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
 }
 
 /**
- * Generate thermal label data from order and package info
+ * Generate A5 label data from order and package info
  */
-export function createThermalLabelData(order: any, packageInfo: any): ThermalLabelData {
+export function createA5LabelData(order: any, packageInfo: any): A5LabelData {
   // Determine sender name and mobile
   const senderName = order.reseller_name && 
                     order.reseller_name.trim() !== '' && 
@@ -357,19 +342,19 @@ export function createThermalLabelData(order: any, packageInfo: any): ThermalLab
 }
 
 /**
- * Generate multiple thermal labels for bulk printing
+ * Generate multiple A5 labels for bulk printing
  */
-export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): string {
+export function generateBulkA5Labels(labelDataArray: A5LabelData[]): string {
   const html = `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Bulk Thermal Labels - ${labelDataArray.length} Labels</title>
+    <title>Bulk A5 Labels - ${labelDataArray.length} Labels</title>
     <style>
         @page {
-            size: 80mm auto;
-            margin: 0;
+            size: A5;
+            margin: 10mm;
         }
         
         * {
@@ -377,16 +362,16 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
         }
         
         body {
-            font-family: 'Courier New', monospace;
+            font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 0;
             background-color: white;
         }
         
         .label-page {
-            width: 80mm;
-            max-width: 80mm;
-            margin: 2mm auto;
+            width: 148mm;
+            max-width: 148mm;
+            margin: 0 auto;
             page-break-after: always;
         }
         
@@ -394,32 +379,59 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
             page-break-after: avoid;
         }
         
-        /* Include all the thermal label styles here */
+        /* Include all the A5 label styles here */
         .label-container {
-            width: 80mm;
-            max-width: 80mm;
-            padding: 0;
-            margin: 2mm;
+            width: 148mm;
+            max-width: 148mm;
+            padding: 5mm;
+            margin: 0;
             background-color: white;
-            border: 1px solid #000;
+            border: 2px solid #000;
+            min-height: 190mm;
         }
         
         .header {
             text-align: center;
-            border-bottom: 1px solid #000;
-            padding-bottom: 2mm;
-            margin-bottom: 2mm;
+            border-bottom: 2px solid #000;
+            padding-bottom: 3mm;
+            margin-bottom: 3mm;
+            position: relative;
+        }
+        
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3mm;
+            flex-wrap: wrap;
+        }
+        
+        .logo-container {
+            position: absolute;
+            left: 5mm;
+            top: 0;
+        }
+        
+        .logo-container img {
+            max-height: 20mm;
+            max-width: 40mm;
+            object-fit: contain;
+        }
+        
+        .header-text {
+            flex: 1;
+            min-width: 60mm;
         }
         
         .courier-name {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
             margin: 0;
             text-transform: uppercase;
         }
         
         .payment-info {
-            font-size: 16px;
+            font-size: 14px;
             margin: 1mm 0;
             color: #000;
             font-weight: bold;
@@ -427,79 +439,76 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
         
         .barcode-section {
             text-align: center;
-            margin: 2mm 0;
-            padding: 1mm;
+            margin: 3mm 0;
+            padding: 2mm;
             border: 1px solid #000;
         }
         
         .barcode-image {
             max-width: 100%;
             height: auto;
-            max-height: 25mm;
+            max-height: 30mm;
             display: block;
             margin: 0 auto;
         }
         
         .address-section {
-            margin: 2mm 0;
-            border: 1px solid #000;
-            padding: 2mm;
+            margin: 3mm 0;
+            border: 2px solid #000;
+            padding: 3mm;
         }
         
         .section-title {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             text-transform: uppercase;
-            margin-bottom: 1mm;
+            margin-bottom: 2mm;
             border-bottom: 1px solid #000;
             padding-bottom: 1mm;
         }
         
         .address-details {
-            font-size: 16px;
-            line-height: 1.3;
+            font-size: 12px;
+            line-height: 1.5;
             color: #000;
-            font-weight: bold;
         }
         
         .address-line {
-            margin: 0.5mm 0;
+            margin: 1mm 0;
             word-wrap: break-word;
             color: #000;
-            font-weight: bold;
         }
         
         .sender-section {
-            margin: 2mm 0;
-            border: 1px solid #000;
-            padding: 2mm;
+            margin: 3mm 0;
+            border: 2px solid #000;
+            padding: 3mm;
             background-color: #f8f8f8;
         }
         
         .reference-section {
             text-align: center;
-            margin: 2mm 0;
-            padding: 1mm;
+            margin: 3mm 0;
+            padding: 2mm;
             border: 1px solid #000;
-            font-size: 16px;
+            font-size: 12px;
             color: #000;
             font-weight: bold;
         }
         
         .footer {
             text-align: center;
-            font-size: 16px;
-            margin-top: 2mm;
-            padding-top: 1mm;
+            font-size: 12px;
+            margin-top: 3mm;
+            padding-top: 2mm;
             border-top: 1px solid #000;
             color: #000;
-            font-weight: bold;
         }
         
-        .text-center { text-align: center; color: #000; font-weight: bold; }
+        .text-center { text-align: center; color: #000; }
         .text-bold { font-weight: bold; color: #000; }
-        .text-small { font-size: 16px; color: #000; font-weight: bold; }
-        .text-large { font-size: 20px; color: #000; font-weight: bold; }
+        .text-small { font-size: 10px; color: #000; }
+        .text-large { font-size: 16px; color: #000; }
         
         @media print {
             body {
@@ -509,80 +518,82 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
             
             .label-page {
                 page-break-inside: avoid;
-                margin: 2mm auto;
+                margin: 0 auto;
             }
             
             .label-container {
                 page-break-inside: avoid;
-                margin: 2mm;
-                padding: 0;
+                margin: 0;
+                padding: 5mm;
             }
         }
     </style>
 </head>
 <body>
     ${labelDataArray.map((data, index) => `
-        <div class="label-page">
-            <div class="label-container">
-                <!-- Header -->
-                <div class="header">
-                    <div class="courier-name">${data.courierService.toUpperCase()}</div>
-                    <div class="payment-info">Payment: ${data.paymentType}</div>
-                </div>
-                
-                <!-- Barcode Section -->
-                <div class="barcode-section">
-                    ${data.barcode ? `
-                        <img src="${data.barcode}" alt="Barcode" class="barcode-image" />
+    <div class="label-page">
+        <div class="label-container">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-content">
+                    ${data.logoInfo?.displayLogoOnWaybill && data.logoInfo?.url ? `
+                    <div class="logo-container">
+                        <img src="${data.logoInfo.url}" alt="Company Logo" />
+                    </div>
                     ` : ''}
-                </div>
-                
-                <!-- Recipient Address -->
-                <div class="address-section">
-                    <div class="section-title">Ship To:</div>
-                    <div class="address-details">
-                        <div class="address-line text-bold">${data.recipientName}</div>
-                        <div class="address-line">${data.recipientAddress}</div>
-                        <div class="address-line">${data.recipientCity}, ${data.recipientState}</div>
-                        <div class="address-line">PIN: ${data.recipientPincode}</div>
-                        <div class="address-line">Mobile: ${data.recipientMobile}</div>
+                    <div class="header-text">
+                        <div class="courier-name">${data.courierService}</div>
+                        <div class="payment-info">${data.paymentType}</div>
                     </div>
-                </div>
-                
-                <!-- Sender Information -->
-                ${data.senderName ? `
-                <div class="sender-section">
-                    <div class="section-title">From:</div>
-                    <div class="address-details">
-                        <div class="address-line text-bold">${data.senderName}</div>
-                        ${data.senderAddress && data.courierService.toLowerCase() === 'india_post' ? `<div class="address-line">${data.senderAddress}</div>` : ''}
-                        ${data.senderMobile ? `<div class="address-line">Mobile: ${data.senderMobile}</div>` : ''}
-                    </div>
-                </div>
-                ` : ''}
-                
-                <!-- Reference -->
-                ${data.referenceNumber ? `
-                <div class="reference-section">
-                    <div class="text-bold">Reference: ${data.referenceNumber}</div>
-                </div>
-                ` : ''}
-                
-
-                
-                <!-- Date -->
-                ${data.date ? `
-                <div class="reference-section">
-                    <div class="text-small">Date: ${data.date}</div>
-                </div>
-                ` : ''}
-                
-                <!-- Footer -->
-                <div class="footer">
-                    <div>Generated by Scan2Ship</div>
                 </div>
             </div>
+            
+            <!-- Barcode Section -->
+            ${data.barcode ? `
+            <div class="barcode-section">
+                <img src="${data.barcode}" alt="Barcode" class="barcode-image" />
+            </div>
+            ` : ''}
+            
+            <!-- Address Section -->
+            <div class="address-section">
+                <div class="section-title">To:</div>
+                <div class="address-details">
+                    <div class="address-line text-bold">${data.recipientName}</div>
+                    <div class="address-line">${data.recipientAddress}</div>
+                    <div class="address-line">${data.recipientCity}, ${data.recipientState} - ${data.recipientPincode}</div>
+                    <div class="address-line text-bold">Mobile: ${data.recipientMobile}</div>
+                </div>
+            </div>
+            
+            <!-- Sender Section -->
+            ${data.senderName ? `
+            <div class="sender-section">
+                <div class="section-title">From:</div>
+                <div class="address-details">
+                    <div class="address-line text-bold">${data.senderName}</div>
+                    ${data.senderAddress && data.courierService.toLowerCase() === 'india_post' ? `<div class="address-line">${data.senderAddress}</div>` : ''}
+                    ${data.senderMobile ? `<div class="address-line text-bold">Mobile: ${data.senderMobile}</div>` : ''}
+                </div>
+            </div>
+            ` : ''}
+            
+            <!-- Reference Section -->
+            ${data.referenceNumber ? `
+            <div class="reference-section">
+                <div>Reference: ${data.referenceNumber}</div>
+                ${data.packageValue ? `<div>Value: ₹${data.packageValue}</div>` : ''}
+                ${data.quantity ? `<div>Qty: ${data.quantity}</div>` : ''}
+                ${data.date ? `<div>Date: ${data.date}</div>` : ''}
+            </div>
+            ` : ''}
+            
+            <!-- Footer -->
+            <div class="footer">
+                <div>Generated by Scan2Ship</div>
+            </div>
         </div>
+    </div>
     `).join('')}
 </body>
 </html>

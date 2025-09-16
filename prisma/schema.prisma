@@ -102,6 +102,7 @@ model client_order_configs {
   clientId                  String   @unique
   enableResellerFallback    Boolean  @default(true)
   enableThermalPrint        Boolean  @default(false)
+  enableA5Print             Boolean  @default(false)
   enableReferencePrefix     Boolean  @default(true)
   pickup_location_overrides Json?    @default("{}")
   displayLogoOnWaybill      Boolean? @default(false)

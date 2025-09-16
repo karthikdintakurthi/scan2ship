@@ -4,6 +4,7 @@ import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middlew
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import jwt from 'jsonwebtoken'
 import { generateThermalLabelHTML, createThermalLabelData } from '@/lib/thermal-label-generator'
+import { generateA5LabelHTML, createA5LabelData } from '@/lib/a5-label-generator'
 
 const prisma = new PrismaClient()
 
@@ -216,8 +217,8 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             <div class="recipient-title">From:</div>
             <div class="recipient-details">
                 <strong>Name:</strong> ${order.reseller_name}<br>
-                ${order.courier_service.toLowerCase() === 'india_post' ? `
-                <strong>Address:</strong> ${order.clients.address || 'N/A'}, ${order.clients.city || 'N/A'}, ${order.clients.city || 'N/A'}, ${order.clients.state || 'N/A'} ${order.clients.pincode || 'N/A'}<br>
+                ${courierService.toLowerCase() === 'india_post' ? `
+                <strong>Address:</strong> ${order.clients.address || 'N/A'}, ${order.clients.city || 'N/A'}, ${order.clients.state || 'N/A'} ${order.clients.pincode || 'N/A'}<br>
                 ` : ''}
                 ${order.reseller_mobile && 
                   order.reseller_mobile.trim() !== '' && 
@@ -275,9 +276,10 @@ export async function GET(
     const { id } = await params
     const orderId = parseInt(id)
     
-    // Check for thermal printer format query parameter
+    // Check for print format query parameters
     const url = new URL(request.url)
     const isThermal = url.searchParams.get('thermal') === 'true'
+    const isA5 = url.searchParams.get('a5') === 'true'
     
     // Get order details with client information and logo config
     const order = await prisma.orders.findUnique({
@@ -361,6 +363,32 @@ export async function GET(
       htmlContent = generateThermalLabelHTML(thermalData)
       filename = `thermal-waybill-${trackingNumber}.html`
       console.log('✅ Thermal waybill generated for order:', orderId, 'Courier:', order.courier_service, 'Logo:', logoInfo ? 'Yes' : 'No')
+    } else if (isA5) {
+      // Generate A5-friendly label
+      const packageInfo = {
+        wbn: trackingNumber,
+        barcode: barcodeDataURL,
+        pt: 'Pre-paid',
+        oid: order.reference_number
+      }
+      
+      // Add client address information to order data for A5 label
+      const orderWithClientAddress = {
+        ...order,
+        client_address: order.clients?.address,
+        client_city: order.clients?.city,
+        client_state: order.clients?.state,
+        client_pincode: order.clients?.pincode
+      }
+      
+      const a5Data = createA5LabelData(orderWithClientAddress, packageInfo)
+      // Add logo info to A5 data
+      if (logoInfo) {
+        a5Data.logoInfo = logoInfo;
+      }
+      htmlContent = generateA5LabelHTML(a5Data)
+      filename = `a5-waybill-${trackingNumber}.html`
+      console.log('✅ A5 waybill generated for order:', orderId, 'Courier:', order.courier_service, 'Logo:', logoInfo ? 'Yes' : 'No')
     } else {
       // Generate universal waybill HTML
       htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service, logoInfo)
