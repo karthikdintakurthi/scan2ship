@@ -19,15 +19,15 @@ model analytics_events {
 }
 
 model audit_logs {
-  id         Int      @id @default(autoincrement())
-  userId     Int?
-  action     String
-  resource   String
-  resourceId String?
-  details    Json?
   ipAddress  String?
   userAgent  String?
+  resource   String
+  action     String
   createdAt  DateTime @default(now())
+  resourceId String?
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  details    Json?
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -100,18 +100,18 @@ model client_order_configs {
   requireWeight             Boolean  @default(true)
   requireTotalItems         Boolean  @default(true)
   clientId                  String   @unique
+  enableReferencePrefix     Boolean  @default(true)
   enableResellerFallback    Boolean  @default(true)
   enableThermalPrint        Boolean  @default(false)
-  enableA5Print             Boolean  @default(false)
-  enableReferencePrefix     Boolean  @default(true)
-  pickup_location_overrides Json?    @default("{}")
   displayLogoOnWaybill      Boolean? @default(false)
   logoFileName              String?
   logoFileSize              Int?
   logoFileType              String?
   logoEnabledCouriers       String?
   enableAltMobileNumber     Boolean? @default(false)
+  enableA5Print             Boolean  @default(false)
   logoUrl                   String?
+  pickup_location_overrides Json?    @default("{}")
   clients                   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
@@ -178,10 +178,10 @@ model credit_transactions {
   orderId            Int?
   createdAt          DateTime @default(now())
   clientName         String
-  utrNumber          String?
   screenshotFileName String?
   screenshotFileSize Int?
   screenshotFileType String?
+  utrNumber          String?
   clients            clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
   orders             orders?  @relation(fields: [orderId], references: [id])
   users              users?   @relation(fields: [userId], references: [id])
@@ -268,6 +268,8 @@ model orders {
   shopify_fulfillment_id    String?
   shopify_status            String?
   shopify_tracking_number   String?
+  tracking_status           String?               @default("pending")
+  delhivery_tracking_status String?
   shopify_customer_email    String?
   shopify_note              String?
   shopify_order_id          String?
@@ -276,8 +278,6 @@ model orders {
   shopify_update_error      String?
   shopify_update_status     String?
   shopify_update_timestamp  DateTime?             @db.Timestamp(6)
-  tracking_status           String?               @default("pending")
-  delhivery_tracking_status String?
   credit_transactions       credit_transactions[]
   order_analytics           order_analytics?
   clients                   clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -320,35 +320,35 @@ model pickup_requests {
 }
 
 model rate_limits {
-  id          Int      @id @default(autoincrement())
-  identifier  String
-  endpoint    String
-  requests    Int      @default(0)
-  windowStart DateTime
-  windowEnd   DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now())
   key         String   @default("")
   count       Int      @default(0)
+  windowStart DateTime
   expiresAt   DateTime @default(now()) @db.Timestamp(6)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+  endpoint    String
+  identifier  String
+  requests    Int      @default(0)
+  windowEnd   DateTime
+  id          Int      @id @default(autoincrement())
 }
 
 model sessions {
   id           String    @id
   userId       String
   clientId     String
-  sessionToken String    @unique
-  refreshToken String    @unique
-  ipAddress    String
-  userAgent    String
-  location     String?
-  role         String
-  permissions  String
-  createdAt    DateTime  @default(now()) @db.Timestamp(6)
-  lastActivity DateTime  @default(now()) @db.Timestamp(6)
   expiresAt    DateTime  @db.Timestamp(6)
+  createdAt    DateTime  @default(now()) @db.Timestamp(6)
+  ipAddress    String
   isActive     Boolean   @default(true)
+  lastActivity DateTime  @default(now()) @db.Timestamp(6)
+  location     String?
+  permissions  String
+  refreshToken String    @unique
   revokedAt    DateTime? @db.Timestamp(6)
+  role         String
+  sessionToken String    @unique
+  userAgent    String
   clients      clients   @relation(fields: [clientId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users        users     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
@@ -389,43 +389,43 @@ model users {
 }
 
 model webhook_logs {
-  id         Int      @id @default(autoincrement())
-  webhookId  Int
-  url        String
-  method     String
+  createdAt  DateTime @default(now())
+  duration   Int?
+  error      String?
   headers    Json?
+  method     String
   payload    Json?
   response   Json?
   statusCode Int?
-  duration   Int?
   success    Boolean  @default(false)
-  error      String?
-  createdAt  DateTime @default(now())
+  url        String
+  id         Int      @id @default(autoincrement())
+  webhookId  Int
 }
 
 model webhooks {
-  id        Int      @id @default(autoincrement())
   name      String
   url       String
   events    String[]
-  isActive  Boolean  @default(true)
   secret    String?
-  clientId  Int?
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  clientId  Int?
 }
 
 model api_keys {
-  id          Int       @id @default(autoincrement())
-  key         String    @unique
   name        String
-  clientId    Int
-  permissions String[]
+  key         String    @unique
   isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now())
+  permissions String[]
   lastUsedAt  DateTime?
   expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
+  id          Int       @id @default(autoincrement())
+  clientId    Int
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -446,12 +446,12 @@ model shopify_integrations {
 }
 
 model shopify_orders {
-  id             Int       @id @default(autoincrement())
   shopifyOrderId String    @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now())
+  lastSyncAt     DateTime?
   orderId        Int
   shopifyData    Json?
   syncStatus     String    @default("pending")
-  lastSyncAt     DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @default(now())
+  id             Int       @id @default(autoincrement())
 }
