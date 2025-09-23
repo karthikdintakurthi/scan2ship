@@ -79,10 +79,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Mobile number must be exactly 10 digits and start with 6, 7, 8, or 9' }, { status: 400 });
     }
 
-    // Validate alternate mobile number if provided
-    if (orderData.alt_mobile && !validateMobileNumber(orderData.alt_mobile)) {
-      return NextResponse.json({ error: 'Alternate mobile number must be exactly 10 digits and start with 6, 7, 8, or 9' }, { status: 400 });
-    }
 
     // Validate reseller mobile number if provided
     if (orderData.reseller_mobile && !validateMobileNumber(orderData.reseller_mobile)) {

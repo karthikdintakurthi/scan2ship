@@ -75,7 +75,6 @@ Expected JSON response format:
 {
   "customer_name": "First and Last name (properly formatted with proper case)",
   "mobile_number": "remove any international formats and give just 10 digit mobile number",
-  "alt_mobile_number": "second mobile number if present, otherwise null",
   "pincode": "6 digit pincode entered",
   "city": "City name",
   "state": "State name", 
@@ -94,9 +93,7 @@ Rules:
 5. Format the customer name properly with proper case (e.g., "John Doe" not "john doe" or "JOHN DOE")
 6. If no name is found anywhere in the text, use "No Name"
 7. MOBILE NUMBER EXTRACTION: Look for ALL mobile numbers in the address
-8. If there are 2 mobile numbers mentioned:
-   - First mobile number goes to "mobile_number" field
-   - Second mobile number goes to "alt_mobile_number" field
+8. If there are multiple mobile numbers mentioned, use the first one as "mobile_number"
 9. Remove any +91, 91, or other country codes, keep only 10 digits
 10. RESELLER DETECTION: Look for secondary names and mobile numbers with labels like "From:", "Reseller:", "Contact Person:", "Agent:", "Dealer:", etc.
 11. CRITICAL: When you see "From:" followed by a name and mobile number on separate lines, extract that as reseller information
@@ -131,10 +128,10 @@ Examples of name extraction:
 - "A.B. Kumar, 789 Oak St, Delhi" → customer_name: "A.B. Kumar"
 
 Examples of mobile number extraction:
-- "Mobile: 9876543210" → mobile_number: "9876543210", alt_mobile_number: null
-- "Contact: 9876543210, Alt: 8765432109" → mobile_number: "9876543210", alt_mobile_number: "8765432109"
-- "Phone: 9876543210, Mobile: 8765432109" → mobile_number: "9876543210", alt_mobile_number: "8765432109"
-- "9876543210, 8765432109" → mobile_number: "9876543210", alt_mobile_number: "8765432109"
+- "Mobile: 9876543210" → mobile_number: "9876543210"
+- "Contact: 9876543210, Alt: 8765432109" → mobile_number: "9876543210"
+- "Phone: 9876543210, Mobile: 8765432109" → mobile_number: "9876543210"
+- "9876543210, 8765432109" → mobile_number: "9876543210"
 
 Examples of reseller detection:
 - "From: ABC Store, Contact: 9876543210" → reseller_name: "ABC Store", reseller_mobile: "9876543210"

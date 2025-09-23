@@ -105,8 +105,6 @@ export async function GET(request: NextRequest) {
           // Reference prefix settings
           enableReferencePrefix: true,
           
-          // Alt mobile number settings
-          enableAltMobileNumber: false,
           
           // Logo settings
           displayLogoOnWaybill: false,
@@ -125,7 +123,6 @@ export async function GET(request: NextRequest) {
       defaultWeight: orderConfig.defaultWeight,
       defaultTotalItems: orderConfig.defaultTotalItems,
       codEnabledByDefault: orderConfig.codEnabledByDefault,
-      enableAltMobileNumber: orderConfig.enableAltMobileNumber,
       displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
       logoFileName: orderConfig.logoFileName
     });
@@ -169,8 +166,6 @@ export async function GET(request: NextRequest) {
         // Reference prefix settings
         enableReferencePrefix: orderConfig.enableReferencePrefix,
         
-        // Alt mobile number settings
-        enableAltMobileNumber: orderConfig.enableAltMobileNumber,
         
         // Logo settings
         displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
@@ -235,8 +230,7 @@ export async function PUT(request: NextRequest) {
     if ((body.hasOwnProperty('enableResellerFallback') && Object.keys(body).length === 1) ||
         (body.hasOwnProperty('enableThermalPrint') && Object.keys(body).length === 1) ||
         (body.hasOwnProperty('enableA5Print') && Object.keys(body).length === 1) ||
-        (body.hasOwnProperty('enableReferencePrefix') && Object.keys(body).length === 1) ||
-        (body.hasOwnProperty('enableAltMobileNumber') && Object.keys(body).length === 1)) {
+        (body.hasOwnProperty('enableReferencePrefix') && Object.keys(body).length === 1)) {
               // Partial update - just update the specific setting
         const updateData: any = {};
         
@@ -260,10 +254,6 @@ export async function PUT(request: NextRequest) {
           console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reference prefix: ${body.enableReferencePrefix}`);
         }
         
-        if (body.hasOwnProperty('enableAltMobileNumber')) {
-          updateData.enableAltMobileNumber = body.enableAltMobileNumber;
-          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - alt mobile number: ${body.enableAltMobileNumber}`);
-        }
         
         const updatedConfig = await prisma.client_order_configs.update({
           where: { clientId: client.id },
@@ -285,9 +275,6 @@ export async function PUT(request: NextRequest) {
       } else if (body.hasOwnProperty('enableReferencePrefix')) {
         settingName = 'reference prefix';
         settingValue = body.enableReferencePrefix;
-      } else if (body.hasOwnProperty('enableAltMobileNumber')) {
-        settingName = 'alt mobile number';
-        settingValue = body.enableAltMobileNumber;
       }
       
       console.log(`✅ [API_ORDER_CONFIG_PUT] ${settingName} updated for client ${client.companyName}: ${settingValue}`);
@@ -332,7 +319,6 @@ export async function PUT(request: NextRequest) {
         enableThermalPrint: orderConfig.enableThermalPrint,
         enableA5Print: orderConfig.enableA5Print,
         enableReferencePrefix: orderConfig.enableReferencePrefix,
-        enableAltMobileNumber: orderConfig.enableAltMobileNumber,
         displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
         logoFileName: orderConfig.logoFileName,
         logoFileSize: orderConfig.logoFileSize,
@@ -363,7 +349,6 @@ export async function PUT(request: NextRequest) {
         enableThermalPrint: orderConfig.enableThermalPrint,
         enableA5Print: orderConfig.enableA5Print,
         enableReferencePrefix: orderConfig.enableReferencePrefix,
-        enableAltMobileNumber: orderConfig.enableAltMobileNumber,
         displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
         logoFileName: orderConfig.logoFileName,
         logoFileSize: orderConfig.logoFileSize,

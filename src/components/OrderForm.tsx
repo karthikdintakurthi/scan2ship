@@ -13,7 +13,6 @@ import { getOrderConfig, validateOrderData } from '@/lib/order-config'
 interface AddressFormData {
   customer_name: string
   mobile_number: string
-  alt_mobile_number: string
   address: string
   city: string
   state: string
@@ -52,7 +51,6 @@ export default function OrderForm() {
   const [formData, setFormData] = useState<AddressFormData>({
     customer_name: '',
     mobile_number: '',
-    alt_mobile_number: '',
     address: '',
     city: '',
     state: '',
@@ -101,9 +99,7 @@ export default function OrderForm() {
         setOrderConfig(formConfig);
         setClientOrderConfig(clientConfig);
         
-        // Debug logging for Alt Mobile Number setting
         console.log('🔍 [ORDER_FORM] Client config loaded:', clientConfig);
-        console.log('🔍 [ORDER_FORM] enableAltMobileNumber:', clientConfig?.enableAltMobileNumber);
         
         // Load saved courier service from localStorage if available
         const savedCourierService = localStorage.getItem('scan2ship_courier_service');
@@ -279,6 +275,18 @@ export default function OrderForm() {
     })
   }
 
+  const handleBooleanChange = (field: keyof AddressFormData, value: boolean) => {
+    console.log('🔍 [FORM_INPUT] Boolean field change:', field, 'Value:', value)
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [field]: value
+      }
+      console.log('🔍 [FORM_INPUT] Updated form data:', updated)
+      return updated
+    })
+  }
+
   const handleFormFieldChange = (field: keyof AddressFormData, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
@@ -393,7 +401,7 @@ export default function OrderForm() {
       const { unused, used } = currentData.dtdcSlips
       
       // Remove the tracking number from unused section
-      const unusedNumbers = unused.split(',').map((num: string) => num.trim()).filter(num => num !== trackingNumber)
+      const unusedNumbers = unused.split(',').map((num: string) => num.trim()).filter((num: string) => num !== trackingNumber)
       const newUnused = unusedNumbers.join(', ')
       
       // Add the tracking number to used section
@@ -477,7 +485,6 @@ export default function OrderForm() {
           ...prev,
           customer_name: formatted.customer_name || prev.customer_name,
           mobile_number: formatted.mobile_number || prev.mobile_number,
-          alt_mobile_number: formatted.alt_mobile_number || prev.alt_mobile_number,
           address: formatted.address || prev.address,
           city: formatted.city || prev.city,
           state: formatted.state || prev.state,
@@ -560,7 +567,6 @@ export default function OrderForm() {
           ...prev,
           customer_name: formatted.customer_name || prev.customer_name,
           mobile_number: formatted.mobile_number || prev.mobile_number,
-          alt_mobile_number: formatted.alt_mobile_number || prev.alt_mobile_number,
           address: formatted.address || prev.address,
           city: formatted.city || prev.city,
           state: formatted.state || prev.state,
@@ -658,7 +664,6 @@ export default function OrderForm() {
       // Reset customer information fields
       customer_name: '',
       mobile_number: '',
-      alt_mobile_number: '',
       address: '',
       city: '',
       state: '',
@@ -721,11 +726,6 @@ export default function OrderForm() {
       return
     }
 
-    // Validate alternate mobile number if provided
-    if (formData.alt_mobile_number && !validateMobileNumber(formData.alt_mobile_number)) {
-      setError('Alternate mobile number must be exactly 10 digits and start with 6, 7, 8, or 9')
-      return
-    }
 
     // Validate reseller mobile number if provided
     if (formData.reseller_mobile && !validateMobileNumber(formData.reseller_mobile)) {
@@ -825,7 +825,7 @@ export default function OrderForm() {
       const orderData = {
         name: formData.customer_name,
         mobile: formData.mobile_number,
-        phone: formData.alt_mobile_number ?? formData.mobile_number, // Use nullish coalescing to preserve empty strings
+        phone: formData.mobile_number, // Use mobile number as phone
         address: formData.address,
         city: formData.city,
         state: formData.state,
@@ -850,7 +850,6 @@ export default function OrderForm() {
       // Debug logging to see what values are being sent
       console.log('🔍 [ORDER_FORM] Form data debug:')
       console.log('  - formData.mobile_number:', formData.mobile_number)
-      console.log('  - formData.alt_mobile_number:', formData.alt_mobile_number)
       console.log('  - orderData.mobile:', orderData.mobile)
       console.log('  - orderData.phone:', orderData.phone)
       console.log('  - Full orderData:', orderData)
@@ -904,7 +903,6 @@ export default function OrderForm() {
           // Reset customer information fields
           customer_name: '',
           mobile_number: '',
-          alt_mobile_number: '',
           address: '',
           city: '',
           state: '',
@@ -966,7 +964,6 @@ export default function OrderForm() {
       // Reset customer information fields
       customer_name: '',
       mobile_number: '',
-      alt_mobile_number: '',
       address: '',
       city: '',
       state: '',
@@ -1105,7 +1102,7 @@ export default function OrderForm() {
                 type="checkbox"
                 id="skip_tracking"
                 checked={formData.skip_tracking}
-                onChange={(e) => handleInputChange('skip_tracking', e.target.checked)}
+                onChange={(e) => handleBooleanChange('skip_tracking', e.target.checked)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
               <label htmlFor="skip_tracking" className="ml-2 text-sm text-gray-700">
@@ -1357,27 +1354,6 @@ export default function OrderForm() {
                 />
               </div>
               
-              {(() => {
-                console.log('🔍 [ORDER_FORM] Rendering Alt Mobile field check:', {
-                  clientOrderConfig: !!clientOrderConfig,
-                  enableAltMobileNumber: clientOrderConfig?.enableAltMobileNumber,
-                  shouldShow: clientOrderConfig?.enableAltMobileNumber
-                });
-                return clientOrderConfig?.enableAltMobileNumber;
-              })() && (
-                <div>
-                  <label htmlFor="alt_mobile_number" className="block text-sm font-medium text-gray-700 mb-1">
-                    Alternate Mobile Number
-                  </label>
-                  <input
-                    type="tel"
-                    id="alt_mobile_number"
-                    value={formData.alt_mobile_number}
-                    onChange={(e) => handleInputChange('alt_mobile_number', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              )}
               
               <div className="md:col-span-2">
                 <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">

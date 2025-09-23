@@ -132,13 +132,6 @@ export class DatabaseHealthCheck {
         console.log('✅ [DB_HEALTH] Added logoEnabledCouriers column to client_order_configs');
       }
 
-      // Check if enableAltMobileNumber column exists
-      const hasEnableAltMobileNumber = await this.columnExists('client_order_configs', 'enableAltMobileNumber');
-      if (!hasEnableAltMobileNumber) {
-        await prisma.$executeRaw`ALTER TABLE client_order_configs ADD COLUMN "enableAltMobileNumber" BOOLEAN DEFAULT false`;
-        fixedColumns.push('client_order_configs.enableAltMobileNumber');
-        console.log('✅ [DB_HEALTH] Added enableAltMobileNumber column to client_order_configs');
-      }
 
     } catch (error) {
       console.error('❌ [DB_HEALTH] Error fixing client_order_configs columns:', error);

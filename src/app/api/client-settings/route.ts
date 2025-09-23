@@ -71,7 +71,6 @@ export async function PUT(request: NextRequest) {
           enableResellerFallback: true,
           enableThermalPrint: false,
           enableReferencePrefix: true,
-          enableAltMobileNumber: false,
           displayLogoOnWaybill: false,
           logoFileName: null,
           logoFileSize: null,

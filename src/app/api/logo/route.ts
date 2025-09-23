@@ -134,7 +134,6 @@ export async function PUT(request: NextRequest) {
             enableResellerFallback: true,
             enableThermalPrint: false,
             enableReferencePrefix: true,
-            enableAltMobileNumber: false,
             // Logo settings
             logoUrl: logoUrl || null,
             displayLogoOnWaybill: displayLogoOnWaybill,
@@ -359,7 +358,6 @@ export async function POST(request: NextRequest) {
             enableResellerFallback: true,
             enableThermalPrint: false,
             enableReferencePrefix: true,
-            enableAltMobileNumber: false,
             // Logo settings
             logoFileName: fileName,
             logoFileSize: file.size,
