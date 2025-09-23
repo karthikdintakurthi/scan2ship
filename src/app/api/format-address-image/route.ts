@@ -103,17 +103,19 @@ Rules:
 11. CRITICAL: When you see "From:" followed by a name and mobile number on separate lines, extract that as reseller information
 12. If a secondary name is found, put it in reseller_name field
 13. If a secondary mobile number is found, put it in reseller_mobile field
-14. Extract 6-digit pincode
-15. Extract city name
-16. Extract state name
-17. Set country to "India" if not specified
-18. Address field should contain only the street address, building, area, etc. without the extracted fields
-19. TRACKING NUMBER EXTRACTION: Look for barcodes in the image
-20. If barcode is readable, extract the number from it
-21. If barcode is not readable, look for a printed number below or near the barcode
-22. This is typically the tracking number or waybill number
-23. If no tracking number found, set to null
-24. Return ONLY the JSON object, no additional text or explanation
+14. IMPORTANT: If no reseller name is found, set reseller_name to empty string "" (not "no name")
+15. IMPORTANT: If no reseller mobile is found, set reseller_mobile to empty string "" (not "no number")
+16. Extract 6-digit pincode
+17. Extract city name
+18. Extract state name
+19. Set country to "India" if not specified
+20. Address field should contain only the street address, building, area, etc. without the extracted fields
+21. TRACKING NUMBER EXTRACTION: Look for barcodes in the image
+22. If barcode is readable, extract the number from it
+23. If barcode is not readable, look for a printed number below or near the barcode
+24. This is typically the tracking number or waybill number
+25. If no tracking number found, set to null
+26. Return ONLY the JSON object, no additional text or explanation
 
 Examples of name extraction:
 - "G.subrahmanyam, plot no 92, flat no.202..." → customer_name: "G. Subrahmanyam"
@@ -137,6 +139,8 @@ Examples of reseller detection:
 - "Dealer: Mary Agent, Contact: 6543210987" → reseller_name: "Mary Agent", reseller_mobile: "6543210987"
 - "From: kavitha\n6281182320" → reseller_name: "kavitha", reseller_mobile: "6281182320"
 - "From: John\n9876543210" → reseller_name: "John", reseller_mobile: "9876543210"
+- "No reseller information found" → reseller_name: "", reseller_mobile: ""
+- "Only customer info present" → reseller_name: "", reseller_mobile: ""
 
 Examples of tracking number extraction:
 - Package with barcode "123456789012345" and printed number "987654321" below it → tracking_number: "987654321"
