@@ -2259,7 +2259,9 @@ export default function OrderList() {
                             is_cod: selectedOrder.is_cod,
                             cod_amount: selectedOrder.cod_amount,
                             tracking_id: selectedOrder.tracking_id,
-                            reference_number: selectedOrder.reference_number
+                            reference_number: selectedOrder.reference_number,
+                            reseller_name: selectedOrder.reseller_name,
+                            reseller_mobile: selectedOrder.reseller_mobile
                           })
                         } else {
                           setEditFormData({})
@@ -2588,21 +2590,53 @@ export default function OrderList() {
 
 
 
-              {selectedOrder.reseller_name && 
-               selectedOrder.reseller_name.trim() !== '' && 
-               selectedOrder.reseller_name.toLowerCase() !== 'no name' && (
-                <div className="mt-6">
-                  <h4 className="font-medium text-gray-900 mb-2">Reseller Information</h4>
-                  <div className="text-sm space-y-1 text-gray-900">
-                    <div><span className="font-medium">Name:</span> {selectedOrder.reseller_name}</div>
-                    {selectedOrder.reseller_mobile && 
-                     selectedOrder.reseller_mobile.trim() !== '' && 
-                     selectedOrder.reseller_mobile.toLowerCase() !== 'no number' && (
-                      <div><span className="font-medium">Mobile:</span> {selectedOrder.reseller_mobile}</div>
-                    )}
-                  </div>
+              {/* Reseller Information */}
+              <div className="mt-6">
+                <h4 className="font-medium text-gray-900 mb-2">Reseller Information</h4>
+                <div className="text-sm space-y-2 text-gray-900">
+                  {isEditMode ? (
+                    <>
+                      <div>
+                        <label className="font-medium">Reseller Name:</label>
+                        <input
+                          type="text"
+                          value={editFormData.reseller_name || ''}
+                          onChange={(e) => handleEditInputChange('reseller_name', e.target.value)}
+                          placeholder="Enter reseller name"
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-medium">Reseller Mobile:</label>
+                        <input
+                          type="text"
+                          value={editFormData.reseller_mobile || ''}
+                          onChange={(e) => handleEditInputChange('reseller_mobile', e.target.value)}
+                          placeholder="Enter reseller mobile number"
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {selectedOrder.reseller_name && 
+                       selectedOrder.reseller_name.trim() !== '' && 
+                       selectedOrder.reseller_name.toLowerCase() !== 'no name' ? (
+                        <div><span className="font-medium">Name:</span> {selectedOrder.reseller_name}</div>
+                      ) : (
+                        <div><span className="font-medium">Name:</span> <span className="text-gray-500 italic">Not provided</span></div>
+                      )}
+                      {selectedOrder.reseller_mobile && 
+                       selectedOrder.reseller_mobile.trim() !== '' && 
+                       selectedOrder.reseller_mobile.toLowerCase() !== 'no number' ? (
+                        <div><span className="font-medium">Mobile:</span> {selectedOrder.reseller_mobile}</div>
+                      ) : (
+                        <div><span className="font-medium">Mobile:</span> <span className="text-gray-500 italic">Not provided</span></div>
+                      )}
+                    </>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
