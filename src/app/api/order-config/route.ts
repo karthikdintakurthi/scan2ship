@@ -105,6 +105,9 @@ export async function GET(request: NextRequest) {
           // Reference prefix settings
           enableReferencePrefix: true,
           
+          // Footer note settings
+          enableFooterNote: false,
+          footerNoteText: null,
           
           // Logo settings
           displayLogoOnWaybill: false,
@@ -166,6 +169,9 @@ export async function GET(request: NextRequest) {
         // Reference prefix settings
         enableReferencePrefix: orderConfig.enableReferencePrefix,
         
+        // Footer note settings
+        enableFooterNote: orderConfig.enableFooterNote,
+        footerNoteText: orderConfig.footerNoteText,
         
         // Logo settings
         displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
@@ -230,7 +236,10 @@ export async function PUT(request: NextRequest) {
     if ((body.hasOwnProperty('enableResellerFallback') && Object.keys(body).length === 1) ||
         (body.hasOwnProperty('enableThermalPrint') && Object.keys(body).length === 1) ||
         (body.hasOwnProperty('enableA5Print') && Object.keys(body).length === 1) ||
-        (body.hasOwnProperty('enableReferencePrefix') && Object.keys(body).length === 1)) {
+        (body.hasOwnProperty('enableReferencePrefix') && Object.keys(body).length === 1) ||
+        (body.hasOwnProperty('enableFooterNote') && Object.keys(body).length === 1) ||
+        (body.hasOwnProperty('footerNoteText') && Object.keys(body).length === 1) ||
+        ((body.hasOwnProperty('enableFooterNote') && body.hasOwnProperty('footerNoteText')) && Object.keys(body).length === 2)) {
               // Partial update - just update the specific setting
         const updateData: any = {};
         
@@ -254,6 +263,16 @@ export async function PUT(request: NextRequest) {
           console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reference prefix: ${body.enableReferencePrefix}`);
         }
         
+        if (body.hasOwnProperty('enableFooterNote')) {
+          updateData.enableFooterNote = body.enableFooterNote;
+          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - footer note enabled: ${body.enableFooterNote}`);
+        }
+        
+        if (body.hasOwnProperty('footerNoteText')) {
+          updateData.footerNoteText = body.footerNoteText;
+          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - footer note text: ${body.footerNoteText}`);
+        }
+        
         
         const updatedConfig = await prisma.client_order_configs.update({
           where: { clientId: client.id },
@@ -275,6 +294,15 @@ export async function PUT(request: NextRequest) {
       } else if (body.hasOwnProperty('enableReferencePrefix')) {
         settingName = 'reference prefix';
         settingValue = body.enableReferencePrefix;
+      } else if (body.hasOwnProperty('enableFooterNote')) {
+        settingName = 'footer note enabled';
+        settingValue = body.enableFooterNote;
+      } else if (body.hasOwnProperty('footerNoteText')) {
+        settingName = 'footer note text';
+        settingValue = body.footerNoteText;
+      } else if (body.hasOwnProperty('enableFooterNote') && body.hasOwnProperty('footerNoteText')) {
+        settingName = 'footer note settings';
+        settingValue = `${body.enableFooterNote ? 'enabled' : 'disabled'} with text: ${body.footerNoteText || 'none'}`;
       }
       
       console.log(`✅ [API_ORDER_CONFIG_PUT] ${settingName} updated for client ${client.companyName}: ${settingValue}`);
@@ -319,6 +347,8 @@ export async function PUT(request: NextRequest) {
         enableThermalPrint: orderConfig.enableThermalPrint,
         enableA5Print: orderConfig.enableA5Print,
         enableReferencePrefix: orderConfig.enableReferencePrefix,
+        enableFooterNote: orderConfig.enableFooterNote,
+        footerNoteText: orderConfig.footerNoteText,
         displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
         logoFileName: orderConfig.logoFileName,
         logoFileSize: orderConfig.logoFileSize,
@@ -349,6 +379,8 @@ export async function PUT(request: NextRequest) {
         enableThermalPrint: orderConfig.enableThermalPrint,
         enableA5Print: orderConfig.enableA5Print,
         enableReferencePrefix: orderConfig.enableReferencePrefix,
+        enableFooterNote: orderConfig.enableFooterNote,
+        footerNoteText: orderConfig.footerNoteText,
         displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
         logoFileName: orderConfig.logoFileName,
         logoFileSize: orderConfig.logoFileSize,

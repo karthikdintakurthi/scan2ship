@@ -25,6 +25,10 @@ export interface ThermalLabelData {
     url: string
     displayLogoOnWaybill: boolean
   }
+  footerNote?: {
+    enabled: boolean
+    text: string | null
+  }
 }
 
 export function generateThermalLabelHTML(data: ThermalLabelData): string {
@@ -190,6 +194,18 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
             font-weight: bold;
         }
         
+        /* Footer Note */
+        .footer-note {
+            margin-top: 2mm;
+            padding: 1mm;
+            border: 1px solid #000;
+            font-size: 14px;
+            color: #000;
+            font-weight: bold;
+            text-align: center;
+            background-color: #f8f8f8;
+        }
+        
         /* Utility classes */
         .text-center { text-align: center; color: #000; font-weight: bold; }
         .text-bold { font-weight: bold; color: #000; }
@@ -277,6 +293,13 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         ${data.date ? `
         <div class="reference-section">
             <div class="text-small">Date: ${data.date}</div>
+        </div>
+        ` : ''}
+        
+        ${data.footerNote && data.footerNote.enabled && data.footerNote.text ? `
+        <!-- Footer Note -->
+        <div class="footer-note">
+            ${data.footerNote.text}
         </div>
         ` : ''}
         

@@ -87,6 +87,10 @@ interface ClientConfigData {
     // Reference number prefix settings
     enableReferencePrefix: boolean;
     
+    // Footer note settings
+    enableFooterNote: boolean;
+    footerNoteText: string | null;
+    
   };
   dtdcSlips?: {
     from: string;
@@ -151,6 +155,10 @@ export default function ClientSettingsPage() {
     code: '',
     isActive: true
   });
+
+  // Footer note state
+  const [footerNoteEnabled, setFooterNoteEnabled] = useState(false);
+  const [footerNoteText, setFooterNoteText] = useState('');
 
   // Check authentication and redirect if needed
   useEffect(() => {
@@ -243,6 +251,12 @@ export default function ClientSettingsPage() {
         };
         
         setConfig(transformedConfig);
+        
+        // Initialize footer note state
+        if (data.orderConfig) {
+          setFooterNoteEnabled(data.orderConfig.enableFooterNote || false);
+          setFooterNoteText(data.orderConfig.footerNoteText || '');
+        }
       } else {
         const errorText = await response.text();
         console.error('❌ [CLIENT_SETTINGS] API error:', errorText);
@@ -690,6 +704,134 @@ export default function ClientSettingsPage() {
           }
         };
       });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Function to handle footer note enabled checkbox change
+  const handleFooterNoteEnabledChange = async (enabled: boolean) => {
+    if (!config?.clientOrderConfig) return;
+    
+    try {
+      setIsSaving(true);
+      setError('');
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
+
+      // Update the local state immediately for better UX
+      setFooterNoteEnabled(enabled);
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableFooterNote: enabled
+          }
+        };
+      });
+
+      // Save to database
+      const response = await fetch('/api/order-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          enableFooterNote: enabled
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update footer note setting');
+      }
+
+      setSuccess('Footer note setting updated successfully!');
+      
+      // Refresh the config to ensure consistency
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error('❌ [FOOTER_NOTE] Error updating setting:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update footer note setting');
+      
+      // Revert the local state change on error
+      setFooterNoteEnabled(!enabled);
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableFooterNote: !enabled
+          }
+        };
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Function to handle footer note text input change (local state only)
+  const handleFooterNoteTextChange = (text: string) => {
+    setFooterNoteText(text);
+  };
+
+  // Function to save footer note text
+  const handleSaveFooterNoteText = async () => {
+    if (!config?.clientOrderConfig) return;
+    
+    try {
+      setIsSaving(true);
+      setError('');
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
+
+      // Save to database
+      const response = await fetch('/api/order-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          footerNoteText: footerNoteText
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update footer note text');
+      }
+
+      // Update the local config state after successful save
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            footerNoteText: footerNoteText
+          }
+        };
+      });
+
+      setSuccess('Footer note text saved successfully!');
+      
+    } catch (error) {
+      console.error('❌ [FOOTER_NOTE_TEXT] Error saving text:', error);
+      setError(error instanceof Error ? error.message : 'Failed to save footer note text');
     } finally {
       setIsSaving(false);
     }
@@ -1586,6 +1728,58 @@ export default function ClientSettingsPage() {
                         <dd className="text-xs text-gray-500 mt-1">
                           When enabled, auto-generated reference numbers use alphanumeric + mobile format. When disabled, auto-generated uses only mobile number, but custom values still use custom + mobile format.
                         </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-gray-500">Footer Note in Waybill</dt>
+                        <dd className="text-sm text-gray-900">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={footerNoteEnabled}
+                              onChange={(e) => handleFooterNoteEnabledChange(e.target.checked)}
+                              disabled={isSaving}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                              {footerNoteEnabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                            {isSaving && (
+                              <span className="ml-2 text-xs text-gray-500">
+                                Saving...
+                              </span>
+                            )}
+                          </label>
+                        </dd>
+                        <dd className="text-xs text-gray-500 mt-1">
+                          When enabled, a custom footer note will be displayed on printed waybills
+                        </dd>
+                        {footerNoteEnabled && (
+                          <div className="mt-3">
+                            <label className="block text-xs text-gray-500 mb-1">
+                              Footer Note Text
+                            </label>
+                            <textarea
+                              value={footerNoteText}
+                              onChange={(e) => handleFooterNoteTextChange(e.target.value)}
+                              disabled={isSaving}
+                              placeholder="Enter your custom footer note text..."
+                              rows={3}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                            <div className="mt-2 flex justify-end">
+                              <button
+                                onClick={handleSaveFooterNoteText}
+                                disabled={isSaving}
+                                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isSaving ? 'Saving...' : 'Save Footer Note'}
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              This text will appear at the bottom of printed waybills
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                     </dl>

@@ -111,6 +111,8 @@ model client_order_configs {
   enableA5Print             Boolean  @default(false)
   logoUrl                   String?
   pickup_location_overrides Json?    @default("{}")
+  enableFooterNote          Boolean  @default(false)
+  footerNoteText            String?
   clients                   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 

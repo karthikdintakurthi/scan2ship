@@ -25,6 +25,10 @@ export interface A5LabelData {
     url: string
     displayLogoOnWaybill: boolean
   }
+  footerNote?: {
+    enabled: boolean
+    text: string | null
+  }
 }
 
 export function generateA5LabelHTML(data: A5LabelData): string {
@@ -187,6 +191,17 @@ export function generateA5LabelHTML(data: A5LabelData): string {
             color: #000;
         }
         
+        /* Footer Note */
+        .footer-note {
+            margin-top: 3mm;
+            padding: 2mm;
+            border: 1px solid #000;
+            font-size: 11px;
+            color: #000;
+            text-align: center;
+            background-color: #f8f8f8;
+        }
+        
         /* Utility classes */
         .text-center { text-align: center; color: #000; }
         .text-bold { font-weight: bold; color: #000; }
@@ -262,6 +277,13 @@ export function generateA5LabelHTML(data: A5LabelData): string {
             ${data.packageValue ? `<div>Value: ₹${data.packageValue}</div>` : ''}
             ${data.quantity ? `<div>Qty: ${data.quantity}</div>` : ''}
             ${data.date ? `<div>Date: ${data.date}</div>` : ''}
+        </div>
+        ` : ''}
+        
+        ${data.footerNote && data.footerNote.enabled && data.footerNote.text ? `
+        <!-- Footer Note -->
+        <div class="footer-note">
+            ${data.footerNote.text}
         </div>
         ` : ''}
         
