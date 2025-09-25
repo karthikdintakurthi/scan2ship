@@ -23,21 +23,109 @@ export async function POST(request: NextRequest) {
       return securityResponse;
     }
 
-    // Authorize user
-    const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
-      requiredPermissions: [PermissionLevel.WRITE],
-      requireActiveUser: true,
-      requireActiveClient: true
-    });
-
-    if (authResult.response) {
-      securityHeaders(authResult.response);
-      return authResult.response;
-    }
-
-    const { user, client } = authResult;
     const { action, data } = await request.json();
+
+    // Check if this is a catalog app JWT token (different from scan2ship tokens)
+    const authHeader = request.headers.get('authorization');
+    let user, client;
+    
+    console.log('🔍 [CATALOG API] Auth header:', authHeader ? 'Present' : 'Missing');
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      console.log('🔍 [CATALOG API] Token length:', token.length);
+      
+      // Try to decode the token to check if it's a catalog app token
+      try {
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.decode(token);
+        console.log('🔍 [CATALOG API] Decoded token:', decoded);
+        
+        // Check if this is a catalog app token (has clientSlug field)
+        if (decoded && decoded.clientSlug && decoded.clientId) {
+          console.log('🔍 [CATALOG API] This is a catalog app token');
+          // This is a catalog app token, handle it differently
+          const catalogClient = await prisma.clients.findFirst({
+            where: {
+              OR: [
+                { id: decoded.clientId },
+                { slug: decoded.clientSlug }
+              ],
+              isActive: true
+            }
+          });
+
+          console.log('🔍 [CATALOG API] Found catalog client:', catalogClient);
+
+          if (!catalogClient) {
+            console.log('🔍 [CATALOG API] No catalog client found');
+            return NextResponse.json(
+              { error: 'Invalid catalog client' },
+              { status: 401 }
+            );
+          }
+
+          // Create a mock user object for catalog app authentication
+          user = {
+            id: decoded.userId,
+            email: decoded.email,
+            role: 'USER', // Default role for catalog app users
+            clientId: catalogClient.id,
+            isActive: true,
+            client: {
+              id: catalogClient.id,
+              isActive: catalogClient.isActive,
+              subscriptionStatus: catalogClient.subscriptionStatus,
+              subscriptionExpiresAt: catalogClient.subscriptionExpiresAt
+            },
+            permissions: [PermissionLevel.READ, PermissionLevel.WRITE, PermissionLevel.DELETE]
+          };
+          
+          client = catalogClient;
+          console.log('🔍 [CATALOG API] Created user and client objects');
+        } else {
+          console.log('🔍 [CATALOG API] This is a scan2ship token');
+          // This is a scan2ship token, use normal authentication
+          const authResult = await authorizeUser(request, {
+            requiredRole: UserRole.USER,
+            requiredPermissions: [PermissionLevel.WRITE],
+            requireActiveUser: true,
+            requireActiveClient: true
+          });
+
+          if (authResult.response) {
+            securityHeaders(authResult.response);
+            return authResult.response;
+          }
+
+          user = authResult.user;
+          client = user.client;
+        }
+      } catch (error) {
+        console.log('🔍 [CATALOG API] Token decoding failed:', error);
+        // If token decoding fails, try normal scan2ship authentication
+        const authResult = await authorizeUser(request, {
+          requiredRole: UserRole.USER,
+          requiredPermissions: [PermissionLevel.WRITE],
+          requireActiveUser: true,
+          requireActiveClient: true
+        });
+
+        if (authResult.response) {
+          securityHeaders(authResult.response);
+          return authResult.response;
+        }
+
+        user = authResult.user;
+        client = user.client;
+      }
+    } else {
+      console.log('🔍 [CATALOG API] No auth header or invalid format');
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
 
     switch (action) {
       case 'authenticate':
@@ -53,7 +141,7 @@ export async function POST(request: NextRequest) {
         return await handleInventoryCheck(data, client);
       
       case 'reduce_inventory':
-        return await handleInventoryReduction(data, client);
+        return await handleInventoryReduction(data, client, request);
       
       case 'restore_inventory':
         return await handleInventoryRestoration(data, client);
@@ -358,7 +446,7 @@ async function handleInventoryCheck(data: any, client: any) {
   }
 }
 
-async function handleInventoryReduction(data: any, client: any) {
+async function handleInventoryReduction(data: any, client: any, request: NextRequest) {
   try {
     const { items, orderId } = data;
     
@@ -369,25 +457,36 @@ async function handleInventoryReduction(data: any, client: any) {
       );
     }
 
-    // Get catalog session details
-    const sessionData = await getCatalogSessionForApi(client.id);
-    
-    if (!sessionData) {
+    // Get the authorization token from the request
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
-        { 
-          error: 'Catalog authentication required. Please login to catalog first.',
-          requiresLogin: true
-        },
+        { error: 'Authorization token required' },
         { status: 401 }
       );
     }
 
+    const token = authHeader.substring(7);
+    
+    // Try to decode the token to get client slug
+    let clientSlug = client.slug;
+    try {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.decode(token);
+      if (decoded && decoded.clientSlug) {
+        clientSlug = decoded.clientSlug;
+      }
+    } catch (error) {
+      console.warn('Could not decode token for client slug, using client.slug:', error);
+    }
+
     // Call catalog app inventory reduction
     const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
-    const response = await fetch(`${catalogUrl}/api/public/inventory/reduce?client=${sessionData.catalogClientSlug}`, {
+    const response = await fetch(`${catalogUrl}/api/public/inventory/reduce?client=${clientSlug}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ 
         items,
