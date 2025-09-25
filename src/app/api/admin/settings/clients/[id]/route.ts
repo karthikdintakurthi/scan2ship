@@ -195,7 +195,27 @@ export async function GET(
           
           // Reseller settings
           enableResellerFallback: client.client_order_configs.enableResellerFallback
-        } : null,
+        } : {
+          // Default values when no config exists
+          id: null,
+          defaultProductDescription: '',
+          defaultPackageValue: 0,
+          defaultWeight: 0,
+          defaultTotalItems: 1,
+          codEnabledByDefault: false,
+          defaultCodAmount: 0,
+          minPackageValue: 0,
+          maxPackageValue: 100000,
+          minWeight: 0,
+          maxWeight: 50000,
+          minTotalItems: 1,
+          maxTotalItems: 100,
+          requireProductDescription: false,
+          requirePackageValue: false,
+          requireWeight: false,
+          requireTotalItems: false,
+          enableResellerFallback: false
+        },
 
         orderConfig: {
           autoAssignTracking: configByCategory.order?.find(c => c.key === 'AUTO_ASSIGN_TRACKING')?.value === 'true' || false,

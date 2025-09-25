@@ -141,6 +141,13 @@ export async function POST(request: NextRequest) {
     delete processedOrderData.creationPattern;
     delete processedOrderData.skip_tracking;
     
+    // Handle products field - convert to JSON if present
+    if (orderData.products && Array.isArray(orderData.products)) {
+      console.log('🔍 [API_ORDERS_POST] Products data received:', orderData.products);
+      processedOrderData.products = JSON.stringify(orderData.products);
+      console.log('🔍 [API_ORDERS_POST] Products data saved as JSON:', processedOrderData.products);
+    }
+    
     // Log the processed data for debugging
     console.log('🔍 [API_ORDERS_POST] Processed order data:', processedOrderData);
 
@@ -195,10 +202,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Create order with client ID (only if Delhivery succeeded or not required)
-    // Set delhivery_tracking_status to 'pending' if no tracking ID is assigned
+    // Set tracking_status to 'pending' if no tracking ID is assigned
     const orderDataToCreate = {
       ...processedOrderData,
-      delhivery_tracking_status: processedOrderData.tracking_id ? null : 'pending'
+      tracking_status: processedOrderData.tracking_id ? null : 'pending'
     };
     
     const order = await prisma.orders.create({
@@ -215,7 +222,7 @@ export async function POST(request: NextRequest) {
           delhivery_waybill_number: delhiveryResponse.waybill_number,
           delhivery_order_id: delhiveryResponse.order_id,
           delhivery_api_status: 'success',
-          delhivery_tracking_status: 'manifested',
+          tracking_status: 'manifested',
           tracking_id: delhiveryResponse.waybill_number,
           last_delhivery_attempt: new Date()
         }
@@ -439,28 +446,28 @@ export async function GET(request: NextRequest) {
         const notDispatchedConditions = [
           { 
             AND: [
-              { delhivery_tracking_status: null },
+              { tracking_status: null },
               { tracking_id: { not: null } },
               { tracking_id: { not: '' } }
             ]
           },
           { 
             AND: [
-              { delhivery_tracking_status: 'manifested' },
+              { tracking_status: 'manifested' },
               { tracking_id: { not: null } },
               { tracking_id: { not: '' } }
             ]
           },
           { 
             AND: [
-              { delhivery_tracking_status: 'not picked' },
+              { tracking_status: 'not picked' },
               { tracking_id: { not: null } },
               { tracking_id: { not: '' } }
             ]
           },
           { 
             AND: [
-              { delhivery_tracking_status: 'pending' },
+              { tracking_status: 'pending' },
               { tracking_id: { not: null } },
               { tracking_id: { not: '' } }
             ]
@@ -480,7 +487,7 @@ export async function GET(request: NextRequest) {
       } else if (trackingStatus === 'pending') {
         // Handle "Pending" case - match pending delhivery status OR "Not assigned" tracking status OR no tracking number
         const pendingConditions = [
-          { delhivery_tracking_status: 'pending' },
+          { tracking_status: 'pending' },
           { tracking_status: 'Not assigned' },
           { tracking_id: null },
           { tracking_id: '' }
@@ -497,7 +504,7 @@ export async function GET(request: NextRequest) {
           whereClause.OR = pendingConditions;
         }
       } else {
-        whereClause.delhivery_tracking_status = trackingStatus;
+        whereClause.tracking_status = trackingStatus;
       }
     }
     
@@ -516,8 +523,20 @@ export async function GET(request: NextRequest) {
     
     console.log(`✅ [API_ORDERS_GET] Found ${orders.length} orders out of ${totalCount} total for client ID: ${client.id}`);
     
+    // Parse products JSON string for each order
+    const processedOrders = orders.map(order => {
+      const parsedProducts = order.products ? JSON.parse(order.products) : null;
+      if (parsedProducts && parsedProducts.length > 0) {
+        console.log('🔍 [API_ORDERS_GET] Parsed products for order:', order.id, parsedProducts);
+      }
+      return {
+        ...order,
+        products: parsedProducts
+      };
+    });
+    
     return NextResponse.json({
-      orders,
+      orders: processedOrders,
       pagination: {
         currentPage: page,
         totalPages,

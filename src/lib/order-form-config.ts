@@ -76,7 +76,7 @@ export interface OrderFormConfig {
 // Default configuration with fallback values
 export const orderFormConfig: OrderFormConfig = {
   defaultValues: {
-    courier_service: 'delhivery',
+    courier_service: 'dtdc',
     pickup_location: 'RVD Jewels',
     package_value: '5000',
     weight: '100',
@@ -88,8 +88,8 @@ export const orderFormConfig: OrderFormConfig = {
   // Default courier services (will be overridden by async function)
   courierServices: [
     {
-      value: 'delhivery',
-      label: 'Delhivery'
+      value: 'dtdc',
+      label: 'DTDC'
     }
   ],
   

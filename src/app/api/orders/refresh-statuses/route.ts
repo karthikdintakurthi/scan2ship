@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
             if (trackingResult.success && trackingResult.data) {
               const rawStatus = trackingResult.data.current_status || trackingResult.data.status;
               const newStatus = delhiveryTrackingService.mapStatusToInternal(rawStatus);
-              const oldStatus = order.delhivery_tracking_status;
+              const oldStatus = order.tracking_status;
 
               // Always update regardless of status change (manual refresh)
               console.log(`📝 [MANUAL_REFRESH] Updating order ${order.id}: ${oldStatus || 'null'} → ${newStatus}`);
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
               await prisma.orders.update({
                 where: { id: order.id },
                 data: {
-                  delhivery_tracking_status: newStatus,
+                  tracking_status: newStatus,
                   delhivery_api_error: null,
                   updated_at: new Date()
                 }

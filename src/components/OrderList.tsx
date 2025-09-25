@@ -6,6 +6,7 @@ import { getActiveCourierServices } from '@/lib/courier-service-config'
 import { useAuth } from '@/contexts/AuthContext'
 import ExcelJS from 'exceljs'
 import TrackingModal from './TrackingModal'
+import ImageModal from './ImageModal'
 
 
 interface Order {
@@ -35,7 +36,7 @@ interface Order {
   delhivery_waybill_number?: string
   delhivery_order_id?: string
   delhivery_api_status?: string
-  delhivery_tracking_status?: string
+  tracking_status?: string
   delhivery_api_error?: string
   delhivery_retry_count?: number
   last_delhivery_attempt?: string
@@ -74,6 +75,9 @@ interface Order {
   invoice_date?: string
   return_reason?: string
   ewbn?: string
+  
+  // Catalog integration fields
+  products?: any[] // JSON array of selected products from catalog-app
 }
 
 export default function OrderList() {
@@ -109,7 +113,16 @@ export default function OrderList() {
   };
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [imageModalOpen, setImageModalOpen] = useState(false)
+  const [selectedImageUrl, setSelectedImageUrl] = useState('')
+  const [selectedImageAlt, setSelectedImageAlt] = useState('')
   const [retrying, setRetrying] = useState<number | null>(null)
+
+  const handleImageClick = (imageUrl: string, alt: string) => {
+    setSelectedImageUrl(imageUrl)
+    setSelectedImageAlt(alt)
+    setImageModalOpen(true)
+  }
   const [isFulfilling, setIsFulfilling] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editFormData, setEditFormData] = useState<Partial<Order>>({})
@@ -1152,7 +1165,7 @@ export default function OrderList() {
         productDescription: order.product_description || '',
         delhiveryWaybill: order.delhivery_waybill_number || '',
         delhiveryOrderId: order.delhivery_order_id || '',
-        delhiveryStatus: order.delhivery_tracking_status || '',
+        delhiveryStatus: order.tracking_status || '',
         shipmentLength: order.shipment_length || '',
         shipmentBreadth: order.shipment_breadth || '',
         shipmentHeight: order.shipment_height || '',
@@ -2232,7 +2245,7 @@ export default function OrderList() {
       {/* Order Details Modal */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Order Details</h3>
@@ -2517,6 +2530,78 @@ export default function OrderList() {
                 </div>
               </div>
 
+              {/* Product Information */}
+              {selectedOrder.products && selectedOrder.products.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Product Information</h4>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="space-y-3">
+                      {selectedOrder.products.map((product: any, index: number) => {
+                        console.log('🔍 [ORDER_LIST] Product data:', product);
+                        return (
+                        <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                          <div className="flex items-center space-x-3">
+                            {product.thumbnailUrl ? (
+                              <div className="relative">
+                                <img 
+                                  src={product.thumbnailUrl} 
+                                  alt={product.name}
+                                  className="w-12 h-12 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => handleImageClick(product.thumbnailUrl, product.name)}
+                                  onError={(e) => {
+                                    console.log('❌ [ORDER_LIST] Image failed to load:', product.thumbnailUrl);
+                                    // Hide the broken image and show placeholder
+                                    e.currentTarget.style.display = 'none';
+                                    const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
+                                    if (placeholder) {
+                                      placeholder.style.display = 'flex';
+                                    }
+                                  }}
+                                  onLoad={() => {
+                                    console.log('✅ [ORDER_LIST] Image loaded successfully:', product.thumbnailUrl);
+                                  }}
+                                />
+                                <div className="w-12 h-12 bg-gray-200 rounded-md flex items-center justify-center absolute top-0 left-0" style={{display: 'none'}}>
+                                  <span className="text-xs text-gray-500">Failed</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-12 h-12 bg-gray-200 rounded-md flex items-center justify-center">
+                                <span className="text-xs text-gray-500">No Image</span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium text-gray-900">{product.name}</p>
+                              <p className="text-sm text-gray-600">SKU: {product.sku}</p>
+                              <p className="text-xs text-gray-500">Price: ₹{(parseFloat(product.price) || 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-gray-900">Qty: {product.quantity}</p>
+                            <p className="text-sm text-gray-600">Total: ₹{((parseFloat(product.price) || 0) * (product.quantity || 1)).toFixed(2)}</p>
+                          </div>
+                        </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-gray-200">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="font-medium text-gray-900">Total Products:</span>
+                        <span className="font-medium text-gray-900">{selectedOrder.products.length}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm mt-1">
+                        <span className="font-medium text-gray-900">Total Value:</span>
+                        <span className="font-medium text-gray-900">
+                          ₹{selectedOrder.products.reduce((sum: number, product: any) => 
+                            sum + ((parseFloat(product.price) || 0) * (product.quantity || 1)), 0
+                          ).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Tracking Information */}
               {selectedOrder.courier_service.toLowerCase() === 'delhivery' ? (
                 <div className="mt-6 p-4 bg-gray-50 rounded-lg">
@@ -2709,6 +2794,14 @@ export default function OrderList() {
           courierService={selectedTrackingOrder.courier_service}
         />
       )}
+
+      {/* Image Modal */}
+      <ImageModal
+        isOpen={imageModalOpen}
+        onClose={() => setImageModalOpen(false)}
+        imageUrl={selectedImageUrl}
+        alt={selectedImageAlt}
+      />
     </div>
   )
 }

@@ -135,7 +135,7 @@ export async function POST(
           delhivery_waybill_number: delhiveryResponse.waybill_number,
           delhivery_order_id: delhiveryResponse.order_id,
           delhivery_api_status: 'success',
-          delhivery_tracking_status: 'manifested',
+          tracking_status: 'manifested',
           last_delhivery_attempt: new Date(),
           shopify_status: 'pending', // Will be updated after Shopify call
           updated_at: new Date()

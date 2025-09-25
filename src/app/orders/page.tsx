@@ -1,8 +1,23 @@
 'use client'
 
-import OrderForm from '@/components/OrderForm'
+import { useState } from 'react';
+import OrderForm from '@/components/OrderForm';
+import ProductSelection from '@/components/ProductSelection';
+import { useAuth } from '@/contexts/AuthContext';
+import { OrderItem } from '@/types/catalog';
 
 export default function OrdersPage() {
+  const { currentClient } = useAuth();
+  const [selectedProducts, setSelectedProducts] = useState<OrderItem[]>([]);
+
+  const handleProductsChange = (items: OrderItem[]) => {
+    setSelectedProducts(items);
+  };
+
+  const handleOrderSuccess = () => {
+    setSelectedProducts([]); // Reset selected products after successful order
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-8">
@@ -10,10 +25,21 @@ export default function OrdersPage() {
           Create Order
         </h1>
         <p className="text-xl text-gray-600">
-          Create orders using AI-powered address processing or manual entry
+          Create orders with product selection and AI-powered address processing
         </p>
       </div>
-      <OrderForm />
+      
+      {/* Product Selection Section */}
+      <ProductSelection 
+        onProductsChange={handleProductsChange}
+        currentClient={currentClient}
+      />
+      
+      {/* Order Form */}
+      <OrderForm 
+        selectedProducts={selectedProducts} 
+        onOrderSuccess={handleOrderSuccess}
+      />
     </div>
   )
 }

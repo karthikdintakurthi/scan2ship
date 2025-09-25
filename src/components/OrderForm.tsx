@@ -7,6 +7,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { getPickupLocationConfig } from '@/lib/pickup-location-config'
 import { getCourierServiceByValue, validateCourierServiceRestrictions } from '@/lib/courier-service-config'
 import { getOrderConfig, validateOrderData } from '@/lib/order-config'
+import { CatalogService } from '@/lib/catalog-service'
+import { OrderItem } from '@/types/catalog'
 
 
 
@@ -33,7 +35,12 @@ interface AddressFormData {
   skip_tracking: boolean
 }
 
-export default function OrderForm() {
+interface OrderFormProps {
+  selectedProducts?: OrderItem[];
+  onOrderSuccess?: () => void;
+}
+
+export default function OrderForm({ selectedProducts = [], onOrderSuccess }: OrderFormProps) {
   const { refreshCredits, currentClient } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentStep, setCurrentStep] = useState<'idle' | 'creating' | 'completed'>('idle')
@@ -60,7 +67,7 @@ export default function OrderForm() {
     reference_number: '',
     reseller_name: '',
     reseller_mobile: '',
-            courier_service: 'delhivery', // Default, will be updated when config loads
+            courier_service: '', // Will be set from config when loaded
     package_value: '5000',
     weight: '100',
     total_items: '1',
@@ -105,6 +112,12 @@ export default function OrderForm() {
         const savedCourierService = localStorage.getItem('scan2ship_courier_service');
         console.log('🔍 [ORDER_FORM] Saved courier service from localStorage:', savedCourierService);
         
+        // Clear invalid cached courier service (delhivery is no longer valid)
+        if (savedCourierService === 'delhivery') {
+          console.log('🧹 [ORDER_FORM] Clearing invalid cached courier service: delhivery');
+          localStorage.removeItem('scan2ship_courier_service');
+        }
+        
         if (clientConfig) {
           // Log the initial package value for debugging
           console.log('🔍 [INITIAL_CONFIG] Client config defaultPackageValue:', clientConfig.defaultPackageValue);
@@ -113,8 +126,8 @@ export default function OrderForm() {
           // Update form data with client-specific defaults
           setFormData(prev => ({
             ...prev,
-            // Priority: Saved selection > User selection > Default from config
-            courier_service: savedCourierService || prev.courier_service || (formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : 'delhivery'),
+            // Priority: Valid saved selection > User selection > Default from config
+            courier_service: (savedCourierService && savedCourierService !== 'delhivery') || prev.courier_service || (formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : ''),
             package_value: clientConfig.defaultPackageValue.toString(),
             weight: clientConfig.defaultWeight.toString(),
             total_items: clientConfig.defaultTotalItems.toString(),
@@ -128,6 +141,21 @@ export default function OrderForm() {
         
         setConfigLoaded(true);
         console.log('✅ [ORDER_FORM] Configuration loaded:', { formConfig, clientConfig });
+        
+        // Validate and fix courier service after config is loaded
+        setTimeout(() => {
+          setFormData(prev => {
+            const validServices = formConfig.courierServices.map(s => s.value);
+            if (prev.courier_service && !validServices.includes(prev.courier_service)) {
+              console.log('🔧 [ORDER_FORM] Fixing invalid courier service:', prev.courier_service, '->', validServices[0]);
+              return {
+                ...prev,
+                courier_service: validServices[0] || ''
+              };
+            }
+            return prev;
+          });
+        }, 100);
       } catch (error) {
         console.error('❌ [ORDER_FORM] Error loading configuration:', error);
         setConfigLoaded(true);
@@ -844,7 +872,22 @@ export default function OrderForm() {
         waybill: formData.tracking_number,
         reference_number: formData.reference_number,
         skip_tracking: formData.skip_tracking,
-        creationPattern // Add creation pattern to order data
+        creationPattern, // Add creation pattern to order data
+        // Include product details if any products were selected
+        products: selectedProducts.length > 0 ? selectedProducts.map(item => {
+          console.log('🔍 [ORDER_FORM] Mapping product for order:', {
+            sku: item.product.sku,
+            name: item.product.name,
+            thumbnailUrl: item.product.thumbnailUrl
+          });
+          return {
+            sku: item.product.sku,
+            name: item.product.name,
+            quantity: item.quantity,
+            price: item.price,
+            thumbnailUrl: item.product.thumbnailUrl
+          };
+        }) : undefined
       }
 
       // Debug logging to see what values are being sent
@@ -885,6 +928,41 @@ export default function OrderForm() {
       if (result.success) {
         setCurrentStep('completed')
         setSuccess(`Order created successfully! Order Number: ${result.order.referenceNumber}`)
+        
+        // Update inventory in catalog-app if products were selected
+        if (selectedProducts.length > 0) {
+          try {
+            console.log('🔄 [ORDER_FORM] Updating inventory in catalog-app...');
+            const catalogService = new CatalogService();
+            
+            // Set client slug if available
+            if (currentClient?.slug) {
+              catalogService.setClientSlug(currentClient.slug);
+            }
+            
+            const inventoryItems = selectedProducts.map(item => ({
+              sku: item.product.sku,
+              quantity: item.quantity
+            }));
+
+            const inventoryResponse = await catalogService.reduceInventory(inventoryItems, result.order.orderNumber);
+            
+            if (inventoryResponse.data.allItemsAvailable) {
+              console.log('✅ [ORDER_FORM] Inventory updated successfully in catalog-app');
+            } else {
+              console.warn('⚠️ [ORDER_FORM] Some items were not available in inventory');
+            }
+          } catch (inventoryError) {
+            console.error('❌ [ORDER_FORM] Failed to update inventory in catalog-app:', inventoryError);
+            // Don't fail the order creation if inventory update fails
+            setError(prev => prev + ' (Note: Order created but inventory update failed)');
+          }
+        }
+        
+        // Call the success callback to reset product selection
+        if (onOrderSuccess) {
+          onOrderSuccess();
+        }
         
         // Refresh credit balance immediately after successful order creation
         refreshCredits();

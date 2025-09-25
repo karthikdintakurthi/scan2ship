@@ -20,13 +20,13 @@ export interface CourierService {
 // Default fallback configuration
 const defaultCourierServices: CourierService[] = [
   {
-    value: 'delhivery',
-    label: 'Delhivery',
-    description: 'Fast and reliable courier service with nationwide coverage',
+    value: 'dtdc',
+    label: 'DTDC',
+    description: 'Reliable courier service with nationwide coverage',
     isActive: true,
     supportsCod: true,
     supportsTracking: true,
-    apiIntegration: 'delhivery',
+    apiIntegration: 'dtdc',
     defaultWeight: 100,
     defaultPackageValue: 5000,
     serviceAreas: ['all'], // All India

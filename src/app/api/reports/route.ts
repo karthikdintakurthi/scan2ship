@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
           tracking_id: true,
           courier_service: true, // Include courier service for verification
           delhivery_api_status: true,
-          delhivery_tracking_status: true,
+          tracking_status: true,
           shopify_status: true
         },
         orderBy: {
@@ -110,9 +110,9 @@ export async function GET(request: NextRequest) {
 
     // Map database status to report status using the same logic as TrackingStatusLabel
     const getOrderStatus = (order: any) => {
-      // Use delhivery_tracking_status as the primary source (this is updated by cron job)
-      if (order.delhivery_tracking_status) {
-        const status = order.delhivery_tracking_status.toLowerCase();
+      // Use tracking_status as the primary source (this is updated by cron job)
+      if (order.tracking_status) {
+        const status = order.tracking_status.toLowerCase();
         
         // Map to report statuses (matching UI logic)
         if (status === 'delivered') {
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
       orders.slice(0, 5).map(order => ({
         id: order.id,
         courier_service: order.courier_service,
-        delhivery_tracking_status: order.delhivery_tracking_status,
+        tracking_status: order.tracking_status,
         delhivery_api_status: order.delhivery_api_status,
         tracking_id: order.tracking_id,
         mapped_status: getOrderStatus(order)
