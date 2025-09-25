@@ -7,73 +7,70 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Order {
-  id                       Int       @id @default(autoincrement())
-  name                     String
-  mobile                   String
-  address                  String
-  city                     String
-  state                    String
-  country                  String
-  pincode                  String
-  courier_service          String
-  pickup_location          String
-  package_value            Float
-  weight                   Float
-  total_items              Int
-  tracking_id              String?
-  reference_number         String?
-  is_cod                   Boolean   @default(false)
-  cod_amount               Float?
-  reseller_name            String?
-  reseller_mobile          String?
-  created_at               DateTime  @default(now())
-  updated_at               DateTime
-  delhivery_waybill_number String?
-  delhivery_order_id       String?
-  delhivery_api_status     String?
-  delhivery_api_error      String?
-  delhivery_retry_count    Int       @default(0)
-  last_delhivery_attempt   DateTime?
-  shipment_length          Float?
-  shipment_breadth         Float?
-  shipment_height          Float?
-  product_description      String?
-  return_address           String?
-  return_pincode           String?
-  fragile_shipment         Boolean   @default(false)
-  seller_name              String?
-  seller_address           String?
-  seller_gst               String?
-  invoice_number           String?
-  commodity_value          Float?
-  tax_value                Float?
-  category_of_goods        String?
-  vendor_pickup_location   String?
-  hsn_code                 String?
-  seller_cst_no            String?
-  seller_tin               String?
-  invoice_date             String?
-  return_reason            String?
-  ewbn                     String?
-  phone                    String?
+model analytics_events {
+  id        String   @id
+  eventType String
+  eventData Json?
+  clientId  String?
+  userId    String?
+  createdAt DateTime @default(now())
+  clients   clients? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users     users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model categories {
-  id                 String               @id
-  name               String
-  description        String?
-  isActive           Boolean              @default(true)
-  clientId           String
-  parentId           String?
-  sortOrder          Int                  @default(0)
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime
-  categories         categories?          @relation("categoriesTocategories", fields: [parentId], references: [id], onDelete: Cascade)
-  other_categories   categories[]         @relation("categoriesTocategories")
-  product_categories product_categories[]
+model api_keys {
+  id          String    @id
+  name        String
+  key         String    @unique
+  secret      String?
+  clientId    String
+  isActive    Boolean   @default(true)
+  permissions String[]  @default([])
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  clients     clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  @@unique([name, clientId, parentId])
+  @@index([clientId])
+  @@index([key])
+}
+
+model audit_logs {
+  id        String   @id
+  eventType String
+  severity  String
+  userId    String?
+  clientId  String?
+  sessionId String?
+  ipAddress String
+  userAgent String
+  resource  String?
+  action    String?
+  details   String
+  metadata  String
+  riskScore Int
+  tags      String[]
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+  @@index([createdAt])
+  @@index([eventType])
+  @@index([ipAddress])
+  @@index([severity])
+  @@index([tags])
+  @@index([userId])
+}
+
+model blocked_ips {
+  id        String   @id
+  ipAddress String   @unique
+  reason    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([ipAddress])
 }
 
 model client_config {
@@ -92,184 +89,341 @@ model client_config {
   @@unique([clientId, key])
 }
 
-model client_order_configs {
-  id                        String  @id
-  defaultProductDescription String  @default("ARTIFICAL JEWELLERY")
-  defaultPackageValue       Float   @default(5000)
-  defaultWeight             Float   @default(100)
-  defaultTotalItems         Int     @default(1)
-  codEnabledByDefault       Boolean @default(false)
-  defaultCodAmount          Float?
-  minPackageValue           Float   @default(100)
-  maxPackageValue           Float   @default(100000)
-  minWeight                 Float   @default(1)
-  maxWeight                 Float   @default(50000)
-  minTotalItems             Int     @default(1)
-  maxTotalItems             Int     @default(100)
-  requireProductDescription Boolean @default(true)
-  requirePackageValue       Boolean @default(true)
-  requireWeight             Boolean @default(true)
-  requireTotalItems         Boolean @default(true)
-  clientId                  String  @unique
-  clients                   clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+model client_credit_costs {
+  id        String   @id
+  clientId  String
+  feature   String
+  cost      Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  clients   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, feature])
 }
 
-model client_settings {
-  id                 String   @id
-  clientId           String   @unique
-  companyName        String
-  email              String
-  phone              String?
-  address            String?
-  timezone           String   @default("America/New_York")
-  lowStockThreshold  Int      @default(10)
-  autoReorder        Boolean  @default(false)
-  emailNotifications Boolean  @default(true)
-  smsNotifications   Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime
-  clients            clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+model client_credits {
+  id         String   @id
+  clientId   String   @unique
+  balance    Int      @default(0)
+  totalAdded Int      @default(0)
+  totalUsed  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  clients    clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model client_order_configs {
+  id                        String   @id
+  defaultProductDescription String   @default("ARTIFICAL JEWELLERY")
+  defaultPackageValue       Float    @default(5000)
+  defaultWeight             Float    @default(100)
+  defaultTotalItems         Int      @default(1)
+  codEnabledByDefault       Boolean  @default(false)
+  defaultCodAmount          Float?
+  minPackageValue           Float    @default(100)
+  maxPackageValue           Float    @default(100000)
+  minWeight                 Float    @default(1)
+  maxWeight                 Float    @default(50000)
+  minTotalItems             Int      @default(1)
+  maxTotalItems             Int      @default(100)
+  requireProductDescription Boolean  @default(true)
+  requirePackageValue       Boolean  @default(true)
+  requireWeight             Boolean  @default(true)
+  requireTotalItems         Boolean  @default(true)
+  enableResellerFallback    Boolean  @default(true)
+  clientId                  String   @unique
+  enableThermalPrint        Boolean  @default(false)
+  enableReferencePrefix     Boolean  @default(true)
+  displayLogoOnWaybill      Boolean? @default(false)
+  logoFileName              String?
+  logoFileSize              Int?
+  logoFileType              String?
+  logoEnabledCouriers       String?
+  enableAltMobileNumber     Boolean? @default(false)
+  enableA5Print             Boolean  @default(false)
+  logoUrl                   String?
+  pickup_location_overrides Json?    @default("{}")
+  clients                   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 model clients {
-  id                   String                @id
-  name                 String
-  slug                 String                @unique
-  domain               String?
-  email                String
-  phone                String?
-  address              String?
-  logo                 String?
-  countryId            String?
-  currencyId           String?
-  isActive             Boolean               @default(true)
-  plan                 Plan                  @default(STARTER)
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime
-  client_config        client_config[]
-  client_order_configs client_order_configs?
-  client_settings      client_settings?
-  countries            countries?            @relation(fields: [countryId], references: [id])
-  currencies           currencies?           @relation(fields: [currencyId], references: [id])
-  products             products[]
-  users                users[]
+  id                    String                 @id
+  name                  String
+  slug                  String                 @unique
+  companyName           String
+  email                 String                 @unique
+  phone                 String?
+  address               String?
+  city                  String?
+  state                 String?
+  country               String                 @default("India")
+  pincode               String?
+  subscriptionPlan      String                 @default("basic")
+  subscriptionStatus    String                 @default("active")
+  subscriptionExpiresAt DateTime?
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime
+  analytics_events      analytics_events[]
+  api_keys              api_keys[]
+  client_config         client_config[]
+  client_credit_costs   client_credit_costs[]
+  client_credits        client_credits?
+  client_order_configs  client_order_configs?
+  courier_services      courier_services[]
+  credit_transactions   credit_transactions[]
+  order_analytics       order_analytics[]
+  orders                orders[]
+  pickup_locations      pickup_locations[]
+  pickup_requests       pickup_requests[]
+  sessions              sessions[]
+  shopify_integrations  shopify_integrations[]
+  shopify_orders        shopify_orders[]
+  users                 users[]
+  webhooks              webhooks[]
 }
 
-model countries {
-  id         String     @id
-  name       String     @unique
-  code       String     @unique
-  currencyId String
-  isActive   Boolean    @default(true)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime
-  clients    clients[]
-  currencies currencies @relation(fields: [currencyId], references: [id])
+model courier_services {
+  id                    String  @id
+  isActive              Boolean @default(true)
+  clientId              String
+  isDefault             Boolean @default(false)
+  code                  String
+  name                  String
+  baseRate              Float?
+  codCharges            Float?
+  estimatedDays         Int?
+  freeShippingThreshold Float?
+  maxWeight             Float?
+  minWeight             Float?
+  ratePerKg             Float?
+  clients               clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([code, clientId])
 }
 
-model currencies {
-  id            String      @id
-  name          String      @unique
-  code          String      @unique
-  symbol        String
-  decimalPlaces Int         @default(2)
-  isActive      Boolean     @default(true)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime
-  clients       clients[]
-  countries     countries[]
-}
-
-model inventory_history {
-  id        String        @id
-  productId String
-  quantity  Int
-  type      InventoryType
-  reason    String?
-  userId    String?
-  clientId  String
-  createdAt DateTime      @default(now())
-  products  products      @relation(fields: [productId], references: [id])
-  users     users?        @relation(fields: [userId], references: [id])
-}
-
-model media {
-  id           String    @id
-  productId    String?
-  kind         String
-  s3Key        String
-  originalName String
-  mimeType     String
-  fileSize     Int
-  width        Int?
-  height       Int?
-  durationMs   Int?
-  altText      String?
-  caption      String?
-  sortOrder    Int       @default(0)
-  isPrimary    Boolean   @default(false)
-  status       String    @default("pending")
-  error        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime
-  products     products? @relation(fields: [productId], references: [id], onDelete: Cascade)
-}
-
-model performance_metrics {
-  id                  String   @id
-  url                 String
-  timestamp           DateTime
-  fcp                 Float?
-  lcp                 Float?
-  fid                 Float?
-  cls                 Float?
-  ttfb                Float?
-  fmp                 Float?
-  tti                 Float?
-  userAgent           String?
-  connectionType      String?
-  deviceMemory        Int?
-  hardwareConcurrency Int?
-  createdAt           DateTime @default(now())
-}
-
-model product_categories {
-  id         String     @id
-  productId  String
-  categoryId String
-  createdAt  DateTime   @default(now())
-  categories categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  products   products   @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, categoryId])
-}
-
-model products {
-  id                 String               @id
-  name               String
-  sku                String
-  description        String?
-  price              Decimal              @db.Decimal(10, 2)
-  category           String
-  categoryId         String?
-  variations         Json?
-  stockLevel         Int                  @default(0)
-  minStock           Int                  @default(0)
-  isActive           Boolean              @default(true)
+model credit_transactions {
+  id                 String   @id
   clientId           String
-  mediaData          Json?
-  images             Json?
-  videos             Json?
-  thumbnailUrl       String?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime
-  allowPreorder      Boolean              @default(false)
-  inventory_history  inventory_history[]
-  media              media[]
-  product_categories product_categories[]
-  clients            clients              @relation(fields: [clientId], references: [id])
+  userId             String?
+  type               String
+  amount             Int
+  balance            Int
+  description        String
+  feature            String?
+  orderId            Int?
+  createdAt          DateTime @default(now())
+  clientName         String
+  utrNumber          String?
+  screenshotFileName String?
+  screenshotFileSize Int?
+  screenshotFileType String?
+  clients            clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orders             orders?  @relation(fields: [orderId], references: [id])
+  users              users?   @relation(fields: [userId], references: [id])
+}
 
-  @@unique([sku, clientId])
+model csrf_tokens {
+  id        String   @id
+  token     String   @unique
+  userId    String?
+  sessionId String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([sessionId])
+  @@index([token])
+  @@index([userId])
+}
+
+model order_analytics {
+  id              String   @id
+  orderId         Int      @unique
+  creationPattern String
+  clientId        String
+  userId          String?
+  createdAt       DateTime @default(now())
+  clients         clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orders          orders   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  users           users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model orders {
+  id                       Int                   @id @default(autoincrement())
+  clientId                 String
+  name                     String
+  mobile                   String
+  phone                    String?
+  address                  String
+  city                     String
+  state                    String
+  country                  String
+  pincode                  String
+  courier_service          String
+  pickup_location          String
+  package_value            Float
+  weight                   Float
+  total_items              Int
+  tracking_id              String?
+  reference_number         String?
+  is_cod                   Boolean               @default(false)
+  cod_amount               Float?
+  reseller_name            String?
+  reseller_mobile          String?
+  created_at               DateTime              @default(now())
+  updated_at               DateTime
+  delhivery_waybill_number String?
+  delhivery_order_id       String?
+  delhivery_api_status     String?
+  delhivery_api_error      String?
+  delhivery_retry_count    Int                   @default(0)
+  last_delhivery_attempt   DateTime?
+  shipment_length          Float?
+  shipment_breadth         Float?
+  shipment_height          Float?
+  product_description      String?
+  return_address           String?
+  return_pincode           String?
+  fragile_shipment         Boolean               @default(false)
+  seller_name              String?
+  seller_address           String?
+  seller_gst               String?
+  invoice_number           String?
+  commodity_value          Float?
+  tax_value                Float?
+  category_of_goods        String?
+  vendor_pickup_location   String?
+  hsn_code                 String?
+  seller_cst_no            String?
+  seller_tin               String?
+  invoice_date             String?
+  return_reason            String?
+  ewbn                     String?
+  last_shopify_attempt     DateTime?
+  shopify_api_error        String?
+  shopify_api_status       String?
+  shopify_fulfillment_id   String?
+  shopify_status           String?
+  shopify_tracking_number  String?
+  tracking_status          String?               @default("pending")
+  products                 Json?
+  credit_transactions      credit_transactions[]
+  order_analytics          order_analytics?
+  clients                  clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model pickup_locations {
+  id              String  @id
+  value           String
+  label           String
+  delhiveryApiKey String?
+  clientId        String
+  clients         clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([label, clientId])
+}
+
+model pickup_requests {
+  id                     String   @id
+  clientId               String
+  userId                 String
+  pickup_date            String
+  pickup_time            String
+  pickup_address         String
+  contact_person         String
+  contact_phone          String
+  special_instructions   String?
+  pickup_location        String
+  delhivery_request_id   String?
+  status                 String   @default("scheduled")
+  created_at             DateTime @default(now())
+  updated_at             DateTime
+  expected_package_count Int      @default(1)
+  clients                clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users                  users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([pickup_date])
+  @@index([status])
+  @@index([userId])
+}
+
+model rate_limits {
+  id          String   @id
+  key         String   @unique
+  count       Int      @default(0)
+  windowStart DateTime
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+
+  @@index([expiresAt])
+  @@index([key])
+}
+
+model sessions {
+  id           String    @id
+  userId       String
+  clientId     String
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  ipAddress    String
+  isActive     Boolean   @default(true)
+  lastActivity DateTime  @default(now())
+  location     String?
+  permissions  String
+  refreshToken String    @unique
+  revokedAt    DateTime?
+  role         String
+  sessionToken String    @unique
+  userAgent    String
+  clients      clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users        users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([isActive])
+  @@index([refreshToken])
+  @@index([sessionToken])
+  @@index([userId])
+}
+
+model shopify_integrations {
+  id            String    @id
+  clientId      String
+  shopDomain    String
+  accessToken   String
+  webhookSecret String?
+  isActive      Boolean   @default(true)
+  lastSyncAt    DateTime?
+  syncStatus    String    @default("pending")
+  errorMessage  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime
+  clients       clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([shopDomain, clientId])
+  @@index([clientId])
+  @@index([shopDomain])
+}
+
+model shopify_orders {
+  id               String   @id
+  clientId         String
+  shopifyOrderId   String
+  shopifyOrderName String
+  scan2shipOrderId Int?
+  status           String   @default("pending")
+  syncData         Json?
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime
+  clients          clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([shopifyOrderId, clientId])
+  @@index([clientId])
+  @@index([shopifyOrderId])
 }
 
 model system_config {
@@ -285,39 +439,59 @@ model system_config {
 }
 
 model users {
-  id                String              @id
-  email             String
-  password          String
-  name              String?
-  role              Role                @default(ADMIN)
-  clientId          String?
-  isActive          Boolean             @default(true)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime
-  inventory_history inventory_history[]
-  clients           clients?            @relation(fields: [clientId], references: [id])
+  id                  String                @id
+  email               String
+  name                String
+  password            String?
+  role                String                @default("user")
+  isActive            Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  clientId            String
+  analytics_events    analytics_events[]
+  credit_transactions credit_transactions[]
+  order_analytics     order_analytics[]
+  pickup_requests     pickup_requests[]
+  sessions            sessions[]
+  clients             clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([email, clientId])
 }
 
-enum InventoryType {
-  PURCHASE
-  SALE
-  ADJUSTMENT
-  RETURN
-  DAMAGE
-  TRANSFER
+model webhook_logs {
+  id           String   @id
+  webhookId    String
+  eventType    String
+  orderId      Int?
+  status       String
+  responseCode Int?
+  responseBody String?
+  errorMessage String?
+  attemptCount Int      @default(1)
+  createdAt    DateTime @default(now())
+  webhooks     webhooks @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([webhookId])
 }
 
-enum Plan {
-  STARTER
-  PROFESSIONAL
-  ENTERPRISE
-}
+model webhooks {
+  id           String         @id
+  clientId     String
+  name         String
+  url          String
+  events       String[]
+  secret       String?
+  isActive     Boolean        @default(true)
+  retryCount   Int            @default(3)
+  timeout      Int            @default(30000)
+  headers      Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  webhook_logs webhook_logs[]
+  clients      clients        @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-enum Role {
-  SUPER_ADMIN
-  ADMIN
-  MANAGER
-  USER
+  @@index([clientId])
+  @@index([isActive])
 }
