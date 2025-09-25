@@ -58,6 +58,9 @@ export async function POST(request: NextRequest) {
       case 'restore_inventory':
         return await handleInventoryRestoration(data, client);
       
+      case 'logout':
+        return await handleCatalogLogout(data, client);
+      
       default:
         return NextResponse.json(
           { error: 'Invalid action' },
@@ -105,7 +108,51 @@ async function handleCatalogAuthentication(data: any, client: any) {
 
     const authData = await response.json();
     
-    // Store catalog auth in client config
+    // Decode JWT token to get expiration time
+    const jwt = require('jsonwebtoken');
+    let tokenExpiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // Default 8 hours
+    
+    try {
+      const decoded = jwt.decode(authData.token);
+      if (decoded && decoded.exp) {
+        tokenExpiresAt = new Date(decoded.exp * 1000);
+      }
+    } catch (error) {
+      console.warn('Could not decode JWT token for expiration time:', error);
+    }
+    
+    // Store catalog session details
+    await prisma.catalog_sessions.upsert({
+      where: {
+        scan2shipClientId: client.id
+      },
+      update: {
+        catalogClientId: authData.user.clientId,
+        catalogUserId: authData.user.id,
+        catalogUserEmail: authData.user.email,
+        catalogUserRole: authData.user.role,
+        catalogClientSlug: authData.user.client?.slug || null,
+        authToken: authData.token,
+        tokenExpiresAt: tokenExpiresAt,
+        isActive: true,
+        lastUsedAt: new Date(),
+        updatedAt: new Date()
+      },
+      create: {
+        scan2shipClientId: client.id,
+        catalogClientId: authData.user.clientId,
+        catalogUserId: authData.user.id,
+        catalogUserEmail: authData.user.email,
+        catalogUserRole: authData.user.role,
+        catalogClientSlug: authData.user.client?.slug || null,
+        authToken: authData.token,
+        tokenExpiresAt: tokenExpiresAt,
+        isActive: true,
+        lastUsedAt: new Date()
+      }
+    });
+    
+    // Also store in client_config for backward compatibility
     await prisma.client_config.upsert({
       where: {
         clientId_key: {
@@ -159,19 +206,16 @@ async function handleProductSearch(data: any, client: any) {
       );
     }
 
-    // Get catalog auth token
-    const authConfig = await prisma.client_config.findUnique({
-      where: {
-        clientId_key: {
-          clientId: client.id,
-          key: 'catalog_auth_token'
-        }
-      }
-    });
+    // Get catalog session details
+    const { getCatalogSessionForApi } = await import('@/lib/catalog-session');
+    const sessionData = await getCatalogSessionForApi(client.id);
 
-    if (!authConfig) {
+    if (!sessionData) {
       return NextResponse.json(
-        { error: 'Not authenticated with catalog app' },
+        { 
+          error: 'Catalog authentication required. Please login to catalog first.',
+          requiresLogin: true
+        },
         { status: 401 }
       );
     }
@@ -187,7 +231,7 @@ async function handleProductSearch(data: any, client: any) {
     const response = await fetch(`${catalogUrl}/api/products?${searchParams}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${authConfig.value}`,
+        'Authorization': `Bearer ${sessionData.authToken}`,
         'Content-Type': 'application/json',
       },
     });
@@ -223,19 +267,16 @@ async function handleGetProduct(data: any, client: any) {
       );
     }
 
-    // Get catalog auth token
-    const authConfig = await prisma.client_config.findUnique({
-      where: {
-        clientId_key: {
-          clientId: client.id,
-          key: 'catalog_auth_token'
-        }
-      }
-    });
+    // Get catalog session details
+    const { getCatalogSessionForApi } = await import('@/lib/catalog-session');
+    const sessionData = await getCatalogSessionForApi(client.id);
 
-    if (!authConfig) {
+    if (!sessionData) {
       return NextResponse.json(
-        { error: 'Not authenticated with catalog app' },
+        { 
+          error: 'Catalog authentication required. Please login to catalog first.',
+          requiresLogin: true
+        },
         { status: 401 }
       );
     }
@@ -245,7 +286,7 @@ async function handleGetProduct(data: any, client: any) {
     const response = await fetch(`${catalogUrl}/api/products/sku/${encodeURIComponent(sku)}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${authConfig.value}`,
+        'Authorization': `Bearer ${sessionData.authToken}`,
         'Content-Type': 'application/json',
       },
     });
@@ -394,6 +435,26 @@ async function handleInventoryRestoration(data: any, client: any) {
     console.error('Inventory restoration error:', error);
     return NextResponse.json(
       { error: 'Failed to restore inventory' },
+      { status: 500 }
+    );
+  }
+}
+
+async function handleCatalogLogout(data: any, client: any) {
+  try {
+    // Invalidate catalog session
+    const { invalidateCatalogSession } = await import('@/lib/catalog-session');
+    await invalidateCatalogSession(client.id);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Successfully logged out from catalog app'
+    });
+
+  } catch (error: any) {
+    console.error('Catalog logout error:', error);
+    return NextResponse.json(
+      { error: 'Failed to logout from catalog app' },
       { status: 500 }
     );
   }

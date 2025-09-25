@@ -245,6 +245,83 @@ export class CatalogService {
   }
 
   /**
+   * Logout from catalog (invalidate session)
+   */
+  async logout(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/catalog`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({
+          action: 'logout',
+          data: {}
+        })
+      });
+
+      if (response.ok) {
+        this.clearAuth();
+        console.log('Catalog Service: Successfully logged out');
+        return true;
+      } else {
+        console.error('Catalog Service: Logout failed:', response.status);
+        return false;
+      }
+    } catch (error) {
+      console.error('Catalog Service: Logout error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if catalog session is valid
+   */
+  async checkSessionStatus(): Promise<{
+    isValid: boolean;
+    requiresLogin: boolean;
+    message?: string;
+  }> {
+    try {
+      // Try to search for products to test session validity
+      const response = await fetch(`${this.baseUrl}/api/catalog`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({
+          action: 'search_products',
+          data: {
+            query: 'test',
+            page: 1,
+            limit: 1
+          }
+        })
+      });
+
+      if (response.ok) {
+        return { isValid: true, requiresLogin: false };
+      } else if (response.status === 401) {
+        const errorData = await response.json();
+        return { 
+          isValid: false, 
+          requiresLogin: true,
+          message: errorData.error || 'Session expired'
+        };
+      } else {
+        return { 
+          isValid: false, 
+          requiresLogin: false,
+          message: 'Session check failed'
+        };
+      }
+    } catch (error) {
+      console.error('Catalog Service: Session check error:', error);
+      return { 
+        isValid: false, 
+        requiresLogin: false,
+        message: 'Session check failed'
+      };
+    }
+  }
+
+  /**
    * Set client slug for API calls
    */
   setClientSlug(slug: string): void {

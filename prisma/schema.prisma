@@ -150,7 +150,7 @@ model client_order_configs {
 model clients {
   id                    String                 @id
   name                  String
-  slug                  String                 @unique
+  slug                  String?                @unique
   companyName           String
   email                 String                 @unique
   phone                 String?
@@ -182,6 +182,7 @@ model clients {
   shopify_orders        shopify_orders[]
   users                 users[]
   webhooks              webhooks[]
+  catalog_sessions      catalog_sessions[]
 }
 
 model courier_services {
@@ -494,4 +495,29 @@ model webhooks {
 
   @@index([clientId])
   @@index([isActive])
+}
+
+model catalog_sessions {
+  id                String    @id @default(cuid())
+  scan2shipClientId String    // The scan2ship client ID
+  catalogClientId   String    // The catalog app client ID
+  catalogUserId     String    // The catalog app user ID
+  catalogUserEmail  String    // The catalog app user email
+  catalogUserRole   String    // The catalog app user role
+  catalogClientSlug String?   // The catalog app client slug
+  authToken         String    // The JWT token for catalog API calls
+  tokenExpiresAt    DateTime  // When the token expires
+  isActive          Boolean   @default(true)
+  lastUsedAt        DateTime? // When the session was last used
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  scan2shipClient   clients   @relation(fields: [scan2shipClientId], references: [id], onDelete: Cascade)
+  
+  @@unique([scan2shipClientId]) // One active session per scan2ship client
+  @@index([catalogClientId])
+  @@index([catalogUserId])
+  @@index([isActive])
+  @@index([tokenExpiresAt])
 }
