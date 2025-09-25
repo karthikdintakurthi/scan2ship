@@ -445,35 +445,27 @@ export class CatalogService {
   async reduceInventory(items: Array<{ sku: string; quantity: number; isPreorder?: boolean }>, orderId?: string): Promise<InventoryUpdateResponse> {
     console.log('Catalog Service: reduceInventory called with clientSlug:', this.clientSlug);
     
-    // If client slug is missing, try to refresh it
-    if (!this.clientSlug) {
-      console.log('Catalog Service: Client slug missing, attempting to refresh...');
-      const refreshed = this.refreshClientSlug();
-      if (!refreshed) {
-        console.error('Catalog Service: Client slug not set for reduceInventory. Auth token:', !!this.authToken);
-        throw new Error('Client slug not set');
-      }
+    if (!this.authToken) {
+      throw new Error('Not authenticated with catalog-app');
     }
 
     // Generate a temporary order ID if none provided
     const tempOrderId = orderId || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Determine reduce mode based on whether any items are preorders
-    const hasPreorders = items.some(item => item.isPreorder);
-    const reduceMode = hasPreorders ? 'allow_negative' : 'strict';
-    
-    console.log('Catalog Service: reduceMode determined:', reduceMode, 'hasPreorders:', hasPreorders);
-
     try {
-      const response = await fetch(`${this.baseUrl}/api/public/inventory/reduce?client=${this.clientSlug}`, {
+      // Call scan2ship catalog API instead of catalog app directly
+      const response = await fetch('/api/catalog', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`,
         },
-        body: JSON.stringify({ 
-          items: items.map(item => ({ sku: item.sku, quantity: item.quantity })), // Remove isPreorder from items
-          orderId: tempOrderId,
-          reduceMode: reduceMode
+        body: JSON.stringify({
+          action: 'reduce_inventory',
+          data: {
+            items: items.map(item => ({ sku: item.sku, quantity: item.quantity })),
+            orderId: tempOrderId
+          }
         }),
       });
 
@@ -482,7 +474,11 @@ export class CatalogService {
         throw new Error(error.error || 'Failed to reduce inventory');
       }
 
-      return await response.json();
+      const result = await response.json();
+      return {
+        success: true,
+        data: result
+      };
     } catch (error) {
       console.error('Inventory reduction error:', error);
       throw error;

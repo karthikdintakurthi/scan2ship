@@ -360,7 +360,7 @@ async function handleInventoryCheck(data: any, client: any) {
 
 async function handleInventoryReduction(data: any, client: any) {
   try {
-    const { items } = data;
+    const { items, orderId } = data;
     
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -369,14 +369,30 @@ async function handleInventoryReduction(data: any, client: any) {
       );
     }
 
+    // Get catalog session details
+    const sessionData = await getCatalogSessionForApi(client.id);
+    
+    if (!sessionData) {
+      return NextResponse.json(
+        { 
+          error: 'Catalog authentication required. Please login to catalog first.',
+          requiresLogin: true
+        },
+        { status: 401 }
+      );
+    }
+
     // Call catalog app inventory reduction
     const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
-    const response = await fetch(`${catalogUrl}/api/public/inventory/reduce?client=${client.slug}`, {
+    const response = await fetch(`${catalogUrl}/api/public/inventory/reduce?client=${sessionData.catalogClientSlug}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ 
+        items,
+        orderId: orderId || `scan2ship-${Date.now()}`
+      }),
     });
 
     if (!response.ok) {
