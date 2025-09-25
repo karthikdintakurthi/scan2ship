@@ -158,8 +158,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       const response = await fetch('/api/auth/verify', {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
 
@@ -173,10 +175,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else {
         // Clear invalid session
         removeStoredToken();
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        setCurrentClient(null);
+        setCurrentSession(null);
         return false;
       }
     } catch (error) {
       console.error('Auth check failed:', error);
+      removeStoredToken();
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      setCurrentClient(null);
+      setCurrentSession(null);
       return false;
     }
   };

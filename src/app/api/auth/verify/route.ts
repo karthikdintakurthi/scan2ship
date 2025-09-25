@@ -16,19 +16,40 @@ export async function GET(request: NextRequest) {
 
     const token = authHeader.substring(7);
 
-    // Verify JWT token with secure configuration
+    // Verify JWT token with backward-compatible configuration
     let decoded;
+    let verificationError;
+    
+    // Strategy 1: Try with new configuration
     try {
-      decoded = jwt.verify(token, jwtConfig.secret, {
-        issuer: jwtConfig.options.issuer,
-        audience: jwtConfig.options.audience,
-        algorithms: [jwtConfig.options.algorithm]
+      decoded = jwt.verify(token, process.env.JWT_SECRET!, {
+        issuer: process.env.JWT_ISSUER || 'scan2ship-saas',
+        audience: process.env.JWT_AUDIENCE || 'scan2ship-users',
+        algorithms: ['HS256']
       }) as any;
     } catch (error) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
+      verificationError = error;
+      
+      // Strategy 2: Try without issuer/audience validation (for old tokens)
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET!, {
+          algorithms: ['HS256']
+        }) as any;
+      } catch (error2) {
+        // Strategy 3: Try with old hardcoded values for backward compatibility
+        try {
+          decoded = jwt.verify(token, process.env.JWT_SECRET!, {
+            issuer: 'vanitha-logistics',
+            audience: 'vanitha-logistics-users',
+            algorithms: ['HS256']
+          }) as any;
+        } catch (error3) {
+          return NextResponse.json(
+            { error: 'Invalid token' },
+            { status: 401 }
+          );
+        }
+      }
     }
 
     // Get user and client data from database

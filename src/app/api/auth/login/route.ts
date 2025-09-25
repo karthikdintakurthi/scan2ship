@@ -122,8 +122,8 @@ export async function POST(request: NextRequest) {
       process.env.JWT_SECRET,
       {
         expiresIn: '8h',
-        issuer: 'vanitha-logistics',
-        audience: 'vanitha-logistics-users',
+        issuer: process.env.JWT_ISSUER || 'scan2ship-saas',
+        audience: process.env.JWT_AUDIENCE || 'scan2ship-users',
         algorithm: 'HS256'
       }
     );
