@@ -257,7 +257,7 @@ model products {
   minStock           Int                  @default(0)
   isActive           Boolean              @default(true)
   clientId           String
-  media              Json?
+  mediaData          Json?
   images             Json?
   videos             Json?
   thumbnailUrl       String?
