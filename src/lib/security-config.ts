@@ -8,8 +8,8 @@ export const securityConfig = {
   jwt: {
     algorithm: 'HS256' as const,
     expiresIn: '8h', // Reduced from 24h for better security
-    issuer: 'vanitha-logistics',
-    audience: 'vanitha-logistics-users',
+    issuer: process.env.JWT_ISSUER || 'scan2ship-saas',
+    audience: process.env.JWT_AUDIENCE || 'scan2ship-users',
     refreshThreshold: 15 * 60 * 1000, // 15 minutes before expiry
   },
   

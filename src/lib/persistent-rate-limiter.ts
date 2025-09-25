@@ -95,12 +95,11 @@ export async function rateLimit(
       // Create new entry
       await prisma.rate_limits.create({
         data: {
+          id: `rate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           key,
-          identifier: key, // Use key as identifier
-          endpoint: type,
-          requests: 1,
+          count: 1,
           windowStart,
-          windowEnd: new Date(now.getTime() + config.windowMs)
+          expiresAt: new Date(now.getTime() + config.windowMs)
         }
       });
       
@@ -117,9 +116,9 @@ export async function rateLimit(
       await prisma.rate_limits.update({
         where: { id: existing.id },
         data: {
-          requests: 1,
+          count: 1,
           windowStart,
-          windowEnd: new Date(now.getTime() + config.windowMs)
+          expiresAt: new Date(now.getTime() + config.windowMs)
         }
       });
       
@@ -131,8 +130,8 @@ export async function rateLimit(
     }
     
     // Check if limit exceeded
-    if (existing.requests >= config.maxRequests) {
-      const resetTime = existing.windowEnd.getTime();
+    if (existing.count >= config.maxRequests) {
+      const resetTime = existing.expiresAt.getTime();
       const timeUntilReset = Math.ceil((resetTime - now.getTime()) / 1000);
       
       return {
@@ -147,14 +146,14 @@ export async function rateLimit(
     await prisma.rate_limits.update({
       where: { id: existing.id },
       data: {
-        requests: existing.requests + 1
+        count: existing.count + 1
       }
     });
     
     return { 
       allowed: true, 
-      remaining: config.maxRequests - existing.requests - 1,
-      resetTime: existing.windowEnd.getTime()
+      remaining: config.maxRequests - existing.count - 1,
+      resetTime: existing.expiresAt.getTime()
     };
     
   } catch (error) {

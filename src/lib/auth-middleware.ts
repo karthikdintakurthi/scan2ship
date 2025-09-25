@@ -112,11 +112,23 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
         throw new Error('JWT_SECRET environment variable is required for secure authentication');
       }
       
-      decoded = jwt.verify(token, process.env.JWT_SECRET, {
-        issuer: 'vanitha-logistics',
-        audience: 'vanitha-logistics-users',
-        algorithms: ['HS256']
-      });
+      // Try scan2ship JWT verification first
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET, {
+          issuer: process.env.JWT_ISSUER || 'scan2ship-saas',
+          audience: process.env.JWT_AUDIENCE || 'scan2ship-users',
+          algorithms: ['HS256']
+        });
+      } catch (scan2shipError) {
+        // If scan2ship verification fails, try catalog app verification (no audience/issuer validation)
+        try {
+          decoded = jwt.verify(token, process.env.JWT_SECRET, {
+            algorithms: ['HS256']
+          });
+        } catch (catalogError) {
+          throw scan2shipError; // Throw the original error
+        }
+      }
     } catch (error) {
       console.error('🚨 JWT verification error:', error);
       console.error('Token preview:', token.substring(0, 50) + '...');

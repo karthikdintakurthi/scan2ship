@@ -14,7 +14,7 @@ function validateJwtSecret(): string {
     // During build time, use a fallback secret if JWT_SECRET is not set
     if (process.env.NODE_ENV === 'development' || process.env.NEXT_PHASE === 'phase-production-build') {
       console.warn('⚠️ JWT_SECRET not set, using fallback for build. Please set JWT_SECRET in production.');
-      return 'vanitha-logistics-fallback-jwt-secret-for-build-time-only-64-chars';
+      return 'scan2ship-saas-fallback-jwt-secret-for-build-time-only-64-chars';
     }
     throw new Error('JWT_SECRET environment variable is required for secure authentication');
   }
@@ -24,7 +24,7 @@ function validateJwtSecret(): string {
     // During build time, use a fallback secret if JWT_SECRET is too short
     if (process.env.NEXT_PHASE === 'phase-production-build') {
       console.warn('⚠️ JWT_SECRET too short, using fallback for build. Please set JWT_SECRET to at least 32 characters in production.');
-      return 'vanitha-logistics-fallback-jwt-secret-for-build-time-only-64-chars';
+      return 'scan2ship-saas-fallback-jwt-secret-for-build-time-only-64-chars';
     }
     throw new Error('JWT_SECRET must be at least 32 characters long for security');
   }
@@ -73,7 +73,7 @@ export const enhancedJwtConfig = {
     } catch (error) {
       // During build time, return a fallback secret
       if (process.env.NEXT_PHASE === 'phase-production-build') {
-        return 'vanitha-logistics-fallback-jwt-secret-for-build-time-only-64-chars';
+        return 'scan2ship-saas-fallback-jwt-secret-for-build-time-only-64-chars';
       }
       throw error;
     }
@@ -86,7 +86,7 @@ export const enhancedJwtConfig = {
     } catch (error) {
       // During build time, return a fallback secret
       if (process.env.NEXT_PHASE === 'phase-production-build') {
-        return ['vanitha-logistics-fallback-jwt-secret-for-build-time-only-64-chars'];
+        return ['scan2ship-saas-fallback-jwt-secret-for-build-time-only-64-chars'];
       }
       throw error;
     }
