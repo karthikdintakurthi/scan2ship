@@ -112,21 +112,36 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
         throw new Error('JWT_SECRET environment variable is required for secure authentication');
       }
       
-      // Try scan2ship JWT verification first
+      // Try multiple JWT verification strategies for backward compatibility
+      let verificationError;
+      
+      // Strategy 1: Try scan2ship JWT verification with issuer/audience
       try {
         decoded = jwt.verify(token, process.env.JWT_SECRET, {
           issuer: process.env.JWT_ISSUER || 'scan2ship-saas',
           audience: process.env.JWT_AUDIENCE || 'scan2ship-users',
           algorithms: ['HS256']
         });
-      } catch (scan2shipError) {
-        // If scan2ship verification fails, try catalog app verification (no audience/issuer validation)
+      } catch (error) {
+        verificationError = error;
+        
+        // Strategy 2: Try without issuer/audience validation (for old tokens)
         try {
           decoded = jwt.verify(token, process.env.JWT_SECRET, {
             algorithms: ['HS256']
           });
-        } catch (catalogError) {
-          throw scan2shipError; // Throw the original error
+        } catch (error2) {
+          // Strategy 3: Try with old hardcoded values for backward compatibility
+          try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET, {
+              issuer: 'vanitha-logistics',
+              audience: 'vanitha-logistics-users',
+              algorithms: ['HS256']
+            });
+          } catch (error3) {
+            // All strategies failed
+            throw verificationError; // Throw the first error
+          }
         }
       }
     } catch (error) {
@@ -390,3 +405,4 @@ export async function canAccessResource(
   // Regular users can only access their own resources
   return userId === resourceOwnerId;
 }
+
