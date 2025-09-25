@@ -12,6 +12,7 @@ export interface CatalogProduct {
   stockLevel: number;
   minStock: number;
   isActive: boolean;
+  allowPreorder: boolean;
   category?: {
     id: string;
     name: string;
@@ -45,6 +46,13 @@ export interface CatalogSearchResponse {
     total: number;
     pages: number;
   };
+}
+
+export interface OrderItem {
+  product: CatalogProduct;
+  quantity: number;
+  price: number;
+  isPreorder?: boolean;
 }
 
 export interface InventoryUpdateRequest {
@@ -97,9 +105,10 @@ export class CatalogService {
 
   constructor() {
     // For client-side, use the hardcoded URL since environment variables need to be available at build time
-    this.baseUrl = 'http://localhost:3002';
+    this.baseUrl = 'http://localhost:3000'; // catalog-app is running on port 3000
     
     console.log('Catalog Service: Constructor called, loading stored auth...');
+    console.log('Catalog Service: Base URL set to:', this.baseUrl);
     console.log('Catalog Service: Window available:', typeof window !== 'undefined');
     console.log('Catalog Service: localStorage available:', typeof window !== 'undefined' && typeof localStorage !== 'undefined');
     
@@ -272,7 +281,11 @@ export class CatalogService {
         limit: limit.toString(),
       });
 
-      const response = await fetch(`${this.baseUrl}/api/products?${searchParams}`, {
+      const url = `${this.baseUrl}/api/products?${searchParams}`;
+      console.log('Catalog Service: Searching products with URL:', url);
+      console.log('Catalog Service: Auth token available:', !!this.authToken);
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
@@ -352,7 +365,7 @@ export class CatalogService {
   /**
    * Reduce inventory (for order creation)
    */
-  async reduceInventory(items: Array<{ sku: string; quantity: number }>, orderId?: string): Promise<InventoryUpdateResponse> {
+  async reduceInventory(items: Array<{ sku: string; quantity: number; isPreorder?: boolean }>, orderId?: string): Promise<InventoryUpdateResponse> {
     console.log('Catalog Service: reduceInventory called with clientSlug:', this.clientSlug);
     
     // If client slug is missing, try to refresh it
@@ -368,6 +381,12 @@ export class CatalogService {
     // Generate a temporary order ID if none provided
     const tempOrderId = orderId || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+    // Determine reduce mode based on whether any items are preorders
+    const hasPreorders = items.some(item => item.isPreorder);
+    const reduceMode = hasPreorders ? 'allow_negative' : 'strict';
+    
+    console.log('Catalog Service: reduceMode determined:', reduceMode, 'hasPreorders:', hasPreorders);
+
     try {
       const response = await fetch(`${this.baseUrl}/api/public/inventory/reduce?client=${this.clientSlug}`, {
         method: 'POST',
@@ -375,8 +394,9 @@ export class CatalogService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          items,
-          orderId: tempOrderId
+          items: items.map(item => ({ sku: item.sku, quantity: item.quantity })), // Remove isPreorder from items
+          orderId: tempOrderId,
+          reduceMode: reduceMode
         }),
       });
 

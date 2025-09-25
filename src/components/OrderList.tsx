@@ -2571,9 +2571,19 @@ export default function OrderList() {
                               </div>
                             )}
                             <div>
-                              <p className="font-medium text-gray-900">{product.name}</p>
+                              <div className="flex items-center space-x-2">
+                                <p className="font-medium text-gray-900">{product.name}</p>
+                                {product.isPreorder && (
+                                  <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full font-medium">
+                                    PREORDER
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-sm text-gray-600">SKU: {product.sku}</p>
                               <p className="text-xs text-gray-500">Price: ₹{(parseFloat(product.price) || 0).toFixed(2)}</p>
+                              {product.isPreorder && (
+                                <p className="text-xs text-orange-600 font-medium">⚠️ Out of stock - backordered</p>
+                              )}
                             </div>
                           </div>
                           <div className="text-right">

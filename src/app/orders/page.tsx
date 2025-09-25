@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import OrderForm from '@/components/OrderForm';
 import ProductSelection from '@/components/ProductSelection';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,14 +9,24 @@ import { OrderItem } from '@/types/catalog';
 export default function OrdersPage() {
   const { currentClient } = useAuth();
   const [selectedProducts, setSelectedProducts] = useState<OrderItem[]>([]);
+  const productSelectionRef = useRef<() => void>();
 
   const handleProductsChange = (items: OrderItem[]) => {
     setSelectedProducts(items);
   };
 
   const handleOrderSuccess = () => {
+    console.log('🔄 [ORDERS_PAGE] Order created successfully, resetting product selection');
     setSelectedProducts([]); // Reset selected products after successful order
+    // Also reset the ProductSelection component
+    if (productSelectionRef.current) {
+      console.log('🔄 [ORDERS_PAGE] Calling product selection reset function');
+      productSelectionRef.current();
+    } else {
+      console.log('⚠️ [ORDERS_PAGE] Product selection reset function not available');
+    }
   };
+
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -33,6 +43,9 @@ export default function OrdersPage() {
       <ProductSelection 
         onProductsChange={handleProductsChange}
         currentClient={currentClient}
+        onReset={(resetFn) => {
+          productSelectionRef.current = resetFn;
+        }}
       />
       
       {/* Order Form */}

@@ -75,8 +75,8 @@ export default function CatalogConnectPage() {
               </div>
               
               <CatalogAuth
-                onSuccess={handleConnectionSuccess}
-                onError={(error) => console.error('Catalog connection error:', error)}
+                onAuthSuccess={handleConnectionSuccess}
+                onAuthError={(error) => console.error('Catalog connection error:', error)}
               />
             </div>
           )}

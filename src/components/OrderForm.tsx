@@ -754,6 +754,38 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
       return
     }
 
+    // Validate product stock before order submission
+    if (selectedProducts.length > 0) {
+      console.log('📦 [ORDER_FORM] Validating product stock before order submission');
+      for (const item of selectedProducts) {
+        const product = item.product;
+        const currentStock = product.stockLevel || 0;
+        const minStock = product.minStock || 0;
+        const requestedQuantity = item.quantity;
+        
+        console.log(`📦 [STOCK_VALIDATION] ${product.name}: Stock=${currentStock}, Min=${minStock}, Requested=${requestedQuantity}, IsPreorder=${item.isPreorder}`);
+        
+        // Skip stock validation for preorder items
+        if (item.isPreorder) {
+          console.log(`📦 [STOCK_VALIDATION] ${product.name} is a preorder - skipping stock validation`);
+          continue;
+        }
+        
+        if (currentStock <= 0) {
+          setError(`${product.name} is out of stock (Stock: ${currentStock}). Please remove it from the order or add it as a preorder.`);
+          return;
+        }
+        
+        const remainingStock = currentStock - requestedQuantity;
+        if (remainingStock < minStock) {
+          const maxAllowedQuantity = currentStock - minStock;
+          setError(`${product.name} - Cannot order ${requestedQuantity} units. Maximum allowed: ${maxAllowedQuantity} (to maintain minimum stock of ${minStock}). Consider adding as preorder instead.`);
+          return;
+        }
+      }
+      console.log('✅ [ORDER_FORM] All products have sufficient stock or are preorders');
+    }
+
 
     // Validate reseller mobile number if provided
     if (formData.reseller_mobile && !validateMobileNumber(formData.reseller_mobile)) {
@@ -878,14 +910,16 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
           console.log('🔍 [ORDER_FORM] Mapping product for order:', {
             sku: item.product.sku,
             name: item.product.name,
-            thumbnailUrl: item.product.thumbnailUrl
+            thumbnailUrl: item.product.thumbnailUrl,
+            isPreorder: item.isPreorder
           });
           return {
             sku: item.product.sku,
             name: item.product.name,
             quantity: item.quantity,
             price: item.price,
-            thumbnailUrl: item.product.thumbnailUrl
+            thumbnailUrl: item.product.thumbnailUrl,
+            isPreorder: item.isPreorder || false
           };
         }) : undefined
       }
@@ -942,7 +976,8 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
             
             const inventoryItems = selectedProducts.map(item => ({
               sku: item.product.sku,
-              quantity: item.quantity
+              quantity: item.quantity,
+              isPreorder: item.isPreorder || false
             }));
 
             const inventoryResponse = await catalogService.reduceInventory(inventoryItems, result.order.orderNumber);
@@ -961,7 +996,10 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
         
         // Call the success callback to reset product selection
         if (onOrderSuccess) {
+          console.log('🔄 [ORDER_FORM] Calling onOrderSuccess callback');
           onOrderSuccess();
+        } else {
+          console.log('⚠️ [ORDER_FORM] onOrderSuccess callback not provided');
         }
         
         // Refresh credit balance immediately after successful order creation
