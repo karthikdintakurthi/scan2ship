@@ -26,10 +26,10 @@ export default function CreditWallet() {
   }
 
   return (
-    <div className="flex items-center space-x-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
-      <div className="w-5 h-5 text-blue-600 text-center font-bold text-lg">₹</div>
+    <div className="flex items-center space-x-1 px-2 py-1 bg-blue-50 rounded-md border border-blue-200">
+      <div className="w-4 h-4 text-blue-600 text-center font-bold text-sm">₹</div>
       <div className="flex flex-col">
-        <span className="text-sm font-medium text-blue-900">
+        <span className="text-xs font-medium text-blue-900">
           {creditBalance.balance} Credits
         </span>
         <span className="text-xs text-blue-600">

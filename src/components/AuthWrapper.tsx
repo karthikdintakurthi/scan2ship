@@ -76,7 +76,7 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      <main className="pt-16">
+      <main className="pt-12">
         {children}
       </main>
     </div>
