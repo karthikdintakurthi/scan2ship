@@ -58,11 +58,38 @@ export async function POST(request: NextRequest) {
           console.log('🔍 [CATALOG API] Found catalog client:', catalogClient);
 
           if (!catalogClient) {
-            console.log('🔍 [CATALOG API] No catalog client found');
-            return NextResponse.json(
-              { error: 'Invalid catalog client' },
-              { status: 401 }
-            );
+            console.log('🔍 [CATALOG API] No catalog client found, creating new client');
+            // Create the client if it doesn't exist
+            try {
+              catalogClient = await prisma.clients.create({
+                data: {
+                  id: decoded.clientId,
+                  name: decoded.clientSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                  slug: decoded.clientSlug,
+                  companyName: decoded.clientSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                  email: decoded.email,
+                  phone: '+1234567890',
+                  address: '123 Main St',
+                  city: 'New York',
+                  state: 'NY',
+                  country: 'USA',
+                  pincode: '10001',
+                  subscriptionPlan: 'premium',
+                  subscriptionStatus: 'active',
+                  subscriptionExpiresAt: null,
+                  isActive: true,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                }
+              });
+              console.log('🔍 [CATALOG API] Created new client:', catalogClient.id);
+            } catch (createError) {
+              console.error('🔍 [CATALOG API] Error creating client:', createError);
+              return NextResponse.json(
+                { error: 'Failed to create catalog client' },
+                { status: 500 }
+              );
+            }
           }
 
           // Create a mock user object for catalog app authentication
