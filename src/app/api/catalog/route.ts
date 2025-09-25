@@ -177,7 +177,7 @@ async function handleCatalogAuthentication(data: any, client: any) {
     }
 
     // Call catalog app authentication
-    const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
+    const catalogUrl = process.env.CATALOG_APP_URL || 'https://www.stockmind.in';
     const response = await fetch(`${catalogUrl}/api/auth/login`, {
       method: 'POST',
       headers: {
@@ -309,7 +309,7 @@ async function handleProductSearch(data: any, client: any) {
     }
 
     // Call catalog app product search
-    const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
+    const catalogUrl = process.env.CATALOG_APP_URL || 'https://www.stockmind.in';
     const searchParams = new URLSearchParams({
       search: query,
       page: page.toString(),
@@ -370,7 +370,7 @@ async function handleGetProduct(data: any, client: any) {
     }
 
     // Call catalog app get product by SKU
-    const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
+    const catalogUrl = process.env.CATALOG_APP_URL || 'https://www.stockmind.in';
     const response = await fetch(`${catalogUrl}/api/products/sku/${encodeURIComponent(sku)}`, {
       method: 'GET',
       headers: {
@@ -417,7 +417,7 @@ async function handleInventoryCheck(data: any, client: any) {
     }
 
     // Call catalog app inventory check
-    const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
+    const catalogUrl = process.env.CATALOG_APP_URL || 'https://www.stockmind.in';
     const response = await fetch(`${catalogUrl}/api/public/inventory/check?client=${client.slug}`, {
       method: 'POST',
       headers: {
@@ -481,7 +481,7 @@ async function handleInventoryReduction(data: any, client: any, request: NextReq
     }
 
     // Call catalog app inventory reduction
-    const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
+    const catalogUrl = process.env.CATALOG_APP_URL || 'https://www.stockmind.in';
     const response = await fetch(`${catalogUrl}/api/public/inventory/reduce?client=${clientSlug}`, {
       method: 'POST',
       headers: {
@@ -526,7 +526,7 @@ async function handleInventoryRestoration(data: any, client: any) {
     }
 
     // Call catalog app inventory restoration
-    const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
+    const catalogUrl = process.env.CATALOG_APP_URL || 'https://www.stockmind.in';
     const response = await fetch(`${catalogUrl}/api/public/inventory/restore?client=${client.slug}`, {
       method: 'POST',
       headers: {
