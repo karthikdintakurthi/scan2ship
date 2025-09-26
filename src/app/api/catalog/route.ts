@@ -43,6 +43,10 @@ export async function POST(request: NextRequest) {
     const client = user.client;
     console.log('🔍 [CATALOG_API] Using client:', client);
     
+    console.log('🔍 [CATALOG_API] Parsing request body...');
+    const { action, data } = await request.json();
+    console.log('🔍 [CATALOG_API] Request parsed - action:', action, 'data:', data);
+    
     // Fetch complete client data for inventory operations
     let fullClient = client;
     if (action === 'reduce_inventory') {
@@ -69,9 +73,6 @@ export async function POST(request: NextRequest) {
         fullClient = client;
       }
     }
-    console.log('🔍 [CATALOG_API] Parsing request body...');
-    const { action, data } = await request.json();
-    console.log('🔍 [CATALOG_API] Request parsed - action:', action, 'data:', data);
 
     // Get catalog API key for this scan2ship client
     console.log('🔍 [CATALOG_API] Getting catalog auth for client:', fullClient.id);
