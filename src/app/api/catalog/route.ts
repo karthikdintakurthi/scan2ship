@@ -117,6 +117,11 @@ async function handleProductSearch(data: any, client: any, catalogAuth: any) {
 
     // Call catalog app product search using API key
     const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
+    console.log('🔍 [CATALOG_API] Environment check:');
+    console.log('  - CATALOG_APP_URL env var:', process.env.CATALOG_APP_URL);
+    console.log('  - Final catalogUrl:', catalogUrl);
+    console.log('  - NODE_ENV:', process.env.NODE_ENV);
+    
     const searchParams = new URLSearchParams({
       search: query,
       page: page.toString(),

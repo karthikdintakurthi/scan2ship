@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle Delhivery API call if courier service is Delhivery (case-insensitive)
-    if (orderData.courier_service.toLowerCase() === 'delhivery') {
+    if (orderData.courier_service && typeof orderData.courier_service === 'string' && orderData.courier_service.toLowerCase() === 'delhivery') {
       try {
         console.log('🚚 [API_ORDERS_POST] Calling Delhivery API for order:', order.id);
         

@@ -214,7 +214,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
 
   // Auto-fill DTDC tracking number when component loads and DTDC is pre-selected
   useEffect(() => {
-    if (configLoaded && formData.courier_service.toLowerCase() === 'dtdc' && !formData.tracking_number.trim()) {
+    if (configLoaded && formData.courier_service && typeof formData.courier_service === 'string' && formData.courier_service.toLowerCase() === 'dtdc' && !formData.tracking_number.trim()) {
       console.log('🔍 [ORDER_FORM] DTDC pre-selected on load, auto-filling tracking number...');
       // Use setTimeout to ensure this runs after the component is fully rendered
       setTimeout(() => {
@@ -1014,7 +1014,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
         refreshCredits();
         
         // Move used DTDC tracking number from unused to used section if applicable
-        if (formData.courier_service.toLowerCase() === 'dtdc' && formData.tracking_number.trim()) {
+        if (formData.courier_service && typeof formData.courier_service === 'string' && formData.courier_service.toLowerCase() === 'dtdc' && formData.tracking_number.trim()) {
           await moveDtdcTrackingNumberToUsed(formData.tracking_number)
         }
         
@@ -1042,7 +1042,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
         }))
         
         // Trigger DTDC auto-fill after successful order creation
-        if (formData.courier_service.toLowerCase() === 'dtdc') {
+        if (formData.courier_service && typeof formData.courier_service === 'string' && formData.courier_service.toLowerCase() === 'dtdc') {
           console.log('🔄 [ORDER_FORM] Triggering DTDC auto-fill after successful order creation...');
           console.log('🔄 [ORDER_FORM] Current courier service:', formData.courier_service);
           console.log('🔄 [ORDER_FORM] Current tracking number:', formData.tracking_number);
@@ -1112,7 +1112,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
     setOrderNumber(null)
     
     // Trigger DTDC auto-fill after manual form reset
-    if (formData.courier_service.toLowerCase() === 'dtdc') {
+    if (formData.courier_service && typeof formData.courier_service === 'string' && formData.courier_service.toLowerCase() === 'dtdc') {
       console.log('🔄 [ORDER_FORM] Triggering DTDC auto-fill after manual form reset...');
       console.log('🔄 [ORDER_FORM] Current courier service:', formData.courier_service);
       console.log('🔄 [ORDER_FORM] Current tracking number:', formData.tracking_number);
@@ -1205,7 +1205,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
                               required={false}
             />
             {/* DTDC Auto-fill indicator */}
-            {formData.courier_service.toLowerCase() === 'dtdc' && formData.tracking_number && (
+            {formData.courier_service && typeof formData.courier_service === 'string' && formData.courier_service.toLowerCase() === 'dtdc' && formData.tracking_number && (
               <div className="mt-1 flex items-center">
                 <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
                   🔄 Auto-filled from DTDC slips

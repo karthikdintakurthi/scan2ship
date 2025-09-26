@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
 
     // Handle Delhivery API call first if courier service is Delhivery (case-insensitive) and skip_tracking is not enabled
     let delhiveryResponse = null;
-    if (orderData.courier_service.toLowerCase() === 'delhivery' && !orderData.skip_tracking) {
+    if (orderData.courier_service && typeof orderData.courier_service === 'string' && orderData.courier_service.toLowerCase() === 'delhivery' && !orderData.skip_tracking) {
       try {
         console.log('🚚 [API_ORDERS_POST] Calling Delhivery API before creating order');
         console.log('🚚 [API_ORDERS_POST] Order data being sent to Delhivery:', JSON.stringify(processedOrderData, null, 2));
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
     } else {
-      if (orderData.courier_service.toLowerCase() === 'delhivery' && orderData.skip_tracking) {
+      if (orderData.courier_service && typeof orderData.courier_service === 'string' && orderData.courier_service.toLowerCase() === 'delhivery' && orderData.skip_tracking) {
         console.log('📝 [API_ORDERS_POST] Skipping Delhivery API - skip_tracking enabled for Delhivery order');
       } else {
         console.log('📝 [API_ORDERS_POST] Skipping Delhivery API for courier service:', orderData.courier_service);
@@ -638,7 +638,7 @@ export async function DELETE(request: NextRequest) {
     // Cancel Delhivery orders before deletion
     const delhiveryCancelResults = [];
     for (const order of existingOrders) {
-      if (order.courier_service?.toLowerCase() === 'delhivery' && order.tracking_id) {
+      if (order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase() === 'delhivery' && order.tracking_id) {
         try {
           console.log('🚫 [API_ORDERS_DELETE] Cancelling Delhivery order before deletion:', order.tracking_id);
           const cancelResult = await delhiveryService.cancelOrder(

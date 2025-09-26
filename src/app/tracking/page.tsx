@@ -340,7 +340,7 @@ export default function TrackingPage() {
                               <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <span className="text-lg">📦</span>
                                 <span className="font-medium">Tracking:</span>
-                                {order.courier_service.toLowerCase().includes('delhivery') ? (
+                                {order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase().includes('delhivery') ? (
                                   <a
                                     href={`https://www.delhivery.com/track-v2/package/${order.tracking_id}`}
                                     target="_blank"
@@ -362,7 +362,7 @@ export default function TrackingPage() {
                               <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <span className="text-lg">🔗</span>
                                 <span className="font-medium">Track:</span>
-                                {order.courier_service.toLowerCase() === 'dtdc' && (
+                                {order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase() === 'dtdc' && (
                                   <a
                                     href="https://www.dtdc.in/trace.asp"
                                     target="_blank"
@@ -372,7 +372,7 @@ export default function TrackingPage() {
                                     DTDC →
                                   </a>
                                 )}
-                                {order.courier_service.toLowerCase() === 'india_post' && (
+                                {order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase() === 'india_post' && (
                                   <a
                                     href="https://www.indiapost.gov.in/"
                                     target="_blank"
@@ -395,7 +395,7 @@ export default function TrackingPage() {
 
                         {order.tracking_id && (
                           <div className="lg:text-right">
-                            {order.courier_service.toLowerCase().includes('delhivery') ? (
+                            {order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase().includes('delhivery') ? (
                               <a
                                 href={`https://www.delhivery.com/track-v2/package/${order.tracking_id}`}
                                 target="_blank"
@@ -405,7 +405,7 @@ export default function TrackingPage() {
                                 <span>📦</span>
                                 Track on Delhivery
                               </a>
-                            ) : order.courier_service.toLowerCase() === 'dtdc' ? (
+                            ) : (order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase() === 'dtdc') ? (
                               <a
                                 href="https://www.dtdc.in/trace.asp"
                                 target="_blank"
@@ -415,7 +415,7 @@ export default function TrackingPage() {
                                 <span>📦</span>
                                 Track on DTDC
                               </a>
-                            ) : order.courier_service.toLowerCase() === 'india_post' ? (
+                            ) : (order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase() === 'india_post') ? (
                               <a
                                 href="https://www.indiapost.gov.in/"
                                 target="_blank"

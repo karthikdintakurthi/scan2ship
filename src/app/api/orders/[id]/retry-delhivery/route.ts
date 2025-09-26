@@ -46,7 +46,7 @@ export async function POST(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    if (order.courier_service.toLowerCase() !== 'delhivery') {
+    if (!order.courier_service || typeof order.courier_service !== 'string' || order.courier_service.toLowerCase() !== 'delhivery') {
       return NextResponse.json({ error: 'Order is not a Delhivery order' }, { status: 400 })
     }
 

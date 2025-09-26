@@ -331,7 +331,7 @@ export async function GET(
     if (order.tracking_id && order.tracking_id.trim() !== '' && order.tracking_id !== 'null') {
       // For ALL couriers, use tracking_id if available
       trackingNumber = order.tracking_id;
-    } else if (order.courier_service.toLowerCase() === 'delhivery' && order.delhivery_waybill_number) {
+    } else if (order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase() === 'delhivery' && order.delhivery_waybill_number) {
       // For Delhivery, fallback to waybill number if no tracking_id
       trackingNumber = order.delhivery_waybill_number;
     } else {

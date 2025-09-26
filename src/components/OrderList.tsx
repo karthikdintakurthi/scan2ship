@@ -643,7 +643,7 @@ export default function OrderList() {
       }
 
       // If order has Delhivery tracking code, update Delhivery first, then update database
-      if (selectedOrder.delhivery_waybill_number && selectedOrder.courier_service.toLowerCase() === 'delhivery') {
+      if (selectedOrder.delhivery_waybill_number && selectedOrder.courier_service && typeof selectedOrder.courier_service === 'string' && selectedOrder.courier_service.toLowerCase() === 'delhivery') {
         console.log('🔄 [ORDER_UPDATE] Delhivery order detected - updating Delhivery first')
         
         // Create updated order data for Delhivery call
@@ -924,7 +924,7 @@ export default function OrderList() {
           endpoint = `/api/orders/${order.id}/waybill`
           
           // Determine waybill number based on courier service
-          if (order.courier_service.toLowerCase() === 'delhivery' && order.delhivery_waybill_number) {
+          if (order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase() === 'delhivery' && order.delhivery_waybill_number) {
             waybillNumber = order.delhivery_waybill_number
           } else {
             waybillNumber = order.tracking_id || order.reference_number || `ORDER-${order.id}`
@@ -1409,7 +1409,7 @@ export default function OrderList() {
 
   // Helper function to get tracking number
   const getTrackingNumber = (order: Order) => {
-    const trackingNumber = order.courier_service.toLowerCase() === 'delhivery' 
+    const trackingNumber = (order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase() === 'delhivery')
       ? (order.delhivery_waybill_number || order.tracking_id)
       : order.tracking_id
 
@@ -1600,7 +1600,7 @@ export default function OrderList() {
 
 
   const handleTrackingClick = (order: Order) => {
-    const trackingNumber = order.courier_service.toLowerCase() === 'delhivery' 
+    const trackingNumber = (order.courier_service && typeof order.courier_service === 'string' && order.courier_service.toLowerCase() === 'delhivery')
       ? (order.delhivery_waybill_number || order.tracking_id)
       : order.tracking_id
 
@@ -2613,7 +2613,7 @@ export default function OrderList() {
               )}
 
               {/* Tracking Information */}
-              {selectedOrder.courier_service.toLowerCase() === 'delhivery' ? (
+              {selectedOrder.courier_service && typeof selectedOrder.courier_service === 'string' && selectedOrder.courier_service.toLowerCase() === 'delhivery' ? (
                 <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                   <h4 className="font-medium text-gray-900 mb-3">Delhivery API Status</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-900">
@@ -2667,7 +2667,7 @@ export default function OrderList() {
               ) : null}
 
 
-              {selectedOrder.courier_service.toLowerCase() !== 'delhivery' ? (
+              {!(selectedOrder.courier_service && typeof selectedOrder.courier_service === 'string' && selectedOrder.courier_service.toLowerCase() === 'delhivery') ? (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                   <h4 className="font-medium text-gray-900 mb-3">{getCourierServiceName(selectedOrder.courier_service)} Tracking</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-900">
@@ -2797,7 +2797,7 @@ export default function OrderList() {
             setSelectedTrackingOrder(null)
           }}
           waybillNumber={
-            selectedTrackingOrder.courier_service.toLowerCase() === 'delhivery' 
+            (selectedTrackingOrder.courier_service && typeof selectedTrackingOrder.courier_service === 'string' && selectedTrackingOrder.courier_service.toLowerCase() === 'delhivery')
               ? (selectedTrackingOrder.delhivery_waybill_number || selectedTrackingOrder.tracking_id || '')
               : (selectedTrackingOrder.tracking_id || '')
           }
