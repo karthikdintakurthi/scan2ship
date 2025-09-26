@@ -673,7 +673,9 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
+    console.log(`🔍 [API_ORDERS_DELETE] About to start inventory restoration logic`);
     // Restore inventory for orders with products from catalog app
+    console.log(`🔄 [API_ORDERS_DELETE] Starting inventory restoration for ${existingOrders.length} orders`);
     const inventoryRestoreResults = [];
     for (const order of existingOrders) {
       if (order.products) {
