@@ -244,29 +244,59 @@ async function handleInventoryCheck(data: any, client: any, catalogAuth: any) {
 
 async function handleInventoryReduction(data: any, client: any, catalogAuth: any) {
   try {
-    const { sku, quantity } = data;
+    const { items, orderNumber } = data;
     
-    if (!sku || !quantity) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
-        { error: 'SKU and quantity are required' },
+        { error: 'Items array is required and must not be empty' },
         { status: 400 }
       );
     }
 
-    // Call catalog app inventory reduction using API key
+    // Validate items structure
+    for (const item of items) {
+      if (!item.sku || typeof item.quantity !== 'number' || item.quantity <= 0) {
+        return NextResponse.json(
+          { error: 'Each item must have a valid SKU and positive quantity' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Get client slug for catalog app
+    const clientSlug = client.slug || client.name?.toLowerCase().replace(/\s+/g, '-');
+    if (!clientSlug) {
+      return NextResponse.json(
+        { error: 'Client slug is required for inventory reduction' },
+        { status: 400 }
+      );
+    }
+
+    // Call catalog app bulk inventory reduction using API key
     const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
-    const response = await fetch(`${catalogUrl}/api/public/inventory/reduce`, {
+    const response = await fetch(`${catalogUrl}/api/public/inventory/reduce/bulk?client=${clientSlug}`, {
       method: 'POST',
       headers: {
         'X-API-Key': catalogAuth.catalogApiKey,
         'X-Client-ID': catalogAuth.catalogClientId,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ sku, quantity }),
+      body: JSON.stringify({
+        orders: [{
+          orderId: orderNumber || `scan2ship_${Date.now()}`,
+          items: items.map(item => ({
+            sku: item.sku,
+            quantity: item.quantity
+          }))
+        }],
+        reduceMode: 'strict',
+        batchId: `scan2ship_${Date.now()}`
+      }),
     });
 
     if (!response.ok) {
       const error = await response.json();
+      console.error('Catalog app inventory reduction failed:', error);
       return NextResponse.json(
         { error: error.error || 'Failed to reduce inventory' },
         { status: response.status }
@@ -274,6 +304,7 @@ async function handleInventoryReduction(data: any, client: any, catalogAuth: any
     }
 
     const result = await response.json();
+    console.log('✅ [INVENTORY_REDUCTION] Successfully reduced inventory:', result);
     return NextResponse.json(result);
 
   } catch (error: any) {
