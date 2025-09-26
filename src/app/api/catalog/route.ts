@@ -264,7 +264,17 @@ async function handleInventoryReduction(data: any, client: any, catalogAuth: any
     }
 
     // Get client slug for catalog app
-    const clientSlug = client.slug || client.name?.toLowerCase().replace(/\s+/g, '-');
+    let clientSlug = client.slug;
+    if (!clientSlug) {
+      // Generate slug from company name or name
+      const baseName = client.companyName || client.name || 'default-client';
+      clientSlug = baseName.toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+    
     if (!clientSlug) {
       return NextResponse.json(
         { error: 'Client slug is required for inventory reduction' },
