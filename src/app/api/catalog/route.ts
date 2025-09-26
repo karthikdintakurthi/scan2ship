@@ -42,17 +42,44 @@ export async function POST(request: NextRequest) {
     const { user } = authResult;
     const client = user.client;
     console.log('🔍 [CATALOG_API] Using client:', client);
+    
+    // Fetch complete client data for inventory operations
+    let fullClient = client;
+    if (action === 'reduce_inventory') {
+      try {
+        const { PrismaClient } = await import('@prisma/client');
+        const prisma = new PrismaClient();
+        fullClient = await prisma.clients.findUnique({
+          where: { id: client.id },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            companyName: true,
+            isActive: true,
+            subscriptionStatus: true,
+            subscriptionExpiresAt: true
+          }
+        });
+        await prisma.$disconnect();
+        console.log('🔍 [CATALOG_API] Full client data:', fullClient);
+      } catch (error) {
+        console.error('Error fetching full client data:', error);
+        // Fallback to original client data
+        fullClient = client;
+      }
+    }
     console.log('🔍 [CATALOG_API] Parsing request body...');
     const { action, data } = await request.json();
     console.log('🔍 [CATALOG_API] Request parsed - action:', action, 'data:', data);
 
     // Get catalog API key for this scan2ship client
-    console.log('🔍 [CATALOG_API] Getting catalog auth for client:', client.id);
-    const catalogAuth = await getCatalogApiKey(client.id);
+    console.log('🔍 [CATALOG_API] Getting catalog auth for client:', fullClient.id);
+    const catalogAuth = await getCatalogApiKey(fullClient.id);
     console.log('🔍 [CATALOG_API] Catalog auth result:', catalogAuth ? 'FOUND' : 'NOT FOUND');
     
     if (!catalogAuth) {
-      console.log('❌ [CATALOG_API] No catalog auth found for client:', client.id);
+      console.log('❌ [CATALOG_API] No catalog auth found for client:', fullClient.id);
       return NextResponse.json(
         { 
           error: 'Catalog app integration not configured for this client',
@@ -64,22 +91,22 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'test_connection':
-        return await handleTestConnection(data, client, catalogAuth);
+        return await handleTestConnection(data, fullClient, catalogAuth);
       
       case 'search_products':
-        return await handleProductSearch(data, client, catalogAuth);
+        return await handleProductSearch(data, fullClient, catalogAuth);
       
       case 'get_product':
-        return await handleGetProduct(data, client, catalogAuth);
+        return await handleGetProduct(data, fullClient, catalogAuth);
       
       case 'check_inventory':
-        return await handleInventoryCheck(data, client, catalogAuth);
+        return await handleInventoryCheck(data, fullClient, catalogAuth);
       
       case 'reduce_inventory':
-        return await handleInventoryReduction(data, client, catalogAuth);
+        return await handleInventoryReduction(data, fullClient, catalogAuth);
       
       case 'restore_inventory':
-        return await handleInventoryRestoration(data, client, catalogAuth);
+        return await handleInventoryRestoration(data, fullClient, catalogAuth);
       
       default:
         return NextResponse.json(
