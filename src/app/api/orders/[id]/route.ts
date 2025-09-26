@@ -242,8 +242,30 @@ export async function DELETE(
         if (Array.isArray(products) && products.length > 0) {
           console.log(`🔄 [API_ORDERS_DELETE] Restoring inventory for order ${order.id} with ${products.length} products`);
           
+          // Fetch complete client data for inventory operations
+          let fullClient = client;
+          try {
+            fullClient = await prisma.clients.findUnique({
+              where: { id: client.id },
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                companyName: true,
+                isActive: true,
+                subscriptionStatus: true,
+                subscriptionExpiresAt: true
+              }
+            });
+            console.log('🔍 [API_ORDERS_DELETE] Full client data:', fullClient);
+          } catch (error) {
+            console.error('Error fetching full client data:', error);
+            // Fallback to original client data
+            fullClient = client;
+          }
+          
           // Get catalog auth for this client
-          const catalogAuth = await getCatalogApiKey(client.id);
+          const catalogAuth = await getCatalogApiKey(fullClient.id);
           if (catalogAuth) {
             // Prepare inventory restoration data
             const inventoryItems = products.map((item: any) => ({
@@ -254,7 +276,18 @@ export async function DELETE(
             if (inventoryItems.length > 0) {
               // Call catalog app to restore inventory
               const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
-              const clientSlug = client.slug || client.name?.toLowerCase().replace(/\s+/g, '-');
+              let clientSlug = fullClient.slug;
+              if (!clientSlug) {
+                // Generate slug from company name or name
+                const baseName = fullClient.companyName || fullClient.name || 'default-client';
+                clientSlug = baseName.toLowerCase()
+                  .replace(/\s+/g, '-')
+                  .replace(/[^a-z0-9-]/g, '')
+                  .replace(/-+/g, '-')
+                  .replace(/^-|-$/g, '');
+              }
+              
+              console.log('🔍 [API_ORDERS_DELETE] Generated client slug:', clientSlug);
               
               if (clientSlug) {
                 const restoreResponse = await fetch(`${catalogUrl}/api/public/inventory/restore?client=${clientSlug}`, {
