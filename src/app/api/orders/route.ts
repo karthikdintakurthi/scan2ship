@@ -7,7 +7,7 @@ import { CreditService } from '@/lib/credit-service';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { WebhookService } from '@/lib/webhook-service';
-import { getCatalogApiKey } from '@/lib/catalog-api';
+import { getCatalogApiKey } from '@/lib/cross-app-auth';
 
 const delhiveryService = new DelhiveryService();
 

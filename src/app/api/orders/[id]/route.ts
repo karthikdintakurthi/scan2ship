@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { delhiveryService } from '@/lib/delhivery';
-import { getCatalogApiKey } from '@/lib/catalog-api';
+import { getCatalogApiKey } from '@/lib/cross-app-auth';
 
 export async function GET(
   request: NextRequest,
