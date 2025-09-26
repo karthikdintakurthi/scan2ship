@@ -242,6 +242,7 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
 
       const data = await response.json();
       console.log('🔍 [PRODUCT_SELECTION] Search response:', data);
+      console.log('🔍 [PRODUCT_SELECTION] Products with thumbnails:', data.products?.map(p => ({ name: p.name, sku: p.sku, thumbnailUrl: p.thumbnailUrl })));
       setSearchResults(data.products || []);
     } catch (error) {
       console.error('❌ [PRODUCT_SELECTION] Product search error:', error);
@@ -351,6 +352,8 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
                 const isLowStock = currentStock <= minStock;
                 const canAdd = currentStock > 0 && currentStock > minStock;
                 
+                console.log('🔍 [PRODUCT_SELECTION] Rendering product:', { name: product.name, sku: product.sku, thumbnailUrl: product.thumbnailUrl });
+                
                 return (
                   <div
                     key={product.sku}
@@ -368,10 +371,19 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
                             width={40}
                             height={40}
                             className="rounded-md mr-3 object-cover"
+                            onLoad={() => {
+                              console.log('✅ Image loaded successfully:', product.thumbnailUrl);
+                            }}
                             onError={(e) => {
+                              console.error('❌ Image failed to load:', product.thumbnailUrl);
                               e.currentTarget.style.display = 'none';
                             }}
                           />
+                        )}
+                        {!product.thumbnailUrl && (
+                          <div className="w-10 h-10 bg-gray-200 rounded-md mr-3 flex items-center justify-center">
+                            <span className="text-xs text-gray-500">No Image</span>
+                          </div>
                         )}
                         <div>
                           <p className="font-medium text-gray-900">{product.name}</p>

@@ -243,27 +243,17 @@ export default function CrossAppMappingsPage() {
           <CardContent>
             <form onSubmit={handleCreateMapping} className="space-y-4">
               <div>
-                <Label htmlFor="scan2shipClientId">Scan2Ship Client</Label>
-                <select
+                <Label htmlFor="scan2shipClientId">Scan2Ship Client ID</Label>
+                <Input
                   id="scan2shipClientId"
                   value={formData.scan2shipClientId}
                   onChange={(e) => setFormData({ ...formData, scan2shipClientId: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  placeholder="e.g., cmfohvqxb0001jp04hqvisj49"
                   required
-                  disabled={clientsLoading}
-                >
-                  <option value="">
-                    {clientsLoading ? 'Loading clients...' : 'Select a Scan2Ship client'}
-                  </option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.companyName} ({client.name})
-                    </option>
-                  ))}
-                </select>
-                {!clientsLoading && clients.length === 0 && (
-                  <p className="text-sm text-red-500 mt-1">No clients found. Please check your authentication.</p>
-                )}
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Enter the client ID from Scan2Ship (e.g., Vanitha Fashion Jewelry: cmfohvqxb0001jp04hqvisj49)
+                </p>
               </div>
               
               <div>
@@ -272,9 +262,12 @@ export default function CrossAppMappingsPage() {
                   id="catalogClientId"
                   value={formData.catalogClientId}
                   onChange={(e) => setFormData({ ...formData, catalogClientId: e.target.value })}
-                  placeholder="e.g., catalog-client-123"
+                  placeholder="e.g., cmfohvqxb0001jp04hqvisj49"
                   required
                 />
+                <p className="text-sm text-gray-500 mt-1">
+                  Enter the client ID from Catalog App (should match the Scan2Ship client ID)
+                </p>
               </div>
 
               <div>
