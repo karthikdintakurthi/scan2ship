@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CatalogProduct } from '@/types/catalog';
 import { debounce } from '@/lib/debounce';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProductSearchProps {
   onProductSelect: (product: CatalogProduct) => void;
@@ -11,6 +12,7 @@ interface ProductSearchProps {
 }
 
 export default function ProductSearch({ onProductSelect, selectedProducts, disabled = false }: ProductSearchProps) {
+  const { currentSession } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CatalogProduct[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -30,10 +32,15 @@ export default function ProductSearch({ onProductSelect, selectedProducts, disab
       setError('');
 
       try {
+        if (!currentSession?.token) {
+          throw new Error('Authentication required. Please log in to search products.');
+        }
+        
         const response = await fetch('/api/catalog', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentSession.token}`,
           },
           body: JSON.stringify({
             action: 'search_products',

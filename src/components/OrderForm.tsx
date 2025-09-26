@@ -40,7 +40,7 @@ interface OrderFormProps {
 }
 
 export default function OrderForm({ selectedProducts = [], onOrderSuccess }: OrderFormProps) {
-  const { refreshCredits, currentClient } = useAuth();
+  const { refreshCredits, currentClient, currentSession } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentStep, setCurrentStep] = useState<'idle' | 'creating' | 'completed'>('idle')
   const [error, setError] = useState('')
@@ -977,6 +977,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentSession?.token}`,
               },
               body: JSON.stringify({
                 action: 'reduce_inventory',

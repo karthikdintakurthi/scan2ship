@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { CatalogProduct, OrderItem } from '@/types/catalog';
 import { debounce } from '@/lib/debounce';
+import { useAuth } from '@/contexts/AuthContext';
 // Using regular img tag to avoid Image constructor conflict
 
 interface ProductSelectionProps {
@@ -12,6 +13,7 @@ interface ProductSelectionProps {
 }
 
 export default function ProductSelection({ onProductsChange, currentClient, onReset }: ProductSelectionProps) {
+  const { currentSession } = useAuth();
   const [selectedProducts, setSelectedProducts] = useState<CatalogProduct[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,13 +22,53 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
-  // Catalog is always available through Cross-App Mappings
-  const isCatalogConnected = true;
+  const [isCatalogConnected, setIsCatalogConnected] = useState<boolean | null>(null); // null = checking, true = connected, false = not connected
 
   useEffect(() => {
     onProductsChange(orderItems);
   }, [orderItems, onProductsChange]);
+
+  // Check catalog integration status on component mount
+  useEffect(() => {
+    const checkCatalogIntegration = async () => {
+      if (!currentSession?.token) {
+        setIsCatalogConnected(false);
+        return;
+      }
+
+      try {
+        // Make a test request to check if catalog integration is configured
+        const response = await fetch('/api/catalog', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentSession.token}`,
+          },
+          body: JSON.stringify({
+            action: 'test_connection',
+            data: {}
+          }),
+        });
+
+        if (response.ok) {
+          setIsCatalogConnected(true);
+        } else {
+          const errorData = await response.json();
+          if (errorData.error?.includes('not configured') || errorData.error?.includes('integration')) {
+            setIsCatalogConnected(false);
+          } else {
+            // Other errors might be temporary, so we'll still show the component
+            setIsCatalogConnected(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking catalog integration:', error);
+        setIsCatalogConnected(false);
+      }
+    };
+
+    checkCatalogIntegration();
+  }, [currentSession?.token]);
 
   // Auto-convert out-of-stock items to preorders on component load (only if product allows preorders)
   useEffect(() => {
@@ -224,10 +266,16 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
 
     try {
       console.log('🔍 [PRODUCT_SELECTION] Searching for:', term);
+      
+      if (!currentSession?.token) {
+        throw new Error('Authentication required. Please log in to search products.');
+      }
+      
       const response = await fetch('/api/catalog', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession.token}`,
         },
         body: JSON.stringify({
           action: 'search_products',
@@ -237,6 +285,13 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
 
       if (!response.ok) {
         const errorData = await response.json();
+        
+        // If catalog integration is not configured, hide the component
+        if (errorData.error?.includes('not configured') || errorData.error?.includes('integration')) {
+          setIsCatalogConnected(false);
+          return;
+        }
+        
         throw new Error(errorData.error || 'Failed to search products');
       }
 
@@ -296,6 +351,25 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
     debouncedSearchProducts(value);
   };
 
+
+  // Don't render the component if catalog integration is not configured
+  if (isCatalogConnected === false) {
+    return null; // Hide the entire component
+  }
+
+  // Show loading state while checking catalog integration
+  if (isCatalogConnected === null) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Checking catalog integration...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">

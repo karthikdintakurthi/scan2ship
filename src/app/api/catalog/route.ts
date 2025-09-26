@@ -26,30 +26,22 @@ export async function POST(request: NextRequest) {
       return securityResponse;
     }
 
-    // Temporarily bypass authentication for testing - using Vanitha's client ID
-    // TODO: Restore authentication in production
-    // const authResult = await authorizeUser(request, {
-    //   requiredRole: UserRole.USER,
-    //   requiredPermissions: [PermissionLevel.READ],
-    //   requireActiveUser: true,
-    //   requireActiveClient: true
-    // });
+    // Authenticate user
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.USER,
+      requiredPermissions: [PermissionLevel.READ],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
 
-    // if (authResult.response) {
-    //   securityHeaders(authResult.response);
-    //   return authResult.response;
-    // }
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
 
-    // const { client } = authResult;
-    
-    // Use Vanitha's client ID for testing
-    const client = {
-      id: 'cmfohvqxb0001jp04hqvisj49',
-      name: 'Vanitha Fashion Jewelry',
-      slug: 'vanitha-fashion-jewelry',
-      isActive: true
-    };
-    console.log('🔍 [CATALOG_API] Using Vanitha client:', client);
+    const { user } = authResult;
+    const client = user.client;
+    console.log('🔍 [CATALOG_API] Using client:', client);
     console.log('🔍 [CATALOG_API] Parsing request body...');
     const { action, data } = await request.json();
     console.log('🔍 [CATALOG_API] Request parsed - action:', action, 'data:', data);
