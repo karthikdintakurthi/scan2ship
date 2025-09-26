@@ -94,17 +94,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Test database connection and table existence
+    try {
+      await prisma.$queryRaw`SELECT 1 FROM cross_app_mappings LIMIT 1`;
+    } catch (dbError: any) {
+      console.error('Database table check failed:', dbError);
+      return NextResponse.json(
+        { 
+          error: 'Database table not accessible',
+          details: dbError.message,
+          code: dbError.code
+        },
+        { status: 500 }
+      );
+    }
+
     // Check if scan2ship client exists
+    console.log('Looking for scan2ship client:', scan2shipClientId);
     const scan2shipClient = await prisma.clients.findUnique({
       where: { id: scan2shipClientId }
     });
 
     if (!scan2shipClient) {
+      console.log('Scan2Ship client not found:', scan2shipClientId);
       return NextResponse.json(
         { error: 'Scan2Ship client not found' },
         { status: 404 }
       );
     }
+
+    console.log('Found scan2ship client:', scan2shipClient.name);
 
     // Check if mapping already exists for this scan2ship client
     const existingMapping = await prisma.cross_app_mappings.findUnique({
@@ -119,6 +138,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new mapping
+    console.log('Creating cross-app mapping:', {
+      scan2shipClientId,
+      catalogClientId,
+      catalogApiKey: catalogApiKey ? '***' + catalogApiKey.slice(-4) : 'undefined'
+    });
+    
     const mapping = await prisma.cross_app_mappings.create({
       data: {
         scan2shipClientId,
@@ -139,6 +164,8 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    console.log('Successfully created mapping:', mapping.id);
+
     return NextResponse.json({
       success: true,
       data: mapping,
@@ -147,8 +174,19 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Cross-app mappings POST error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack
+    });
+    
     return NextResponse.json(
-      { error: 'Failed to create cross-app mapping' },
+      { 
+        error: 'Failed to create cross-app mapping',
+        details: error.message,
+        code: error.code
+      },
       { status: 500 }
     );
   }
