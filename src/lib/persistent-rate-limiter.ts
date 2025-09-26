@@ -99,7 +99,8 @@ export async function rateLimit(
           key,
           count: 1,
           windowStart,
-          expiresAt: new Date(now.getTime() + config.windowMs)
+          expiresAt: new Date(now.getTime() + config.windowMs),
+          updatedAt: new Date()
         }
       });
       
@@ -118,7 +119,8 @@ export async function rateLimit(
         data: {
           count: 1,
           windowStart,
-          expiresAt: new Date(now.getTime() + config.windowMs)
+          expiresAt: new Date(now.getTime() + config.windowMs),
+          updatedAt: new Date()
         }
       });
       
@@ -146,7 +148,8 @@ export async function rateLimit(
     await prisma.rate_limits.update({
       where: { id: existing.id },
       data: {
-        count: existing.count + 1
+        count: existing.count + 1,
+        updatedAt: new Date()
       }
     });
     
