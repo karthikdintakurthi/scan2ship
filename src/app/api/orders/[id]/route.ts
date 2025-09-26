@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { delhiveryService } from '@/lib/delhivery';
+import { getCatalogApiKey } from '@/lib/catalog-api';
 
 export async function GET(
   request: NextRequest,
@@ -199,7 +200,8 @@ export async function DELETE(
         courier_service: true,
         tracking_id: true,
         pickup_location: true,
-        clientId: true
+        clientId: true,
+        products: true // Include products for inventory restoration
       }
     });
 
@@ -232,6 +234,74 @@ export async function DELETE(
       }
     }
 
+    // Restore inventory if order has products from catalog app
+    let inventoryRestoreResult = null;
+    if (order.products) {
+      try {
+        const products = JSON.parse(order.products);
+        if (Array.isArray(products) && products.length > 0) {
+          console.log(`🔄 [API_ORDERS_DELETE] Restoring inventory for order ${order.id} with ${products.length} products`);
+          
+          // Get catalog auth for this client
+          const catalogAuth = await getCatalogApiKey(client.id);
+          if (catalogAuth) {
+            // Prepare inventory restoration data
+            const inventoryItems = products.map((item: any) => ({
+              sku: item.product?.sku || item.sku,
+              quantity: item.quantity || 1
+            })).filter(item => item.sku); // Only include items with valid SKUs
+
+            if (inventoryItems.length > 0) {
+              // Call catalog app to restore inventory
+              const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
+              const clientSlug = client.slug || client.name?.toLowerCase().replace(/\s+/g, '-');
+              
+              if (clientSlug) {
+                const restoreResponse = await fetch(`${catalogUrl}/api/public/inventory/restore?client=${clientSlug}`, {
+                  method: 'POST',
+                  headers: {
+                    'X-API-Key': catalogAuth.catalogApiKey,
+                    'X-Client-ID': catalogAuth.catalogClientId,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    orderId: `scan2ship_order_${order.id}`,
+                    items: inventoryItems,
+                    reason: 'order_deletion',
+                    webhookId: null
+                  }),
+                });
+
+                if (restoreResponse.ok) {
+                  const restoreData = await restoreResponse.json();
+                  console.log(`✅ [API_ORDERS_DELETE] Successfully restored inventory for order ${order.id}:`, restoreData.data.summary);
+                  inventoryRestoreResult = {
+                    success: true,
+                    restoredItems: restoreData.data.summary.totalRestored
+                  };
+                } else {
+                  const errorData = await restoreResponse.json();
+                  console.error(`❌ [API_ORDERS_DELETE] Failed to restore inventory for order ${order.id}:`, errorData);
+                  inventoryRestoreResult = {
+                    success: false,
+                    error: errorData.error
+                  };
+                }
+              } else {
+                console.warn(`⚠️ [API_ORDERS_DELETE] No client slug available for inventory restoration for order ${order.id}`);
+              }
+            } else {
+              console.log(`ℹ️ [API_ORDERS_DELETE] No valid SKUs found for inventory restoration in order ${order.id}`);
+            }
+          } else {
+            console.log(`ℹ️ [API_ORDERS_DELETE] No catalog auth found for client ${client.id}, skipping inventory restoration for order ${order.id}`);
+          }
+        }
+      } catch (parseError) {
+        console.error(`❌ [API_ORDERS_DELETE] Error parsing products for order ${order.id}:`, parseError);
+      }
+    }
+
     // Delete the order from database
     await prisma.orders.delete({
       where: { id: orderId }
@@ -244,7 +314,8 @@ export async function DELETE(
       delhiveryCancellation: delhiveryCancelResult ? {
         success: delhiveryCancelResult.success,
         message: delhiveryCancelResult.message || delhiveryCancelResult.error
-      } : null
+      } : null,
+      inventoryRestoration: inventoryRestoreResult
     })
   } catch (error) {
     console.error('Error deleting order:', error)

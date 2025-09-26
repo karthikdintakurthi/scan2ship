@@ -7,6 +7,7 @@ import { CreditService } from '@/lib/credit-service';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { WebhookService } from '@/lib/webhook-service';
+import { getCatalogApiKey } from '@/lib/catalog-api';
 
 const delhiveryService = new DelhiveryService();
 
@@ -613,7 +614,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if all orders belong to the authenticated client (security check)
-    // Also fetch courier service and tracking details for Delhivery cancellation
+    // Also fetch courier service, tracking details, and products for Delhivery cancellation and inventory restoration
     const existingOrders = await prisma.orders.findMany({
       where: {
         id: { in: validOrderIds },
@@ -624,7 +625,8 @@ export async function DELETE(request: NextRequest) {
         courier_service: true,
         tracking_id: true,
         pickup_location: true,
-        clientId: true
+        clientId: true,
+        products: true // Include products for inventory restoration
       }
     });
 
@@ -671,6 +673,78 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
+    // Restore inventory for orders with products from catalog app
+    const inventoryRestoreResults = [];
+    for (const order of existingOrders) {
+      if (order.products) {
+        try {
+          const products = JSON.parse(order.products);
+          if (Array.isArray(products) && products.length > 0) {
+            console.log(`🔄 [API_ORDERS_DELETE] Restoring inventory for order ${order.id} with ${products.length} products`);
+            
+            // Get catalog auth for this client
+            const catalogAuth = await getCatalogApiKey(client.id);
+            if (catalogAuth) {
+              // Prepare inventory restoration data
+              const inventoryItems = products.map((item: any) => ({
+                sku: item.product?.sku || item.sku,
+                quantity: item.quantity || 1
+              })).filter(item => item.sku); // Only include items with valid SKUs
+
+              if (inventoryItems.length > 0) {
+                // Call catalog app to restore inventory
+                const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
+                const clientSlug = client.slug || client.name?.toLowerCase().replace(/\s+/g, '-');
+                
+                if (clientSlug) {
+                  const restoreResponse = await fetch(`${catalogUrl}/api/public/inventory/restore?client=${clientSlug}`, {
+                    method: 'POST',
+                    headers: {
+                      'X-API-Key': catalogAuth.catalogApiKey,
+                      'X-Client-ID': catalogAuth.catalogClientId,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      orderId: `scan2ship_order_${order.id}`,
+                      items: inventoryItems,
+                      reason: 'order_deletion',
+                      webhookId: null
+                    }),
+                  });
+
+                  if (restoreResponse.ok) {
+                    const restoreData = await restoreResponse.json();
+                    console.log(`✅ [API_ORDERS_DELETE] Successfully restored inventory for order ${order.id}:`, restoreData.data.summary);
+                    inventoryRestoreResults.push({
+                      orderId: order.id,
+                      success: true,
+                      restoredItems: restoreData.data.summary.totalRestored
+                    });
+                  } else {
+                    const errorData = await restoreResponse.json();
+                    console.error(`❌ [API_ORDERS_DELETE] Failed to restore inventory for order ${order.id}:`, errorData);
+                    inventoryRestoreResults.push({
+                      orderId: order.id,
+                      success: false,
+                      error: errorData.error
+                    });
+                  }
+                } else {
+                  console.warn(`⚠️ [API_ORDERS_DELETE] No client slug available for inventory restoration for order ${order.id}`);
+                }
+              } else {
+                console.log(`ℹ️ [API_ORDERS_DELETE] No valid SKUs found for inventory restoration in order ${order.id}`);
+              }
+            } else {
+              console.log(`ℹ️ [API_ORDERS_DELETE] No catalog auth found for client ${client.id}, skipping inventory restoration for order ${order.id}`);
+            }
+          }
+        } catch (parseError) {
+          console.error(`❌ [API_ORDERS_DELETE] Error parsing products for order ${order.id}:`, parseError);
+        }
+      }
+    }
+
     // Delete all orders in a transaction
     const deleteResult = await prisma.$transaction(async (tx) => {
       const deletedOrders = [];
@@ -697,7 +771,8 @@ export async function DELETE(request: NextRequest) {
         mobile: order.mobile,
         tracking_id: order.tracking_id
       })),
-      delhiveryCancellations: delhiveryCancelResults
+      delhiveryCancellations: delhiveryCancelResults,
+      inventoryRestorations: inventoryRestoreResults
     });
 
   } catch (error) {
