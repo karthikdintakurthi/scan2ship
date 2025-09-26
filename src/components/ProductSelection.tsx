@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { CatalogService } from '@/lib/catalog-service';
 import { CatalogProduct, OrderItem } from '@/types/catalog';
 import { debounce } from '@/lib/debounce';
 // Using regular img tag to avoid Image constructor conflict
@@ -13,7 +12,6 @@ interface ProductSelectionProps {
 }
 
 export default function ProductSelection({ onProductsChange, currentClient, onReset }: ProductSelectionProps) {
-  const [isCatalogConnected, setIsCatalogConnected] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<CatalogProduct[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,18 +21,8 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const catalogService = useMemo(() => new CatalogService(), []);
-
-  useEffect(() => {
-    // Check if catalog is already connected
-    const isConnected = catalogService.loadStoredAuth();
-    setIsCatalogConnected(isConnected);
-    
-    // Set client slug for catalog service
-    if (currentClient?.slug) {
-      catalogService.setClientSlug(currentClient.slug);
-    }
-  }, [catalogService, currentClient]);
+  // Catalog is always available through Cross-App Mappings
+  const isCatalogConnected = true;
 
   useEffect(() => {
     onProductsChange(orderItems);
@@ -236,12 +224,28 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
 
     try {
       console.log('🔍 [PRODUCT_SELECTION] Searching for:', term);
-      const response = await catalogService.searchProducts(term);
-      console.log('🔍 [PRODUCT_SELECTION] Search response:', response);
-      setSearchResults(response.products || []);
+      const response = await fetch('/api/catalog', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'search_products',
+          data: { query: term, page: 1, limit: 10 }
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to search products');
+      }
+
+      const data = await response.json();
+      console.log('🔍 [PRODUCT_SELECTION] Search response:', data);
+      setSearchResults(data.products || []);
     } catch (error) {
       console.error('❌ [PRODUCT_SELECTION] Product search error:', error);
-      setError('Failed to search products. Please check your catalog connection.');
+      setError('Failed to search products. Please try again.');
     } finally {
       setIsSearching(false);
     }
@@ -249,7 +253,7 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
 
   const debouncedSearchProducts = useMemo(
     () => debounce(searchProducts, 500),
-    [catalogService]
+    []
   );
 
   // Cancel any pending debounced operations when clearing
@@ -291,32 +295,6 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
     debouncedSearchProducts(value);
   };
 
-  if (!isCatalogConnected) {
-    return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-yellow-800">
-              Catalog Not Connected
-            </h3>
-            <div className="mt-2 text-sm text-yellow-700">
-              <p>
-                Connect to your product catalog to select products for this order.{' '}
-                <a href="/catalog-connect" className="font-medium underline text-yellow-800 hover:text-yellow-900">
-                  Connect now
-                </a>
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">

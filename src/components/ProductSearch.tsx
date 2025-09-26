@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { catalogService, CatalogProduct } from '@/lib/catalog-service';
+import { CatalogProduct } from '@/types/catalog';
 import { debounce } from '@/lib/debounce';
 
 interface ProductSearchProps {
@@ -30,8 +30,24 @@ export default function ProductSearch({ onProductSelect, selectedProducts, disab
       setError('');
 
       try {
-        const response = await catalogService.searchProducts(query, 1, 10);
-        setSearchResults(response.products);
+        const response = await fetch('/api/catalog', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'search_products',
+            data: { query, page: 1, limit: 10 }
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to search products');
+        }
+
+        const data = await response.json();
+        setSearchResults(data.products || []);
         setShowResults(true);
       } catch (err: any) {
         setError(err.message || 'Failed to search products');

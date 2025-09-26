@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { getPickupLocationConfig } from '@/lib/pickup-location-config'
 import { getCourierServiceByValue, validateCourierServiceRestrictions } from '@/lib/courier-service-config'
 import { getOrderConfig, validateOrderData } from '@/lib/order-config'
-import { CatalogService } from '@/lib/catalog-service'
 import { OrderItem } from '@/types/catalog'
 
 
@@ -967,25 +966,33 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
         if (selectedProducts.length > 0) {
           try {
             console.log('🔄 [ORDER_FORM] Updating inventory in catalog-app...');
-            const catalogService = new CatalogService();
-            
-            // Set client slug if available
-            if (currentClient?.slug) {
-              catalogService.setClientSlug(currentClient.slug);
-            }
-            
             const inventoryItems = selectedProducts.map(item => ({
               sku: item.product.sku,
               quantity: item.quantity,
               isPreorder: item.isPreorder || false
             }));
 
-            const inventoryResponse = await catalogService.reduceInventory(inventoryItems, result.order.orderNumber);
+            // Call catalog API to reduce inventory
+            const inventoryResponse = await fetch('/api/catalog', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'reduce_inventory',
+                data: { items: inventoryItems, orderNumber: result.order.orderNumber }
+              }),
+            });
             
-            if (inventoryResponse.data.allItemsAvailable) {
-              console.log('✅ [ORDER_FORM] Inventory updated successfully in catalog-app');
+            if (inventoryResponse.ok) {
+              const data = await inventoryResponse.json();
+              if (data.data?.allItemsAvailable) {
+                console.log('✅ [ORDER_FORM] Inventory updated successfully in catalog-app');
+              } else {
+                console.warn('⚠️ [ORDER_FORM] Some items were not available in inventory');
+              }
             } else {
-              console.warn('⚠️ [ORDER_FORM] Some items were not available in inventory');
+              console.warn('⚠️ [ORDER_FORM] Failed to update inventory in catalog-app');
             }
           } catch (inventoryError) {
             console.error('❌ [ORDER_FORM] Failed to update inventory in catalog-app:', inventoryError);
