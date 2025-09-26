@@ -264,6 +264,8 @@ async function handleInventoryReduction(data: any, client: any, catalogAuth: any
     }
 
     // Get client slug for catalog app
+    console.log('🔍 [INVENTORY_REDUCTION] Client data:', JSON.stringify(client, null, 2));
+    
     let clientSlug = client.slug;
     if (!clientSlug) {
       // Generate slug from company name or name
@@ -274,6 +276,8 @@ async function handleInventoryReduction(data: any, client: any, catalogAuth: any
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
     }
+    
+    console.log('🔍 [INVENTORY_REDUCTION] Generated client slug:', clientSlug);
     
     if (!clientSlug) {
       return NextResponse.json(
