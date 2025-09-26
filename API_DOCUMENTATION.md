@@ -9,6 +9,7 @@ Production: https://your-domain.com/api
 Development: http://localhost:3000/api
 ```
 
+
 ## Authentication
 All API endpoints require JWT-based authentication using Bearer tokens.
 
