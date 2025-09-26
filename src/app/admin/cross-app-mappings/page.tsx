@@ -181,8 +181,7 @@ export default function CrossAppMappingsPage() {
       const response = await fetch('/api/catalog', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer test-token' // This would be a real token in production
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           action: 'test_connection',

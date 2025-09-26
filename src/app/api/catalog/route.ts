@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       return securityResponse;
     }
 
-    // Temporarily bypass authentication for testing
+    // Temporarily bypass authentication for testing - using Vanitha's client ID
     // TODO: Restore authentication in production
     // const authResult = await authorizeUser(request, {
     //   requiredRole: UserRole.USER,
@@ -42,13 +42,14 @@ export async function POST(request: NextRequest) {
 
     // const { client } = authResult;
     
-    // Mock client for testing - using the actual client ID from the cross-app mapping
+    // Use Vanitha's client ID for testing
     const client = {
-      id: 'master-client-1756272680179',
-      name: 'Karthik Dintakurthi',
-      slug: 'scan2ship',
+      id: 'cmfohvqxb0001jp04hqvisj49',
+      name: 'Vanitha Fashion Jewelry',
+      slug: 'vanitha-fashion-jewelry',
       isActive: true
     };
+    console.log('🔍 [CATALOG_API] Using Vanitha client:', client);
     console.log('🔍 [CATALOG_API] Parsing request body...');
     const { action, data } = await request.json();
     console.log('🔍 [CATALOG_API] Request parsed - action:', action, 'data:', data);
@@ -70,6 +71,9 @@ export async function POST(request: NextRequest) {
     }
 
     switch (action) {
+      case 'test_connection':
+        return await handleTestConnection(data, client, catalogAuth);
+      
       case 'search_products':
         return await handleProductSearch(data, client, catalogAuth);
       
@@ -324,5 +328,57 @@ async function handleInventoryRestoration(data: any, client: any, catalogAuth: a
       { error: 'Failed to restore inventory' },
       { status: 500 }
     );
+  }
+}
+
+async function handleTestConnection(data: any, client: any, catalogAuth: any) {
+  try {
+    console.log('🔍 [TEST_CONNECTION] Testing catalog connection for client:', client.id);
+    
+    // Test the connection by making a simple request to the Catalog App
+    const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${catalogUrl}/api/public/products?search=test&page=1&limit=1`, {
+      method: 'GET',
+      headers: {
+        'X-API-Key': catalogAuth.catalogApiKey,
+        'X-Client-ID': catalogAuth.catalogClientId,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ [TEST_CONNECTION] Catalog App error:', errorText);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to connect to Catalog App',
+        details: errorText
+      }, { status: response.status });
+    }
+
+    const result = await response.json();
+    console.log('✅ [TEST_CONNECTION] Connection test successful');
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Connection test successful',
+      catalogApp: {
+        url: catalogUrl,
+        status: 'connected',
+        responseTime: Date.now()
+      },
+      client: {
+        id: client.id,
+        name: client.name
+      }
+    });
+
+  } catch (error: any) {
+    console.error('❌ [TEST_CONNECTION] Error:', error.message);
+    return NextResponse.json({
+      success: false,
+      error: 'Connection test failed',
+      details: error.message
+    }, { status: 500 });
   }
 }
