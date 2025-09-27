@@ -93,8 +93,9 @@ async function fetchPickupLocationsFromAPI(): Promise<PickupLocationConfig[]> {
 
     if (response.ok) {
       const data = await response.json();
-      const locations = data.pickupLocations || [defaultPickupLocationConfig];
+      const locations = data.data || [defaultPickupLocationConfig];
       console.log(`✅ [CLIENT] Successfully fetched ${locations.length} pickup locations in real-time`);
+      console.log(`✅ [CLIENT] Pickup locations:`, locations);
       return locations;
     } else {
       console.warn(`⚠️ [CLIENT] Failed to fetch pickup locations from API (${response.status}), using default`);
@@ -243,7 +244,7 @@ export async function getDelhiveryApiKey(pickupLocation: string, clientId?: stri
 
         if (response.ok) {
           const data = await response.json();
-          const pickupLocations = data.pickupLocations || [];
+          const pickupLocations = data.data || [];
           
           // Find the specific pickup location
           let location = pickupLocations.find((loc: any) => 

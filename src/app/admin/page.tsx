@@ -14,7 +14,7 @@ export default function AdminDashboardPage() {
     console.log('🔍 [ADMIN_DASHBOARD] Current user:', currentUser);
     console.log('🔍 [ADMIN_DASHBOARD] User role:', currentUser?.role);
     
-    if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'master_admin') {
+    if (currentUser && !['client_admin', 'super_admin', 'master_admin'].includes(currentUser.role)) {
       console.log('❌ [ADMIN_DASHBOARD] User not authorized, redirecting to home');
       router.push('/');
     } else if (currentUser) {
@@ -34,30 +34,81 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // Redirect if not admin or master admin
-  if (currentUser.role !== 'admin' && currentUser.role !== 'master_admin') {
+  // Redirect if not authorized
+  if (!['client_admin', 'super_admin', 'master_admin'].includes(currentUser.role)) {
     return null;
   }
 
-  // Determine if this is a master admin or client admin
+  // Determine admin type
   const isMasterAdmin = currentUser.role === 'master_admin';
-  const isClientAdmin = currentUser.role === 'admin';
+  const isSuperAdmin = currentUser.role === 'super_admin';
+  const isClientAdmin = currentUser.role === 'client_admin';
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
-          {isMasterAdmin ? 'Master Admin Dashboard' : 'Client Admin Dashboard'}
+          {isMasterAdmin ? 'Master Admin Dashboard' : 
+           isSuperAdmin ? 'Super Admin Dashboard' : 
+           'Client Admin Dashboard'}
         </h1>
         <p className="text-gray-600 mt-2">
           {isMasterAdmin 
             ? 'Manage clients and users for the SaaS platform' 
+            : isSuperAdmin
+            ? 'Manage platform-wide operations'
             : 'Manage users and orders for your client organization'
           }
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Client Admin: User Management */}
+        {(isClientAdmin || isSuperAdmin || isMasterAdmin) && (
+          <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 ml-3">User Management</h3>
+            </div>
+            <p className="text-gray-600 mb-4">
+              Manage users, create child users, and assign them to sub-groups.
+            </p>
+            <Link
+              href="/admin/users"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+            >
+              Manage Users
+            </Link>
+          </div>
+        )}
+
+        {/* Client Admin: Sub-Groups Management */}
+        {(isClientAdmin || isSuperAdmin || isMasterAdmin) && (
+          <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 ml-3">Sub-Groups</h3>
+            </div>
+            <p className="text-gray-600 mb-4">
+              Create and manage sub-groups to organize users within your organization.
+            </p>
+            <Link
+              href="/admin/sub-groups"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+            >
+              Manage Sub-Groups
+            </Link>
+          </div>
+        )}
+
         {/* Master Admin Only: Register New Client */}
         {isMasterAdmin && (
           <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">

@@ -129,6 +129,7 @@ export default function OrderList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPickupLocation, setSelectedPickupLocation] = useState('')
   const [selectedCourierService, setSelectedCourierService] = useState('')
+  const [selectedSubGroup, setSelectedSubGroup] = useState('')
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set())
   const headerCheckboxRef = useRef<HTMLInputElement>(null)
   const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -157,6 +158,7 @@ export default function OrderList() {
   // Dynamic configuration state
   const [pickupLocations, setPickupLocations] = useState<Array<{value: string, label: string}>>([])
   const [courierServices, setCourierServices] = useState<Array<{value: string, label: string}>>([])
+  const [subGroups, setSubGroups] = useState<Array<{value: string, label: string}>>([])
   const [configLoaded, setConfigLoaded] = useState(false)
   const [thermalPrintEnabled, setThermalPrintEnabled] = useState(false)
   const [a5PrintEnabled, setA5PrintEnabled] = useState(false)
@@ -186,6 +188,41 @@ export default function OrderList() {
         
         setPickupLocations(dynamicConfig.pickupLocations);
         setCourierServices(dynamicConfig.courierServices);
+        
+        // Load sub-groups
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          try {
+            const subGroupsResponse = await fetch('/api/sub-groups', {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            if (subGroupsResponse.ok) {
+              const subGroupsData = await subGroupsResponse.json();
+              const subGroupsList = subGroupsData.data?.map((sg: any) => ({
+                value: sg.name,
+                label: sg.name
+              })) || [];
+              console.log('🔍 [ORDER_LIST] Loaded sub-groups:', subGroupsList);
+              setSubGroups(subGroupsList);
+              
+              // For child users, automatically set their sub-group as default
+              if (currentUser?.role === 'child_user' && subGroupsList.length === 1) {
+                console.log('🔍 [ORDER_LIST] Auto-selecting sub-group for child user:', subGroupsList[0].value);
+                setSelectedSubGroup(subGroupsList[0].value);
+              }
+            } else {
+              console.warn('⚠️ [ORDER_LIST] Failed to fetch sub-groups:', subGroupsResponse.status);
+              setSubGroups([]);
+            }
+          } catch (subGroupError) {
+            console.error('Error loading sub-groups:', subGroupError);
+            setSubGroups([]);
+          }
+        }
+        
         setConfigLoaded(true);
       } catch (error) {
         console.error('Error loading configuration:', error);
@@ -196,12 +233,21 @@ export default function OrderList() {
           value: service.value,
           label: service.label
         })));
+        setSubGroups([]);
         setConfigLoaded(true);
       }
     };
 
     loadConfiguration();
   }, []);
+
+  // Auto-fetch orders when sub-group is set for child users
+  useEffect(() => {
+    if (currentUser?.role === 'child_user' && selectedSubGroup && configLoaded) {
+      console.log('🔍 [ORDER_LIST] Auto-fetching orders for child user with sub-group:', selectedSubGroup);
+      fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup);
+    }
+  }, [selectedSubGroup, configLoaded, currentUser?.role, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService]);
 
   // Load print settings
   useEffect(() => {
@@ -231,7 +277,7 @@ export default function OrderList() {
 
   // Initial load - only run once
   useEffect(() => {
-    fetchOrders(1, '', '', '', '', '', '')
+    fetchOrders(1, '', '', '', '', '', '', '')
   }, [])
 
   // Debounced search with proper implementation
@@ -249,7 +295,7 @@ export default function OrderList() {
     // If search is cleared, fetch immediately
     if (!searchValue.trim()) {
       setSearchLoading(false)
-      fetchOrders(1, '', fromDate, toDate, selectedPickupLocation, selectedCourierService)
+      fetchOrders(1, '', fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
       return
     }
     
@@ -264,12 +310,12 @@ export default function OrderList() {
     
     // Set new timeout for debounced search
     const timeoutId = setTimeout(() => {
-      fetchOrders(1, searchValue, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+      fetchOrders(1, searchValue, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
       setSearchLoading(false)
     }, 500) // Increased to 500ms for better UX
     
     setSearchTimeout(timeoutId)
-  }, [searchTimeout, fromDate, toDate, selectedPickupLocation, selectedCourierService])
+  }, [searchTimeout, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedSubGroup])
   
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -284,15 +330,22 @@ export default function OrderList() {
   const handlePickupLocationChange = useCallback((pickupLocation: string) => {
     setSelectedPickupLocation(pickupLocation)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, fromDate, toDate, pickupLocation, selectedCourierService, '')
-  }, [searchTerm, fromDate, toDate, selectedCourierService])
+    fetchOrders(1, searchTerm, fromDate, toDate, pickupLocation, selectedCourierService, '', selectedSubGroup)
+  }, [searchTerm, fromDate, toDate, selectedCourierService, selectedSubGroup])
 
   // Handle courier service change
   const handleCourierServiceChange = useCallback((courierService: string) => {
     setSelectedCourierService(courierService)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, courierService, '')
-  }, [searchTerm, fromDate, toDate, selectedPickupLocation])
+    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, courierService, '', selectedSubGroup)
+  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedSubGroup])
+
+  // Handle sub-group change
+  const handleSubGroupChange = useCallback((subGroup: string) => {
+    setSelectedSubGroup(subGroup)
+    setCurrentPage(1) // Reset to first page when filtering
+    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', subGroup)
+  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService])
 
 
   // Handle date range changes
@@ -300,8 +353,8 @@ export default function OrderList() {
     setFromDate(from)
     setToDate(to)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, from, to, selectedPickupLocation, selectedCourierService, '')
-  }, [searchTerm, selectedPickupLocation, selectedCourierService])
+    fetchOrders(1, searchTerm, from, to, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
+  }, [searchTerm, selectedPickupLocation, selectedCourierService, selectedSubGroup])
 
 
   // Clear date filters
@@ -309,7 +362,7 @@ export default function OrderList() {
     setFromDate('')
     setToDate('')
     setCurrentPage(1)
-    fetchOrders(1, searchTerm, '', '', selectedPickupLocation, selectedCourierService, '')
+    fetchOrders(1, searchTerm, '', '', selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
   }
 
   // Clear all filters
@@ -319,14 +372,18 @@ export default function OrderList() {
     setToDate('')
     setSelectedPickupLocation('')
     setSelectedCourierService('')
+    // Don't clear sub-group for child users as it's auto-selected
+    if (currentUser?.role !== 'child_user') {
+      setSelectedSubGroup('')
+    }
     setCurrentPage(1)
-    fetchOrders(1, '', '', '', '', '', '')
+    fetchOrders(1, '', '', '', '', '', '', currentUser?.role === 'child_user' ? selectedSubGroup : '')
   }
 
   // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchOrders(page, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '')
+    fetchOrders(page, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
   }
 
   // Handle page size change
@@ -350,7 +407,7 @@ export default function OrderList() {
 
 
   // Fetch orders with specific page size (for page size changes)
-  const fetchOrdersWithPageSize = async (page = 1, pageSize = 25, search = '', fromDate = '', toDate = '', pickupLocation = '', courierService = '', trackingStatus = '') => {
+  const fetchOrdersWithPageSize = async (page = 1, pageSize = 25, search = '', fromDate = '', toDate = '', pickupLocation = '', courierService = '', trackingStatus = '', subGroup = '') => {
     try {
       // Store current scroll position
       const tableContainer = tableContainerRef.current
@@ -444,7 +501,7 @@ export default function OrderList() {
     }
   }
 
-  const fetchOrders = async (page = 1, search = '', fromDate = '', toDate = '', pickupLocation = '', courierService = '', trackingStatus = '') => {
+  const fetchOrders = async (page = 1, search = '', fromDate = '', toDate = '', pickupLocation = '', courierService = '', trackingStatus = '', subGroup = '') => {
     try {
       // Store current scroll position
       scrollPositionRef.current = tableContainerRef.current?.scrollTop || 0
@@ -479,6 +536,10 @@ export default function OrderList() {
 
       if (courierService) {
         params.append('courierService', courierService)
+      }
+
+      if (subGroup) {
+        params.append('subGroup', subGroup)
       }
 
       
@@ -560,7 +621,7 @@ export default function OrderList() {
       if (response.ok) {
         const result = await response.json()
         alert(`Success! Waybill: ${result.waybill}`)
-        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService) // Refresh the list
+        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup) // Refresh the list
       } else {
         const error = await response.json()
         alert(`Failed to retry: ${error.error}`)
@@ -595,7 +656,7 @@ export default function OrderList() {
         alert(`Order fulfilled successfully! Tracking ID: ${result.trackingId}`)
         
         // Refresh the orders list
-        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
         
         // Update the selected order if it's the same one
         if (selectedOrder && selectedOrder.id === orderId) {
@@ -675,7 +736,7 @@ export default function OrderList() {
             setEditFormData({})
             
             // Refresh the orders list
-            fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+            fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
             
             alert('Order updated successfully!')
           } else {
@@ -705,7 +766,7 @@ export default function OrderList() {
           setEditFormData({})
           
           // Refresh the orders list
-          fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+          fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
           
           alert('Order updated successfully!')
         } else {
@@ -1108,6 +1169,7 @@ export default function OrderList() {
         if (toDate) params.append('toDate', toDate)
         if (selectedPickupLocation) params.append('pickupLocation', selectedPickupLocation)
         if (selectedCourierService) params.append('courierService', selectedCourierService)
+        if (selectedSubGroup && currentUser?.role !== 'child_user') params.append('subGroup', selectedSubGroup)
         params.append('limit', '10000') // Set a high limit to get all orders
         params.append('page', '1') // Start from first page
         
@@ -1255,6 +1317,11 @@ export default function OrderList() {
         const courierName = courierServices.find(service => service.value === selectedCourierService)?.label || selectedCourierService
         filename += `_${courierName.replace(/\s+/g, '_')}`
       }
+
+    if (selectedSubGroup && currentUser?.role !== 'child_user') {
+      const subGroupName = subGroups.find(sg => sg.value === selectedSubGroup)?.label || selectedSubGroup
+      filename += `_${subGroupName.replace(/\s+/g, '_')}`
+    }
 
       // Add selection info to filename
       if (selectedOrders.size > 0) {
@@ -1584,7 +1651,7 @@ export default function OrderList() {
         // Close modal
         setShowDeleteModal(false)
         // Refresh orders to update pagination
-        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService)
+        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
         alert(`Successfully deleted ${orderIds.length} order${orderIds.length !== 1 ? 's' : ''}`)
       } else {
         const error = await response.json()
@@ -1625,7 +1692,7 @@ export default function OrderList() {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="space-y-6">
           {/* Row 1 - Search and Filters */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className={`grid grid-cols-1 gap-6 ${(subGroups.length > 0 && currentUser?.role !== 'child_user') ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
             {/* Search Input */}
             <div className="lg:col-span-1">
               <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
@@ -1704,6 +1771,28 @@ export default function OrderList() {
                 ))}
               </select>
             </div>
+
+            {/* Sub-Group Filter - Only show if sub-groups are available and user is not a child user */}
+            {subGroups.length > 0 && currentUser?.role !== 'child_user' && (
+              <div className="lg:col-span-1">
+                <label htmlFor="subGroup" className="block text-sm font-medium text-gray-700 mb-2">
+                  Sub-Group
+                </label>
+                <select
+                  id="subGroup"
+                  value={selectedSubGroup}
+                  onChange={(e) => handleSubGroupChange(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                >
+                  <option value="">All Sub-Groups</option>
+                  {subGroups.map((subGroup) => (
+                    <option key={subGroup.value} value={subGroup.value}>
+                      {subGroup.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Row 2 - Date Range */}
@@ -1752,7 +1841,7 @@ export default function OrderList() {
         {/* Filter Actions */}
         <div className="mt-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            {(searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService) && (
+            {(searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService || (selectedSubGroup && currentUser?.role !== 'child_user')) && (
               <button
                 onClick={clearAllFilters}
                 className="px-4 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
@@ -1761,7 +1850,7 @@ export default function OrderList() {
               </button>
             )}
             {/* Export Orders Button - Only show when there are orders and filters are applied */}
-            {orders.length > 0 && (searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService) && (
+            {orders.length > 0 && (searchTerm || fromDate || toDate || selectedPickupLocation || selectedCourierService || (selectedSubGroup && currentUser?.role !== 'child_user')) && (
               <button
                 onClick={exportOrders}
                 className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center space-x-2"
@@ -1789,6 +1878,11 @@ export default function OrderList() {
             {selectedCourierService && (
               <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-md">
                 🚚 {courierServices.find(service => service.value === selectedCourierService)?.label}
+              </span>
+            )}
+            {selectedSubGroup && currentUser?.role !== 'child_user' && (
+              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-md">
+                👥 {subGroups.find(sg => sg.value === selectedSubGroup)?.label}
               </span>
             )}
             {fromDate && toDate && (

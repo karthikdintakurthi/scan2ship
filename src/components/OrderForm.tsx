@@ -184,7 +184,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
           if (clientConfig) {
             // Log the package value sources for debugging
             console.log('🔍 [PACKAGE_VALUE] Client config defaultPackageValue:', clientConfig.defaultPackageValue);
-            console.log('🔍 [PACKAGE_VALUE] Pickup config commodity_value:', pickupConfig?.productDetails.commodity_value);
+            console.log('🔍 [PACKAGE_VALUE] Pickup config commodity_value:', pickupConfig?.productDetails?.commodity_value);
             console.log('🔍 [PACKAGE_VALUE] Using client setting for package value');
             
             setFormData(prev => ({

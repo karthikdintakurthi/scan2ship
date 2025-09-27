@@ -131,10 +131,10 @@ model client_order_configs {
   requirePackageValue       Boolean  @default(true)
   requireWeight             Boolean  @default(true)
   requireTotalItems         Boolean  @default(true)
-  enableResellerFallback    Boolean  @default(true)
   clientId                  String   @unique
-  enableThermalPrint        Boolean  @default(false)
   enableReferencePrefix     Boolean  @default(true)
+  enableResellerFallback    Boolean  @default(true)
+  enableThermalPrint        Boolean  @default(false)
   displayLogoOnWaybill      Boolean? @default(false)
   logoFileName              String?
   logoFileSize              Int?
@@ -150,7 +150,6 @@ model client_order_configs {
 model clients {
   id                    String                 @id
   name                  String
-  slug                  String?                @unique
   companyName           String
   email                 String                 @unique
   phone                 String?
@@ -165,6 +164,7 @@ model clients {
   isActive              Boolean                @default(true)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime
+  slug                  String?                @unique
   analytics_events      analytics_events[]
   api_keys              api_keys[]
   client_config         client_config[]
@@ -173,6 +173,7 @@ model clients {
   client_order_configs  client_order_configs?
   courier_services      courier_services[]
   credit_transactions   credit_transactions[]
+  cross_app_mappings    cross_app_mappings?
   order_analytics       order_analytics[]
   orders                orders[]
   pickup_locations      pickup_locations[]
@@ -180,9 +181,9 @@ model clients {
   sessions              sessions[]
   shopify_integrations  shopify_integrations[]
   shopify_orders        shopify_orders[]
+  sub_groups            sub_groups[]
   users                 users[]
   webhooks              webhooks[]
-  cross_app_mappings    cross_app_mappings[]
 }
 
 model courier_services {
@@ -216,10 +217,10 @@ model credit_transactions {
   orderId            Int?
   createdAt          DateTime @default(now())
   clientName         String
-  utrNumber          String?
   screenshotFileName String?
   screenshotFileSize Int?
   screenshotFileType String?
+  utrNumber          String?
   clients            clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
   orders             orders?  @relation(fields: [orderId], references: [id])
   users              users?   @relation(fields: [userId], references: [id])
@@ -310,18 +311,22 @@ model orders {
   shopify_tracking_number  String?
   tracking_status          String?               @default("pending")
   products                 Json?
+  created_by               String?
+  sub_group                String?
   credit_transactions      credit_transactions[]
   order_analytics          order_analytics?
   clients                  clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdByUser            users?                @relation("OrderCreator", fields: [created_by], references: [id])
 }
 
 model pickup_locations {
-  id              String  @id
-  value           String
-  label           String
-  delhiveryApiKey String?
-  clientId        String
-  clients         clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id                  String                  @id
+  value               String
+  label               String
+  delhiveryApiKey     String?
+  clientId            String
+  clients             clients                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userPickupLocations user_pickup_locations[]
 
   @@unique([label, clientId])
 }
@@ -440,23 +445,73 @@ model system_config {
 }
 
 model users {
-  id                  String                @id
+  id                  String                  @id
   email               String
   name                String
   password            String?
-  role                String                @default("user")
-  isActive            Boolean               @default(true)
-  createdAt           DateTime              @default(now())
+  role                String                  @default("child_user")
+  isActive            Boolean                 @default(true)
+  createdAt           DateTime                @default(now())
   updatedAt           DateTime
   clientId            String
+  createdBy           String?
+  parentUserId        String?
   analytics_events    analytics_events[]
   credit_transactions credit_transactions[]
   order_analytics     order_analytics[]
+  createdOrders       orders[]                @relation("OrderCreator")
   pickup_requests     pickup_requests[]
   sessions            sessions[]
-  clients             clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userPickupLocations user_pickup_locations[]
+  userSubGroups       user_sub_groups[]
+  clients             clients                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  parentUser          users?                  @relation("UserHierarchy", fields: [parentUserId], references: [id])
+  childUsers          users[]                 @relation("UserHierarchy")
 
   @@unique([email, clientId])
+  @@index([parentUserId])
+  @@index([createdBy])
+}
+
+model sub_groups {
+  id            String            @id
+  name          String
+  description   String?
+  clientId      String
+  isActive      Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime
+  clients       clients           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userSubGroups user_sub_groups[]
+
+  @@unique([name, clientId])
+  @@index([clientId])
+}
+
+model user_sub_groups {
+  id         String     @id
+  userId     String
+  subGroupId String
+  createdAt  DateTime   @default(now())
+  subGroups  sub_groups @relation(fields: [subGroupId], references: [id], onDelete: Cascade)
+  users      users      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subGroupId])
+  @@index([userId])
+  @@index([subGroupId])
+}
+
+model user_pickup_locations {
+  id               String           @id
+  userId           String
+  pickupLocationId String
+  createdAt        DateTime         @default(now())
+  pickup_locations pickup_locations @relation(fields: [pickupLocationId], references: [id], onDelete: Cascade)
+  users            users            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pickupLocationId])
+  @@index([userId])
+  @@index([pickupLocationId])
 }
 
 model webhook_logs {
@@ -497,20 +552,16 @@ model webhooks {
   @@index([isActive])
 }
 
-
 model cross_app_mappings {
-  id                String    @id @default(cuid())
-  scan2shipClientId String    // The scan2ship client ID
-  catalogClientId   String    // The catalog app client ID
-  catalogApiKey     String    // The catalog app API key for this client
-  isActive          Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  // Relations
-  scan2shipClient   clients   @relation(fields: [scan2shipClientId], references: [id], onDelete: Cascade)
-  
-  @@unique([scan2shipClientId]) // One mapping per scan2ship client
+  id                String   @id @default(cuid())
+  scan2shipClientId String   @unique
+  catalogClientId   String
+  catalogApiKey     String
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  scan2shipClient   clients  @relation(fields: [scan2shipClientId], references: [id], onDelete: Cascade)
+
   @@index([catalogClientId])
   @@index([isActive])
 }

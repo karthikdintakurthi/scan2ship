@@ -22,10 +22,10 @@ export async function GET(request: NextRequest) {
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.MASTER_ADMIN,
       requiredPermissions: [PermissionLevel.READ],
       requireActiveUser: true,
-      requireActiveClient: true
+      requireActiveClient: false // Master admin doesn't need active client
     });
 
     if (authResult.response) {

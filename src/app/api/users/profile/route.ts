@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     // Authorize user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.READ],
       requireActiveUser: true,
       requireActiveClient: true
@@ -86,7 +86,7 @@ export async function PUT(request: NextRequest) {
 
     // Authorize user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.WRITE],
       requireActiveUser: true,
       requireActiveClient: true

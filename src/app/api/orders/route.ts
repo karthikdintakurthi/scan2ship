@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
       return securityResponse;
     }
 
-    // Authorize user
+    // Authorize user - allow all roles to create orders
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.WRITE],
       requireActiveUser: true,
       requireActiveClient: true
@@ -103,6 +103,25 @@ export async function POST(request: NextRequest) {
     const clientOrderConfig = await prisma.client_order_configs.findUnique({
       where: { clientId: client.id }
     });
+
+    // Get user's sub-group name for the order
+    let subGroupName = null;
+    if (user.role === 'child_user') {
+      try {
+        const userSubGroup = await prisma.user_sub_groups.findFirst({
+          where: { userId: user.id },
+          select: {
+            subGroups: {
+              select: { name: true }
+            }
+          }
+        });
+        subGroupName = userSubGroup?.subGroups?.name || null;
+      } catch (error) {
+        console.error('Error fetching user sub-group for order creation:', error);
+        subGroupName = null;
+      }
+    }
 
     // Generate or format reference number with prefix configuration
     let referenceNumber: string;
@@ -206,6 +225,8 @@ export async function POST(request: NextRequest) {
     // Set tracking_status to 'pending' if no tracking ID is assigned
     const orderDataToCreate = {
       ...processedOrderData,
+      created_by: user.id, // Track who created this order
+      sub_group: subGroupName, // Track which sub-group the user belongs to
       tracking_status: processedOrderData.tracking_id ? null : 'pending'
     };
     
@@ -372,9 +393,9 @@ export async function GET(request: NextRequest) {
       return securityResponse;
     }
 
-    // Authorize user
+    // Authorize user - allow all roles to read orders
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.READ],
       requireActiveUser: true,
       requireActiveClient: true
@@ -387,7 +408,7 @@ export async function GET(request: NextRequest) {
 
     const auth = { user: authResult.user!, client: authResult.user!.client };
 
-    const { client } = auth;
+    const { client, user } = auth;
     const { searchParams } = new URL(request.url);
     
     const page = parseInt(searchParams.get('page') || '1');
@@ -398,8 +419,9 @@ export async function GET(request: NextRequest) {
     const pickupLocation = searchParams.get('pickupLocation') || '';
     const courierService = searchParams.get('courierService') || '';
     const trackingStatus = searchParams.get('trackingStatus') || '';
+    const subGroup = searchParams.get('subGroup') || '';
     
-    console.log('🔍 [API_ORDERS_GET] Request parameters:', { page, limit, search, fromDate, toDate, pickupLocation, courierService, trackingStatus, clientId: client.id });
+    console.log('🔍 [API_ORDERS_GET] Request parameters:', { page, limit, search, fromDate, toDate, pickupLocation, courierService, trackingStatus, subGroup, clientId: client.id });
     
     const skip = (page - 1) * limit;
     
@@ -407,14 +429,60 @@ export async function GET(request: NextRequest) {
     const whereClause: any = {
       clientId: client.id // Ensure client isolation
     };
+
+    // Role-based filtering
+    if (user.role === 'child_user') {
+      // Get user's sub-group name
+      try {
+        const userSubGroup = await prisma.user_sub_groups.findFirst({
+          where: { userId: user.id },
+          select: {
+            subGroups: {
+              select: { name: true }
+            }
+          }
+        });
+        const userSubGroupName = userSubGroup?.subGroups?.name;
+        
+        if (userSubGroupName) {
+          // Child users can see orders from their sub-group OR their own orders
+          whereClause.OR = [
+            { sub_group: userSubGroupName },
+            { created_by: user.id }
+          ];
+        } else {
+          // If no sub-group assigned, only see their own orders
+          whereClause.created_by = user.id;
+        }
+      } catch (error) {
+        console.error('Error fetching user sub-group:', error);
+        // Fallback to user's own orders if sub-group query fails
+        whereClause.created_by = user.id;
+      }
+    }
+    // Other roles (user, client_admin, super_admin, master_admin) can see all client orders
     
     if (search) {
-      whereClause.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { mobile: { contains: search, mode: 'insensitive' } },
-        { tracking_id: { contains: search, mode: 'insensitive' } },
-        { reference_number: { contains: search, mode: 'insensitive' } }
-      ];
+      // If there's already an OR clause from role filtering, combine them
+      if (whereClause.OR) {
+        whereClause.AND = [
+          { OR: whereClause.OR },
+          { OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { mobile: { contains: search, mode: 'insensitive' } },
+            { tracking_id: { contains: search, mode: 'insensitive' } },
+            { reference_number: { contains: search, mode: 'insensitive' } }
+          ]}
+        ];
+        delete whereClause.OR;
+      } else {
+        whereClause.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { mobile: { contains: search, mode: 'insensitive' } },
+          { tracking_id: { contains: search, mode: 'insensitive' } },
+          { reference_number: { contains: search, mode: 'insensitive' } }
+        ];
+      }
     }
     
     if (fromDate && toDate) {
@@ -438,6 +506,10 @@ export async function GET(request: NextRequest) {
     
     if (courierService) {
       whereClause.courier_service = courierService;
+    }
+    
+    if (subGroup) {
+      whereClause.sub_group = subGroup;
     }
     
     if (trackingStatus) {
@@ -572,9 +644,9 @@ export async function DELETE(request: NextRequest) {
       return securityResponse;
     }
 
-    // Authorize user
+    // Authorize user - allow child users to delete orders
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.DELETE],
       requireActiveUser: true,
       requireActiveClient: true
@@ -615,11 +687,48 @@ export async function DELETE(request: NextRequest) {
 
     // Check if all orders belong to the authenticated client (security check)
     // Also fetch courier service, tracking details, and products for Delhivery cancellation and inventory restoration
+    const user = authResult.user!;
+    
+    // Build where clause with client isolation and role-based filtering
+    const whereClause: any = {
+      id: { in: validOrderIds },
+      clientId: client.id // Ensure client isolation
+    };
+
+    // Role-based filtering for child users
+    if (user.role === 'child_user') {
+      // Get user's sub-group name
+      try {
+        const userSubGroup = await prisma.user_sub_groups.findFirst({
+          where: { userId: user.id },
+          select: {
+            subGroups: {
+              select: { name: true }
+            }
+          }
+        });
+        const userSubGroupName = userSubGroup?.subGroups?.name;
+        
+        if (userSubGroupName) {
+          // Child users can delete orders from their sub-group OR their own orders
+          whereClause.OR = [
+            { sub_group: userSubGroupName },
+            { created_by: user.id }
+          ];
+        } else {
+          // If no sub-group assigned, only delete their own orders
+          whereClause.created_by = user.id;
+        }
+      } catch (error) {
+        console.error('Error fetching user sub-group for order deletion:', error);
+        // Fallback to user's own orders if sub-group query fails
+        whereClause.created_by = user.id;
+      }
+    }
+    // Other roles (user, client_admin, super_admin, master_admin) can delete all client orders
+
     const existingOrders = await prisma.orders.findMany({
-      where: {
-        id: { in: validOrderIds },
-        clientId: client.id // Ensure client isolation
-      },
+      where: whereClause,
       select: { 
         id: true,
         courier_service: true,
@@ -631,8 +740,11 @@ export async function DELETE(request: NextRequest) {
     });
 
     if (existingOrders.length !== validOrderIds.length) {
+      const errorMessage = user.role === 'child_user' 
+        ? 'Some orders not found or you do not have permission to delete them'
+        : 'Some orders not found or do not belong to your client';
       return NextResponse.json(
-        { error: 'Some orders not found or do not belong to your client' },
+        { error: errorMessage },
         { status: 404 }
       );
     }

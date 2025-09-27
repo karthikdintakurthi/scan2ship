@@ -94,7 +94,7 @@ export default function CrossAppMappingsPage() {
       if (response.ok) {
         const data = await response.json();
         console.log('Fetched clients:', data);
-        setClients(data.clients || []);
+        setClients(data.data || []);
       } else {
         console.error('Failed to fetch clients:', response.status);
         const errorData = await response.json();

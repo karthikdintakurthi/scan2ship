@@ -31,12 +31,18 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
   // Check catalog integration status on component mount
   useEffect(() => {
     const checkCatalogIntegration = async () => {
+      console.log('🔍 [PRODUCT_SELECTION] Checking catalog integration...');
+      console.log('🔍 [PRODUCT_SELECTION] currentSession:', currentSession);
+      console.log('🔍 [PRODUCT_SELECTION] currentSession?.token:', currentSession?.token);
+      
       if (!currentSession?.token) {
+        console.log('❌ [PRODUCT_SELECTION] No session token, setting isCatalogConnected to false');
         setIsCatalogConnected(false);
         return;
       }
 
       try {
+        console.log('🔍 [PRODUCT_SELECTION] Making test connection request...');
         // Make a test request to check if catalog integration is configured
         const response = await fetch('/api/catalog', {
           method: 'POST',
@@ -50,19 +56,27 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
           }),
         });
 
+        console.log('🔍 [PRODUCT_SELECTION] Response status:', response.status);
+        console.log('🔍 [PRODUCT_SELECTION] Response ok:', response.ok);
+
         if (response.ok) {
+          console.log('✅ [PRODUCT_SELECTION] Catalog integration is available');
           setIsCatalogConnected(true);
         } else {
           const errorData = await response.json();
+          console.log('❌ [PRODUCT_SELECTION] Error response:', errorData);
+          
           if (errorData.error?.includes('not configured') || errorData.error?.includes('integration')) {
+            console.log('❌ [PRODUCT_SELECTION] Integration not configured, hiding component');
             setIsCatalogConnected(false);
           } else {
+            console.log('⚠️ [PRODUCT_SELECTION] Other error, still showing component');
             // Other errors might be temporary, so we'll still show the component
             setIsCatalogConnected(true);
           }
         }
       } catch (error) {
-        console.error('Error checking catalog integration:', error);
+        console.error('❌ [PRODUCT_SELECTION] Error checking catalog integration:', error);
         setIsCatalogConnected(false);
       }
     };
@@ -352,13 +366,12 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
   };
 
 
-  // Don't render the component if catalog integration is not configured
-  if (isCatalogConnected === false) {
-    return null; // Hide the entire component
-  }
+  // Debug logging
+  console.log('🔍 [PRODUCT_SELECTION] Render state - isCatalogConnected:', isCatalogConnected);
 
   // Show loading state while checking catalog integration
   if (isCatalogConnected === null) {
+    console.log('🔄 [PRODUCT_SELECTION] Showing loading state');
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
         <div className="flex items-center justify-center py-8">
@@ -370,6 +383,14 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
       </div>
     );
   }
+
+  // Don't render the component if catalog integration is not available
+  if (isCatalogConnected === false) {
+    console.log('❌ [PRODUCT_SELECTION] Integration not available, hiding component');
+    return null;
+  }
+
+  console.log('✅ [PRODUCT_SELECTION] Integration available, showing component');
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     // Try JWT authentication first
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.READ],
       requireActiveUser: true,
       requireActiveClient: true
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
 
     // Try JWT authentication first
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.WRITE],
       requireActiveUser: true,
       requireActiveClient: true

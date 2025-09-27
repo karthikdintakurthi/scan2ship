@@ -54,20 +54,47 @@ export default function Navigation() {
       { name: 'Client Management', href: '/admin/clients', current: pathname === '/admin/clients' },
       { name: 'Client Configurations', href: '/admin/client-configurations', current: pathname === '/admin/client-configurations' },
     ];
-  } else if (currentUser?.role === 'admin') {
-    console.log('✅ [NAVIGATION] Setting up admin navigation');
-    // Regular admin view
+  } else if (currentUser?.role === 'super_admin') {
+    console.log('✅ [NAVIGATION] Setting up super admin navigation');
+    // Super Admin view
     navigation = [
       { name: 'Admin Dashboard', href: '/admin', current: pathname === '/admin' },
     ];
-  } else {
-    console.log('✅ [NAVIGATION] Setting up regular user navigation');
-    // Regular client user view
+  } else if (currentUser?.role === 'client_admin') {
+    console.log('✅ [NAVIGATION] Setting up client admin navigation');
+    // Client Admin view - can manage users and sub-groups
     navigation = [
       { name: 'Dashboard', href: '/', current: pathname === '/' },
       { name: 'Create Order', href: '/orders', current: pathname === '/orders' },
       { name: 'View Orders', href: '/view-orders', current: pathname === '/view-orders' },
       { name: 'Wallet', href: '/credits', current: pathname === '/credits' },
+      { name: 'User Management', href: '/admin/users', current: pathname === '/admin/users' },
+    ];
+    clientDropdownItems = [
+      { name: 'Sub-Groups', href: '/admin/sub-groups', current: pathname === '/admin/sub-groups' },
+    ];
+  } else if (currentUser?.role === 'user') {
+    console.log('✅ [NAVIGATION] Setting up regular user navigation');
+    // Regular client user view - can access all client data
+    navigation = [
+      { name: 'Dashboard', href: '/', current: pathname === '/' },
+      { name: 'Create Order', href: '/orders', current: pathname === '/orders' },
+      { name: 'View Orders', href: '/view-orders', current: pathname === '/view-orders' },
+      { name: 'Wallet', href: '/credits', current: pathname === '/credits' },
+    ];
+  } else if (currentUser?.role === 'child_user') {
+    console.log('✅ [NAVIGATION] Setting up child user navigation');
+    // Child user view - limited access, no wallet
+    navigation = [
+      { name: 'Dashboard', href: '/', current: pathname === '/' },
+      { name: 'Create Order', href: '/orders', current: pathname === '/orders' },
+      { name: 'My Orders', href: '/view-orders', current: pathname === '/view-orders' },
+    ];
+  } else {
+    console.log('✅ [NAVIGATION] Setting up default navigation');
+    // Default fallback
+    navigation = [
+      { name: 'Dashboard', href: '/', current: pathname === '/' },
     ];
   }
 
@@ -120,8 +147,8 @@ export default function Navigation() {
             <div className="hidden md:ml-4 md:flex md:items-center">
               <div className="ml-3 relative">
                 <div className="flex items-center space-x-4">
-                  {/* Credit Wallet - Only show for non-master-admin users */}
-                  {currentUser && currentUser.role !== 'master_admin' && (
+                  {/* Credit Wallet - Only show for non-master-admin and non-child-user users */}
+                  {currentUser && currentUser.role !== 'master_admin' && currentUser.role !== 'child_user' && (
                     <CreditWallet />
                   )}
                   
@@ -213,8 +240,8 @@ export default function Navigation() {
             
             {/* Mobile User Info */}
             <div className="px-2 py-1 border-t border-gray-200">
-              {/* Credit Wallet - Only show for non-master-admin users */}
-              {currentUser && currentUser.role !== 'master_admin' && (
+              {/* Credit Wallet - Only show for non-master-admin and non-child-user users */}
+              {currentUser && currentUser.role !== 'master_admin' && currentUser.role !== 'child_user' && (
                 <div className="mb-2">
                   <CreditWallet />
                 </div>

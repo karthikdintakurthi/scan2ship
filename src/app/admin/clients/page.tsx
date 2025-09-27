@@ -54,7 +54,7 @@ export default function ViewClientsPage() {
         
         if (response.ok) {
           const data = await response.json();
-          setClients(data.clients);
+          setClients(data.data || []);
         } else {
           setError('Failed to fetch clients');
         }
@@ -76,7 +76,7 @@ export default function ViewClientsPage() {
   }, [currentUser, router]);
 
   // Filter clients based on search and status
-  const filteredClients = clients.filter(client => {
+  const filteredClients = clients?.filter(client => {
     const matchesSearch = 
       client.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -87,7 +87,7 @@ export default function ViewClientsPage() {
       (statusFilter === 'inactive' && !client.isActive);
 
     return matchesSearch && matchesStatus;
-  });
+  }) || [];
 
   // Show loading if checking authentication
   if (!currentUser) {
@@ -319,24 +319,24 @@ export default function ViewClientsPage() {
       <div className="mt-6 bg-white rounded-lg shadow-lg p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{clients.length}</div>
+            <div className="text-2xl font-bold text-blue-600">{clients?.length || 0}</div>
             <div className="text-sm text-gray-600">Total Clients</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">
-              {clients.filter(c => c.isActive).length}
+              {clients?.filter(c => c.isActive).length || 0}
             </div>
             <div className="text-sm text-gray-600">Active Clients</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-yellow-600">
-              {clients.filter(c => c.subscriptionStatus === 'suspended').length}
+              {clients?.filter(c => c.subscriptionStatus === 'suspended').length || 0}
             </div>
             <div className="text-sm text-gray-600">Suspended</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600">
-              {clients.filter(c => !c.isActive).length}
+              {clients?.filter(c => !c.isActive).length || 0}
             </div>
             <div className="text-sm text-gray-600">Inactive</div>
           </div>

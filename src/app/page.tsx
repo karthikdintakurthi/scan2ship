@@ -161,7 +161,7 @@ export default function Home() {
   useEffect(() => {
     console.log('🔍 [HOME_PAGE] Auth check:', { isAuthenticated, currentUser: currentUser?.email, role: currentUser?.role });
     
-    if (isAuthenticated && currentUser && (currentUser.role === 'admin' || currentUser.role === 'master_admin')) {
+    if (isAuthenticated && currentUser && (currentUser.role === 'client_admin' || currentUser.role === 'super_admin' || currentUser.role === 'master_admin')) {
       console.log('✅ [HOME_PAGE] Redirecting admin user to /admin');
       router.push('/admin');
     }
@@ -179,13 +179,13 @@ export default function Home() {
     );
   }
 
-  // Don't render anything for admin and master_admin users (they'll be redirected)
-  if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'master_admin')) {
+  // Don't render anything for admin users (they'll be redirected)
+  if (currentUser && (currentUser.role === 'client_admin' || currentUser.role === 'super_admin' || currentUser.role === 'master_admin')) {
     return null;
   }
 
-  // For client users (role: 'user' or 'viewer'), show the client dashboard
-  if (currentUser && (currentUser.role === 'user' || currentUser.role === 'viewer')) {
+  // For client users (role: 'user' or 'child_user'), show the client dashboard
+  if (currentUser && (currentUser.role === 'user' || currentUser.role === 'child_user')) {
     return (
       <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50">
         {/* Hero Section */}

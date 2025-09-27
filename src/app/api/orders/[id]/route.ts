@@ -24,7 +24,7 @@ export async function GET(
 
     // Authorize user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.READ],
       requireActiveUser: true,
       requireActiveClient: true
@@ -77,7 +77,7 @@ export async function PUT(
 
     // Authorize user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.WRITE],
       requireActiveUser: true,
       requireActiveClient: true
@@ -178,7 +178,7 @@ export async function DELETE(
 
     // Authorize user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.DELETE],
       requireActiveUser: true,
       requireActiveClient: true
@@ -191,10 +191,50 @@ export async function DELETE(
 
     const { id } = await params
     const orderId = parseInt(id)
+    const user = authResult.user!;
+    const client = authResult.user!.client;
+    
+    // Build where clause with client isolation and role-based filtering
+    const whereClause: any = {
+      id: orderId,
+      clientId: client.id // Ensure client isolation
+    };
+
+    // Role-based filtering for child users
+    if (user.role === 'child_user') {
+      // Get user's sub-group name
+      try {
+        const userSubGroup = await prisma.user_sub_groups.findFirst({
+          where: { userId: user.id },
+          select: {
+            subGroups: {
+              select: { name: true }
+            }
+          }
+        });
+        const userSubGroupName = userSubGroup?.subGroups?.name;
+        
+        if (userSubGroupName) {
+          // Child users can delete orders from their sub-group OR their own orders
+          whereClause.OR = [
+            { sub_group: userSubGroupName },
+            { created_by: user.id }
+          ];
+        } else {
+          // If no sub-group assigned, only delete their own orders
+          whereClause.created_by = user.id;
+        }
+      } catch (error) {
+        console.error('Error fetching user sub-group for order deletion:', error);
+        // Fallback to user's own orders if sub-group query fails
+        whereClause.created_by = user.id;
+      }
+    }
+    // Other roles (user, client_admin, super_admin, master_admin) can delete all client orders
     
     // First, fetch the order to check if it's a Delhivery order and get necessary details
-    const order = await prisma.orders.findUnique({
-      where: { id: orderId },
+    const order = await prisma.orders.findFirst({
+      where: whereClause,
       select: {
         id: true,
         courier_service: true,
@@ -206,8 +246,11 @@ export async function DELETE(
     });
 
     if (!order) {
+      const errorMessage = user.role === 'child_user' 
+        ? 'Order not found or you do not have permission to delete it'
+        : 'Order not found';
       return NextResponse.json(
-        { error: 'Order not found' },
+        { error: errorMessage },
         { status: 404 }
       );
     }

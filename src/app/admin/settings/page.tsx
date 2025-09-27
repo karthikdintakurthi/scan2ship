@@ -69,7 +69,7 @@ export default function SystemSettingsPage() {
         const clientsResponse = await authenticatedGet('/api/admin/clients');
         if (clientsResponse.ok) {
           const clientsData = await clientsResponse.json();
-          setClients(clientsData.clients);
+          setClients(clientsData.data || []);
         }
 
         // Fetch system config
@@ -391,9 +391,9 @@ export default function SystemSettingsPage() {
                   </Link>
                 </div>
 
-                {clients.length > 0 ? (
+                {clients && clients.length > 0 ? (
                   <div className="space-y-3">
-                    {(showAllClients ? clients : clients.slice(0, 5)).map((client) => (
+                    {(showAllClients ? clients : clients?.slice(0, 5))?.map((client) => (
                       <div key={client.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -422,7 +422,7 @@ export default function SystemSettingsPage() {
                       </div>
                     ))}
                     
-                    {clients.length > 5 && (
+                    {clients && clients.length > 5 && (
                       <div className="text-center pt-2">
                         <button
                           onClick={() => setShowAllClients(!showAllClients)}
@@ -430,7 +430,7 @@ export default function SystemSettingsPage() {
                         >
                           {showAllClients 
                             ? 'Show Less' 
-                            : `View ${clients.length - 5} more clients`
+                            : `View ${clients?.length - 5} more clients`
                           } {showAllClients ? '↑' : '↓'}
                         </button>
                       </div>

@@ -21,10 +21,10 @@ export async function GET(request: NextRequest) {
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.MASTER_ADMIN,
       requiredPermissions: [PermissionLevel.READ],
       requireActiveUser: true,
-      requireActiveClient: true
+      requireActiveClient: false // Master admin doesn't need active client
     });
 
     if (authResult.response) {
@@ -54,7 +54,8 @@ export async function GET(request: NextRequest) {
     console.log(`✅ [API_ADMIN_CLIENTS_GET] Found ${clients.length} clients`);
 
     return NextResponse.json({
-      clients: clients.map((client: any) => ({
+      success: true,
+      data: clients.map((client: any) => ({
         id: client.id,
         name: client.name,
         companyName: client.companyName,
@@ -100,10 +101,10 @@ export async function POST(request: NextRequest) {
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.MASTER_ADMIN,
       requiredPermissions: [PermissionLevel.WRITE],
       requireActiveUser: true,
-      requireActiveClient: true
+      requireActiveClient: false // Master admin doesn't need active client
     });
 
     if (authResult.response) {

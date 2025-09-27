@@ -217,8 +217,8 @@ export default function ClientSettingsPage() {
           })
         ]);
 
-        const pickupData = pickupResponse.ok ? await pickupResponse.json() : { pickupLocations: [] };
-        const courierData = courierResponse.ok ? await courierResponse.json() : { courierServices: [] };
+        const pickupData = pickupResponse.ok ? await pickupResponse.json() : { data: [] };
+        const courierData = courierResponse.ok ? await courierResponse.json() : { data: [] };
 
         // Transform the data to match the expected format
         const transformedConfig = {
@@ -237,7 +237,12 @@ export default function ClientSettingsPage() {
             subscriptionStatus: 'active',
             isActive: true
           },
-          pickupLocations: pickupData.pickupLocations || [],
+          pickupLocations: (pickupData.data || []).map((location: any) => ({
+            id: location.id,
+            name: location.label, // API returns 'label', interface expects 'name'
+            value: location.value,
+            delhiveryApiKey: location.delhiveryApiKey
+          })),
           courierServices: (courierData.courierServices || []).map((service: any) => ({
             id: service.id,
             name: service.label, // API returns 'label', interface expects 'name'

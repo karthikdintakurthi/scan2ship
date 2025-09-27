@@ -276,7 +276,7 @@ export async function GET(
 
     // Authorize user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.READ],
       requireActiveUser: true,
       requireActiveClient: true

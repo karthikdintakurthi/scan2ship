@@ -12,7 +12,7 @@ export default function LoginPage() {
   // If already authenticated, redirect appropriately
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      if (currentUser.role === 'admin' || currentUser.role === 'master_admin') {
+      if (currentUser.role === 'client_admin' || currentUser.role === 'super_admin' || currentUser.role === 'master_admin') {
         router.push('/admin');
       } else {
         router.push('/');

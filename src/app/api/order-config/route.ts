@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     // Authorize user
     console.log('🔍 [API_ORDER_CONFIG_GET] Starting user authorization...');
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
+      requiredRole: UserRole.CHILD_USER,
       requiredPermissions: [PermissionLevel.READ],
       requireActiveUser: true,
       requireActiveClient: true

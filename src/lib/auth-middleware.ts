@@ -8,8 +8,9 @@ import { prisma } from '@/lib/prisma';
 
 // User roles and permissions
 export enum UserRole {
+  CHILD_USER = 'child_user',
   USER = 'user',
-  ADMIN = 'admin',
+  CLIENT_ADMIN = 'client_admin',
   SUPER_ADMIN = 'super_admin',
   MASTER_ADMIN = 'master_admin'
 }
@@ -24,16 +25,21 @@ export enum PermissionLevel {
 
 // Role permissions mapping
 export const ROLE_PERMISSIONS = {
+  [UserRole.CHILD_USER]: [
+    PermissionLevel.READ,
+    PermissionLevel.WRITE,
+    PermissionLevel.DELETE  // Child users can manage their own data only
+  ],
   [UserRole.USER]: [
     PermissionLevel.READ,
     PermissionLevel.WRITE,
-    PermissionLevel.DELETE  // Client users need to delete their own orders
+    PermissionLevel.DELETE  // Regular users can manage all client data
   ],
-  [UserRole.ADMIN]: [
+  [UserRole.CLIENT_ADMIN]: [
     PermissionLevel.READ,
     PermissionLevel.WRITE,
     PermissionLevel.DELETE,
-    PermissionLevel.ADMIN
+    PermissionLevel.ADMIN  // Client admins can manage users and all client data
   ],
   [UserRole.SUPER_ADMIN]: [
     PermissionLevel.READ,
@@ -56,6 +62,8 @@ export interface AuthenticatedUser {
   role: UserRole;
   clientId: string;
   isActive: boolean;
+  parentUserId?: string;
+  createdBy?: string;
   client: {
     id: string;
     isActive: boolean;
@@ -63,6 +71,8 @@ export interface AuthenticatedUser {
     subscriptionExpiresAt: Date | null;
   };
   permissions: PermissionLevel[];
+  subGroups?: string[];
+  pickupLocations?: string[];
 }
 
 // Interface for authorization options
@@ -79,13 +89,26 @@ export interface AuthorizationOptions {
  */
 export async function getAuthenticatedUser(request: NextRequest): Promise<AuthenticatedUser | null> {
   try {
-    const authHeader = request.headers.get('authorization');
+    console.log('🔍 [GET_AUTH_USER] Starting authentication');
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Get token from Authorization header or cookies
+    const authHeader = request.headers.get('authorization');
+    const cookieToken = request.cookies.get('auth-token')?.value;
+    
+    console.log('🔍 [GET_AUTH_USER] Token sources - Header:', !!authHeader, 'Cookie:', !!cookieToken);
+    
+    let token: string | null = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+      console.log('🔍 [GET_AUTH_USER] Using Bearer token from header');
+    } else if (cookieToken) {
+      token = cookieToken;
+      console.log('🔍 [GET_AUTH_USER] Using token from cookie');
+    } else {
+      console.log('🚫 [GET_AUTH_USER] No token found in header or cookie');
       return null;
     }
-
-    const token = authHeader.substring(7);
     
     // Validate token format before verification
     if (!token || token.trim() === '') {
@@ -106,6 +129,8 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
     let decoded;
     
     try {
+      console.log('🔍 [JWT_VERIFY] Starting JWT verification');
+      
       // Verify JWT token with secure configuration
       if (!process.env.JWT_SECRET) {
         console.error('🚨 CRITICAL SECURITY ERROR: JWT_SECRET environment variable is not set');
@@ -117,28 +142,37 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
       
       // Strategy 1: Try scan2ship JWT verification with issuer/audience
       try {
+        console.log('🔍 [JWT_VERIFY] Trying Strategy 1: scan2ship verification');
         decoded = jwt.verify(token, process.env.JWT_SECRET, {
           issuer: process.env.JWT_ISSUER || 'scan2ship-saas',
           audience: process.env.JWT_AUDIENCE || 'scan2ship-users',
           algorithms: ['HS256']
         });
+        console.log('✅ [JWT_VERIFY] Strategy 1 successful');
       } catch (error) {
+        console.log('❌ [JWT_VERIFY] Strategy 1 failed:', error.message);
         verificationError = error;
         
         // Strategy 2: Try without issuer/audience validation (for old tokens)
         try {
+          console.log('🔍 [JWT_VERIFY] Trying Strategy 2: no issuer/audience');
           decoded = jwt.verify(token, process.env.JWT_SECRET, {
             algorithms: ['HS256']
           });
+          console.log('✅ [JWT_VERIFY] Strategy 2 successful');
         } catch (error2) {
+          console.log('❌ [JWT_VERIFY] Strategy 2 failed:', error2.message);
           // Strategy 3: Try with old hardcoded values for backward compatibility
           try {
+            console.log('🔍 [JWT_VERIFY] Trying Strategy 3: vanitha-logistics');
             decoded = jwt.verify(token, process.env.JWT_SECRET, {
               issuer: 'vanitha-logistics',
               audience: 'vanitha-logistics-users',
               algorithms: ['HS256']
             });
+            console.log('✅ [JWT_VERIFY] Strategy 3 successful');
           } catch (error3) {
+            console.log('❌ [JWT_VERIFY] All strategies failed');
             // All strategies failed
             throw verificationError; // Throw the first error
           }
@@ -152,10 +186,14 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
     }
     
     if (!decoded || !decoded.userId) {
+      console.log('🚫 [JWT_VERIFY] No decoded token or userId found');
       return null;
     }
     
+    console.log('✅ [JWT_VERIFY] JWT decoded successfully, userId:', decoded.userId);
+    
     // Get user and client data from database
+    console.log('🔍 [DB_QUERY] Fetching user from database');
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
@@ -166,13 +204,41 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
             subscriptionStatus: true,
             subscriptionExpiresAt: true
           }
+        },
+        userSubGroups: {
+          include: {
+            subGroups: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        },
+        userPickupLocations: {
+          include: {
+            pickup_locations: {
+              select: {
+                id: true,
+                label: true
+              }
+            }
+          }
         }
       }
     });
 
-    if (!user || !user.isActive) {
+    if (!user) {
+      console.log('🚫 [DB_QUERY] User not found in database for userId:', decoded.userId);
       return null;
     }
+    
+    if (!user.isActive) {
+      console.log('🚫 [DB_QUERY] User found but is not active:', user.email);
+      return null;
+    }
+    
+    console.log('✅ [DB_QUERY] User found and active:', user.email, user.role);
 
     // Check if client is active
     if (!user.clients || !user.clients.isActive) {
@@ -193,8 +259,12 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
       role: user.role as UserRole,
       clientId: user.clientId,
       isActive: user.isActive,
+      parentUserId: user.parentUserId || undefined,
+      createdBy: user.createdBy || undefined,
       client: user.clients,
-      permissions
+      permissions,
+      subGroups: user.userSubGroups?.map(usg => usg.subGroups.id) || [],
+      pickupLocations: user.userPickupLocations?.map(upl => upl.pickup_locations.id) || []
     };
 
   } catch (error) {
@@ -208,10 +278,11 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
  */
 export function hasRequiredRole(user: AuthenticatedUser, requiredRole: UserRole): boolean {
   const roleHierarchy = {
-    [UserRole.USER]: 1,
-    [UserRole.ADMIN]: 2,
-    [UserRole.SUPER_ADMIN]: 3,
-    [UserRole.MASTER_ADMIN]: 4
+    [UserRole.CHILD_USER]: 1,
+    [UserRole.USER]: 2,
+    [UserRole.CLIENT_ADMIN]: 3,
+    [UserRole.SUPER_ADMIN]: 4,
+    [UserRole.MASTER_ADMIN]: 5
   };
 
   const userRoleLevel = roleHierarchy[user.role];
@@ -268,7 +339,10 @@ export async function authorizeUser(
   // Get authenticated user
   const user = await getAuthenticatedUser(request);
   
+  console.log('🔍 [AUTHORIZE_USER] User from getAuthenticatedUser:', user ? 'User found' : 'User not found');
+  
   if (!user) {
+    console.log('🚫 [AUTHORIZE_USER] No user found, returning 401');
     return {
       user: null,
       response: NextResponse.json(
@@ -277,6 +351,8 @@ export async function authorizeUser(
       )
     };
   }
+  
+  console.log('✅ [AUTHORIZE_USER] User found, proceeding with authorization checks');
 
   // Check if user is active
   if (requireActiveUser && !user.isActive) {
@@ -404,5 +480,63 @@ export async function canAccessResource(
 
   // Regular users can only access their own resources
   return userId === resourceOwnerId;
+}
+
+/**
+ * Check if user can manage other users
+ */
+export function canManageUsers(user: AuthenticatedUser): boolean {
+  console.log('🔍 [CAN_MANAGE_USERS] User role:', user.role, 'Type:', typeof user.role);
+  console.log('🔍 [CAN_MANAGE_USERS] CLIENT_ADMIN:', UserRole.CLIENT_ADMIN, 'Type:', typeof UserRole.CLIENT_ADMIN);
+  console.log('🔍 [CAN_MANAGE_USERS] Role comparison:', user.role === UserRole.CLIENT_ADMIN);
+  
+  const result = user.role === UserRole.CLIENT_ADMIN || 
+         user.role === UserRole.SUPER_ADMIN || 
+         user.role === UserRole.MASTER_ADMIN;
+  
+  console.log('🔍 [CAN_MANAGE_USERS] Result:', result);
+  return result;
+}
+
+/**
+ * Check if user can access all client data
+ */
+export function canAccessAllClientData(user: AuthenticatedUser): boolean {
+  return user.role === UserRole.USER || 
+         user.role === UserRole.CLIENT_ADMIN || 
+         user.role === UserRole.SUPER_ADMIN || 
+         user.role === UserRole.MASTER_ADMIN;
+}
+
+/**
+ * Check if user can only access their own data
+ */
+export function canOnlyAccessOwnData(user: AuthenticatedUser): boolean {
+  return user.role === UserRole.CHILD_USER;
+}
+
+/**
+ * Check if user can access wallet/credits
+ */
+export function canAccessWallet(user: AuthenticatedUser): boolean {
+  return user.role !== UserRole.CHILD_USER;
+}
+
+/**
+ * Check if user can create child users
+ */
+export function canCreateChildUsers(user: AuthenticatedUser): boolean {
+  return user.role === UserRole.CLIENT_ADMIN || 
+         user.role === UserRole.SUPER_ADMIN || 
+         user.role === UserRole.MASTER_ADMIN;
+}
+
+/**
+ * Check if user can manage sub-groups
+ */
+export function canManageSubGroups(user: AuthenticatedUser): boolean {
+  return user.role === UserRole.CLIENT_ADMIN || 
+         user.role === UserRole.SUPER_ADMIN || 
+         user.role === UserRole.MASTER_ADMIN;
 }
 
