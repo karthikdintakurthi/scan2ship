@@ -17,6 +17,7 @@ export interface ThermalLabelData {
   senderAddress?: string
   courierService: string
   paymentType: string
+  codAmount?: number
   referenceNumber?: string
   packageValue?: number
   quantity?: number
@@ -174,7 +175,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         
         /* Reference Section */
         .reference-section {
-            text-align: center;
+            text-align: left;
             margin: 2mm 0;
             padding: 1mm;
             border: 1px solid #000;
@@ -239,7 +240,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
                 ` : ''}
                 <div class="header-text">
                     <div class="courier-name">${data.courierService.toUpperCase()}</div>
-                    <div class="payment-info">Payment: ${data.paymentType}</div>
+                    <div class="payment-info">Payment: ${data.paymentType}${data.codAmount ? ` (₹${data.codAmount})` : ''}</div>
                 </div>
             </div>
         </div>
@@ -278,7 +279,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
         <!-- Reference -->
         ${data.referenceNumber ? `
         <div class="reference-section">
-            <div class="text-bold">Ref. No: ${data.referenceNumber}</div>
+            <div class="text-bold">${data.referenceNumber}</div>
         </div>
         ` : ''}
         
@@ -366,6 +367,7 @@ export function createThermalLabelData(order: any, packageInfo: any): ThermalLab
     senderAddress,
     courierService: order.courier_service || 'Delhivery',
     paymentType: packageInfo.pt || 'Pre-paid',
+    codAmount: order.cod_amount,
     referenceNumber: packageInfo.oid || order.reference_number,
     packageValue: order.package_value,
     quantity: order.total_items,
@@ -587,7 +589,7 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
                 <!-- Reference -->
                 ${data.referenceNumber ? `
                 <div class="reference-section">
-                    <div class="text-bold">Reference: ${data.referenceNumber}</div>
+                    <div class="text-bold">${data.referenceNumber}</div>
                 </div>
                 ` : ''}
                 

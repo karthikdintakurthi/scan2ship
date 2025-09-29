@@ -17,6 +17,7 @@ export interface A5LabelData {
   senderAddress?: string
   courierService: string
   paymentType: string
+  codAmount?: number
   referenceNumber?: string
   packageValue?: number
   quantity?: number
@@ -235,7 +236,7 @@ export function generateA5LabelHTML(data: A5LabelData): string {
                 ` : ''}
                 <div class="header-text">
                     <div class="courier-name">${data.courierService}</div>
-                    <div class="payment-info">${data.paymentType}</div>
+                    <div class="payment-info">Payment: ${data.paymentType}${data.codAmount ? ` (₹${data.codAmount})` : ''}</div>
                 </div>
             </div>
         </div>
@@ -350,6 +351,7 @@ export function createA5LabelData(order: any, packageInfo: any): A5LabelData {
     senderAddress,
     courierService: order.courier_service || 'Delhivery',
     paymentType: packageInfo.pt || 'Pre-paid',
+    codAmount: order.cod_amount,
     referenceNumber: packageInfo.oid || order.reference_number,
     packageValue: order.package_value,
     quantity: order.total_items,

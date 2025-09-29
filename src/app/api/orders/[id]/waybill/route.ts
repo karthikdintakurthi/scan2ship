@@ -377,7 +377,7 @@ export async function GET(
       const packageInfo = {
         wbn: trackingNumber,
         barcode: barcodeDataURL,
-        pt: 'Pre-paid',
+        pt: order.is_cod ? 'COD' : 'Pre-paid',
         oid: order.reference_number
       }
       const thermalData = createThermalLabelData(order, packageInfo)
@@ -397,7 +397,7 @@ export async function GET(
       const packageInfo = {
         wbn: trackingNumber,
         barcode: barcodeDataURL,
-        pt: 'Pre-paid',
+        pt: order.is_cod ? 'COD' : 'Pre-paid',
         oid: order.reference_number
       }
       
