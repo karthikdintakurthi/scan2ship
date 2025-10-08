@@ -60,9 +60,9 @@ export default function Home() {
       
       if (response.ok) {
         const data = await response.json();
-        setPickupLocations(data.pickupLocations || []);
+        setPickupLocations(data.data || []);
         // Select all locations by default
-        setSelectedPickupLocations(data.pickupLocations?.map(loc => loc.value) || []);
+        setSelectedPickupLocations(data.data?.map(loc => loc.value) || []);
       } else {
         console.error('Failed to fetch pickup locations:', response.status, response.statusText);
         setPickupLocations([]);
