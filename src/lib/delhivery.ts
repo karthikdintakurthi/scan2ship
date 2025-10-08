@@ -159,43 +159,60 @@ export class DelhiveryService {
         console.log('  Mobile:', orderData.reseller_mobile || 'Not provided');
       }
       
-      // Helper function to sanitize text fields for JSON
-      const sanitizeText = (text: any): string => {
+      // Helper function to sanitize text fields for JSON and Delhivery API
+      const sanitizeText = (text: any, fieldName?: string): string => {
         if (!text) return '';
-        return String(text)
+        const original = String(text);
+        const sanitized = original
           .replace(/[\r\n\t]/g, ' ') // Replace newlines and tabs with spaces
           .replace(/[;]/g, ' ') // Remove semicolons and replace with spaces
+          .replace(/[&]/g, 'and') // Replace ampersand with 'and'
+          .replace(/[/\\]/g, ' ') // Replace forward slash and backslash with spaces
+          .replace(/[<>]/g, '') // Remove angle brackets
+          .replace(/['"]/g, '') // Remove quotes
+          .replace(/[|]/g, ' ') // Replace pipe with space
+          .replace(/[{}[\]]/g, '') // Remove curly braces and square brackets
+          .replace(/[`~!@#$%^*()+=]/g, '') // Remove other special characters that might cause issues
           .replace(/\s+/g, ' ') // Replace multiple spaces with single space
           .trim(); // Remove leading/trailing whitespace
+        
+        // Log if sanitization changed the value
+        if (original !== sanitized && fieldName) {
+          console.log(`🧹 [DELHIVERY_SANITIZE] Field "${fieldName}" sanitized:`);
+          console.log(`  Original: "${original}"`);
+          console.log(`  Sanitized: "${sanitized}"`);
+        }
+        
+        return sanitized;
       };
 
       // Map order data to Delhivery API format - exactly matching the working example
       const shipmentData = {
-        name: sanitizeText(orderData.name),
-        add: sanitizeText(orderData.address),
-        pin: sanitizeText(orderData.pincode),
-        city: sanitizeText(orderData.city),
-        state: sanitizeText(orderData.state),
-        country: sanitizeText(orderData.country) || 'India',
-        phone: sanitizeText(orderData.phone || orderData.mobile),
-        mobile: sanitizeText(orderData.mobile),
-        order: sanitizeText(orderData.reference_number) || `Order-${Date.now()}`,
+        name: sanitizeText(orderData.name, 'name'),
+        add: sanitizeText(orderData.address, 'address'),
+        pin: sanitizeText(orderData.pincode, 'pincode'),
+        city: sanitizeText(orderData.city, 'city'),
+        state: sanitizeText(orderData.state, 'state'),
+        country: sanitizeText(orderData.country, 'country') || 'India',
+        phone: sanitizeText(orderData.phone || orderData.mobile, 'phone'),
+        mobile: sanitizeText(orderData.mobile, 'mobile'),
+        order: sanitizeText(orderData.reference_number, 'reference_number') || `Order-${Date.now()}`,
         payment_mode: orderData.is_cod ? 'COD' : 'Prepaid', // Match the exact format from curl example
-        return_pin: sanitizeText(orderData.return_pincode),
+        return_pin: sanitizeText(orderData.return_pincode, 'return_pincode'),
         return_city: '',
         return_phone: '',
-        return_add: sanitizeText(orderData.return_address?.address || orderData.return_address),
+        return_add: sanitizeText(orderData.return_address?.address || orderData.return_address, 'return_address'),
         return_state: '',
         return_country: 'India',
-        products_desc: sanitizeText(orderData.product_description),
-        hsn_code: sanitizeText(orderData.hsn_code),
+        products_desc: sanitizeText(orderData.product_description, 'product_description'),
+        hsn_code: sanitizeText(orderData.hsn_code, 'hsn_code'),
         cod_amount: orderData.is_cod ? (orderData.cod_amount?.toString() || '') : '',
         order_date: null, // Match the curl example format
         total_amount: orderData.package_value?.toString() || '',
-        seller_add: sanitizeText(orderData.seller_address),
-        seller_name: sanitizeText(orderData.reseller_name || orderData.seller_name),
-        seller_inv: sanitizeText(orderData.invoice_number),
-        seller_phone: sanitizeText(orderData.reseller_mobile),
+        seller_add: sanitizeText(orderData.seller_address, 'seller_address'),
+        seller_name: sanitizeText(orderData.reseller_name || orderData.seller_name, 'seller_name'),
+        seller_inv: sanitizeText(orderData.invoice_number, 'invoice_number'),
+        seller_phone: sanitizeText(orderData.reseller_mobile, 'seller_phone'),
         quantity: orderData.total_items?.toString() || '',
         waybill: orderData.tracking_id || '', // Empty for new orders
         shipment_length: orderData.shipment_length?.toString() || '10',
