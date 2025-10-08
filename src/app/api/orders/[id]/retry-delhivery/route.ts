@@ -60,6 +60,8 @@ export async function POST(
     }
 
     console.log(`Retrying Delhivery order creation for order ID: ${orderId}`)
+    console.log(`🔍 [RETRY_DELHIVERY] Order belongs to client: ${order.clientId}`)
+    console.log(`🔍 [RETRY_DELHIVERY] Pickup location: ${order.pickup_location}`)
 
     // Prepare order data for Delhivery API
     const orderData = {
@@ -81,10 +83,12 @@ export async function POST(
       cod_amount: order.cod_amount,
       reseller_name: order.reseller_name,
       reseller_mobile: order.reseller_mobile,
+      clientId: order.clientId,  // Include client ID for correct API key selection
     }
 
     // Try to create order in Delhivery
     console.log(`🚀 [RETRY_DELHIVERY] Calling Delhivery API for order ${orderId}...`);
+    console.log(`🔑 [RETRY_DELHIVERY] Using client ID: ${orderData.clientId} for API key selection`);
     const delhiveryResponse = await delhiveryService.createOrder(orderData)
     console.log(`📡 [RETRY_DELHIVERY] Delhivery API response:`, delhiveryResponse);
 
