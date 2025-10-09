@@ -2073,12 +2073,58 @@ export default function ClientSettingsPage() {
               </div>
               
               {/* Process Button */}
-              <div className="mt-6 flex justify-center">
+              <div className="mt-6 flex justify-center gap-4">
                 <button
                   onClick={processDtdcSlipsRange}
                   className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                 >
                   Process Range
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      setIsSaving(true);
+                      setError('');
+                      setSuccess('');
+                      
+                      const token = localStorage.getItem('authToken');
+                      
+                      // Save DTDC slips configuration
+                      const dtdcResponse = await fetch('/api/dtdc-slips', {
+                        method: 'PUT',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                          dtdcSlips: {
+                            ...dtdcSlips,
+                            enabled: dtdcSlipsEnabled
+                          }
+                        })
+                      });
+
+                      if (!dtdcResponse.ok) {
+                        const errorData = await dtdcResponse.json();
+                        throw new Error(errorData.error || 'Failed to save DTDC slips configuration');
+                      }
+
+                      setSuccess('DTDC slips configuration saved successfully!');
+                      
+                      // Reload DTDC slips data from database to ensure consistency
+                      await loadDtdcSlipsFromDatabase();
+                      
+                    } catch (error) {
+                      console.error('Error saving DTDC slips:', error);
+                      setError(error instanceof Error ? error.message : 'Error saving DTDC slips');
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                  disabled={isSaving}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? 'Saving...' : 'Save DTDC Slips'}
                 </button>
               </div>
             </div>
