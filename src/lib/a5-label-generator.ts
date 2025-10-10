@@ -236,7 +236,7 @@ export function generateA5LabelHTML(data: A5LabelData): string {
                 ` : ''}
                 <div class="header-text">
                     <div class="courier-name">${data.courierService}</div>
-                    <div class="payment-info">Payment: ${data.paymentType}${data.codAmount ? ` (₹${data.codAmount})` : ''}</div>
+                    <div class="payment-info">Payment: ${data.paymentType}${data.paymentType === 'COD' && data.codAmount ? ` (₹${data.codAmount})` : ''}</div>
                 </div>
             </div>
         </div>
