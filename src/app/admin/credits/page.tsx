@@ -44,6 +44,25 @@ interface CreditAction {
   currentBalance: number;
 }
 
+interface Transaction {
+  id: string;
+  type: string;
+  amount: number;
+  balance: number;
+  description: string;
+  createdAt: string;
+  feature?: string;
+  orderId?: number;
+}
+
+interface OrderTransaction {
+  orderId: string;
+  orderReference: string;
+  totalCredits: number;
+  transactions: Transaction[];
+  createdAt: string;
+}
+
 export default function AdminCreditsPage() {
   const { currentUser } = useAuth();
   const router = useRouter();
@@ -67,6 +86,13 @@ export default function AdminCreditsPage() {
   const [amount, setAmount] = useState('');
   const [newBalance, setNewBalance] = useState('');
   const [description, setDescription] = useState('');
+  
+  // Recharge history state
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [selectedClientForHistory, setSelectedClientForHistory] = useState<{ id: string; name: string } | null>(null);
+  const [orderTransactions, setOrderTransactions] = useState<OrderTransaction[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState('');
 
   // Check if user is admin or master admin
   useEffect(() => {
@@ -166,6 +192,45 @@ export default function AdminCreditsPage() {
     setDescription('');
     setActionError('');
     setActionSuccess('');
+  };
+  
+  // Recharge history functions
+  const openHistoryModal = async (clientId: string, clientName: string) => {
+    setSelectedClientForHistory({ id: clientId, name: clientName });
+    setIsHistoryModalOpen(true);
+    setHistoryError('');
+    setOrderTransactions([]);
+    
+    // Fetch transaction history
+    try {
+      setIsLoadingHistory(true);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/admin/credits/${clientId}/transactions?limit=50`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setOrderTransactions(data.data || []);
+      } else {
+        const errorData = await response.json();
+        setHistoryError(errorData.error || 'Failed to fetch transaction history');
+      }
+    } catch (error) {
+      console.error('Error fetching transaction history:', error);
+      setHistoryError('Error loading transaction history');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+  
+  const closeHistoryModal = () => {
+    setIsHistoryModalOpen(false);
+    setSelectedClientForHistory(null);
+    setOrderTransactions([]);
+    setHistoryError('');
   };
 
   const handleAddCredits = async () => {
@@ -604,34 +669,45 @@ export default function AdminCreditsPage() {
                         </div>
 
                         {/* Credit Management Actions */}
-                        <div className="flex space-x-2">
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => openCreditModal({
+                                type: 'add',
+                                clientId: client.id,
+                                clientName: client.companyName,
+                                currentBalance: client.credits.balance
+                              })}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                              </svg>
+                              Add Credits
+                            </button>
+                            <button
+                              onClick={() => openCreditModal({
+                                type: 'reset',
+                                clientId: client.id,
+                                clientName: client.companyName,
+                                currentBalance: client.credits.balance
+                              })}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                            >
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Reset Balance
+                            </button>
+                          </div>
                           <button
-                            onClick={() => openCreditModal({
-                              type: 'add',
-                              clientId: client.id,
-                              clientName: client.companyName,
-                              currentBalance: client.credits.balance
-                            })}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            onClick={() => openHistoryModal(client.id, client.companyName)}
+                            className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                           >
                             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            Add Credits
-                          </button>
-                          <button
-                            onClick={() => openCreditModal({
-                              type: 'reset',
-                              clientId: client.id,
-                              clientName: client.companyName,
-                              currentBalance: client.credits.balance
-                            })}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                          >
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Reset Balance
+                            Recharge History
                           </button>
                         </div>
                       </div>
@@ -771,6 +847,158 @@ export default function AdminCreditsPage() {
                   ) : (
                     creditAction.type === 'add' ? 'Add Credits' : 'Reset Balance'
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recharge History Modal */}
+      {isHistoryModalOpen && selectedClientForHistory && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Recharge History
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Client: <span className="font-medium">{selectedClientForHistory.name}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={closeHistoryModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="mt-4">
+                {isLoadingHistory ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <p className="ml-3 text-gray-600">Loading transaction history...</p>
+                  </div>
+                ) : historyError ? (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                    {historyError}
+                  </div>
+                ) : orderTransactions.length === 0 ? (
+                  <div className="text-center py-12">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No transactions found</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      This client has no credit transaction history yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {orderTransactions.map((orderGroup) => (
+                      <div key={orderGroup.orderId} className="bg-gray-50 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-medium text-gray-900">
+                            {orderGroup.orderReference}
+                          </h4>
+                          <div className="text-right">
+                            <p className="text-sm text-gray-500">
+                              {new Date(orderGroup.createdAt).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              Total: {orderGroup.totalCredits} credits
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-white">
+                              <tr>
+                                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Date
+                                </th>
+                                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Type
+                                </th>
+                                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Amount
+                                </th>
+                                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Balance After
+                                </th>
+                                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Description
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {orderGroup.transactions.map((transaction) => (
+                                <tr key={transaction.id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {new Date(transaction.createdAt).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                      transaction.type === 'ADD' || transaction.type === 'credit' || transaction.type === 'admin_credit'
+                                        ? 'bg-green-100 text-green-800'
+                                        : transaction.type === 'RESET' || transaction.type === 'admin_reset'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {transaction.type.replace('_', ' ').toUpperCase()}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                    <span className={transaction.type === 'RESET' || transaction.type === 'admin_reset' ? 'text-blue-600' : 'text-green-600'}>
+                                      {transaction.type === 'RESET' || transaction.type === 'admin_reset' ? '=' : '+'}{Math.abs(transaction.amount).toLocaleString()}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {transaction.balance.toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-900 max-w-md">
+                                    <div className="line-clamp-2" title={transaction.description}>
+                                      {transaction.description}
+                                      {transaction.feature && (
+                                        <span className="ml-2 text-xs text-gray-500">({transaction.feature})</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={closeHistoryModal}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Close
                 </button>
               </div>
             </div>

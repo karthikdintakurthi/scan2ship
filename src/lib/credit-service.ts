@@ -346,9 +346,14 @@ export class CreditService {
     try {
       const skip = (page - 1) * limit;
 
-      // Get all transactions for the client
+      // Get only ADD and RESET transactions for the client (recharge history)
       const allTransactions = await prisma.credit_transactions.findMany({
-        where: { clientId },
+        where: { 
+          clientId,
+          type: {
+            in: ['ADD', 'RESET', 'credit', 'admin_credit', 'admin_reset']
+          }
+        },
         orderBy: { createdAt: 'desc' },
         include: {
           users: {
@@ -371,12 +376,18 @@ export class CreditService {
       
       allTransactions.forEach(transaction => {
         let orderId = transaction.orderId || 'manual';
-        let orderRef = transaction.orders?.reference_number || 'Manual Transaction';
+        let orderRef = 'Manual Transaction';
         
-        // Special handling for AI processing transactions without order ID
-        if (!transaction.orderId && (transaction.feature === 'IMAGE_PROCESSING' || transaction.feature === 'TEXT_PROCESSING')) {
-          orderId = transaction.feature === 'IMAGE_PROCESSING' ? 'image_processing' : 'text_processing';
-          orderRef = 'AI Usage in Order reference';
+        // For recharge history, group by transaction type for better organization
+        if (transaction.type === 'ADD') {
+          orderId = 'admin_recharge';
+          orderRef = 'Admin Credit Addition';
+        } else if (transaction.type === 'RESET') {
+          orderId = 'admin_reset';
+          orderRef = 'Admin Balance Reset';
+        } else if (transaction.type === 'credit' || transaction.type === 'admin_credit') {
+          orderId = 'credit_recharge';
+          orderRef = 'Credit Recharge';
         }
         
         if (!orderGroups.has(orderId)) {
