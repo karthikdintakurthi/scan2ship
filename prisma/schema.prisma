@@ -134,14 +134,13 @@ model client_order_configs {
   clientId                  String   @unique
   enableReferencePrefix     Boolean  @default(true)
   enableResellerFallback    Boolean  @default(true)
-  enableThermalPrint        Boolean  @default(false)
+  printmode                 String   @default("standard")
   displayLogoOnWaybill      Boolean? @default(false)
   logoFileName              String?
   logoFileSize              Int?
   logoFileType              String?
   logoEnabledCouriers       String?
   enableAltMobileNumber     Boolean? @default(false)
-  enableA5Print             Boolean  @default(false)
   logoUrl                   String?
   pickup_location_overrides Json?    @default("{}")
   clients                   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)

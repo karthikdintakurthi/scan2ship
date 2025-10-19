@@ -96,11 +96,8 @@ export async function GET(request: NextRequest) {
           // Reseller settings
           enableResellerFallback: true,
           
-          // Thermal print settings
-          enableThermalPrint: false,
-          
-          // A5 print settings
-          enableA5Print: false,
+          // Print mode settings
+          printmode: 'standard',
           
           // Reference prefix settings
           enableReferencePrefix: true,
@@ -160,11 +157,8 @@ export async function GET(request: NextRequest) {
         // Reseller settings
         enableResellerFallback: orderConfig.enableResellerFallback,
         
-        // Thermal print settings
-        enableThermalPrint: orderConfig.enableThermalPrint,
-        
-        // A5 print settings
-        enableA5Print: orderConfig.enableA5Print,
+        // Print mode settings
+        printmode: orderConfig.printmode,
         
         // Reference prefix settings
         enableReferencePrefix: orderConfig.enableReferencePrefix,
@@ -231,11 +225,13 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     
     console.log(`📝 [API_ORDER_CONFIG_PUT] Updating order config for client: ${client.companyName}`, body);
+    console.log(`🔍 [API_ORDER_CONFIG_PUT] Body keys:`, Object.keys(body));
+    console.log(`🔍 [API_ORDER_CONFIG_PUT] Has printmode:`, body.hasOwnProperty('printmode'));
+    console.log(`🔍 [API_ORDER_CONFIG_PUT] Has printMode:`, body.hasOwnProperty('printMode'));
 
     // Check if this is a partial update (just specific settings) or full update
     if ((body.hasOwnProperty('enableResellerFallback') && Object.keys(body).length === 1) ||
-        (body.hasOwnProperty('enableThermalPrint') && Object.keys(body).length === 1) ||
-        (body.hasOwnProperty('enableA5Print') && Object.keys(body).length === 1) ||
+        (body.hasOwnProperty('printmode') && Object.keys(body).length === 1) ||
         (body.hasOwnProperty('enableReferencePrefix') && Object.keys(body).length === 1) ||
         (body.hasOwnProperty('enableFooterNote') && Object.keys(body).length === 1) ||
         (body.hasOwnProperty('footerNoteText') && Object.keys(body).length === 1) ||
@@ -248,14 +244,9 @@ export async function PUT(request: NextRequest) {
           console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - reseller fallback: ${body.enableResellerFallback}`);
         }
         
-        if (body.hasOwnProperty('enableThermalPrint')) {
-          updateData.enableThermalPrint = body.enableThermalPrint;
-          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - thermal print: ${body.enableThermalPrint}`);
-        }
-        
-        if (body.hasOwnProperty('enableA5Print')) {
-          updateData.enableA5Print = body.enableA5Print;
-          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - A5 print: ${body.enableA5Print}`);
+        if (body.hasOwnProperty('printmode')) {
+          updateData.printmode = body.printmode;
+          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - print mode: ${body.printmode}`);
         }
         
         if (body.hasOwnProperty('enableReferencePrefix')) {
@@ -285,12 +276,9 @@ export async function PUT(request: NextRequest) {
       if (body.hasOwnProperty('enableResellerFallback')) {
         settingName = 'reseller fallback';
         settingValue = body.enableResellerFallback;
-      } else if (body.hasOwnProperty('enableThermalPrint')) {
-        settingName = 'thermal print';
-        settingValue = body.enableThermalPrint;
-      } else if (body.hasOwnProperty('enableA5Print')) {
-        settingName = 'A5 print';
-        settingValue = body.enableA5Print;
+      } else if (body.hasOwnProperty('printmode')) {
+        settingName = 'print mode';
+        settingValue = body.printmode;
       } else if (body.hasOwnProperty('enableReferencePrefix')) {
         settingName = 'reference prefix';
         settingValue = body.enableReferencePrefix;
@@ -344,8 +332,7 @@ export async function PUT(request: NextRequest) {
         requireWeight: orderConfig.requireWeight,
         requireTotalItems: orderConfig.requireTotalItems,
         enableResellerFallback: orderConfig.enableResellerFallback,
-        enableThermalPrint: orderConfig.enableThermalPrint,
-        enableA5Print: orderConfig.enableA5Print,
+        printmode: orderConfig.printmode,
         enableReferencePrefix: orderConfig.enableReferencePrefix,
         enableFooterNote: orderConfig.enableFooterNote,
         footerNoteText: orderConfig.footerNoteText,
@@ -376,8 +363,7 @@ export async function PUT(request: NextRequest) {
         requireWeight: orderConfig.requireWeight,
         requireTotalItems: orderConfig.requireTotalItems,
         enableResellerFallback: orderConfig.enableResellerFallback,
-        enableThermalPrint: orderConfig.enableThermalPrint,
-        enableA5Print: orderConfig.enableA5Print,
+        printmode: orderConfig.printmode,
         enableReferencePrefix: orderConfig.enableReferencePrefix,
         enableFooterNote: orderConfig.enableFooterNote,
         footerNoteText: orderConfig.footerNoteText,

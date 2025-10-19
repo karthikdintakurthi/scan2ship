@@ -5,6 +5,7 @@ import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware'
 import jwt from 'jsonwebtoken'
 import { generateThermalLabelHTML, createThermalLabelData } from '@/lib/thermal-label-generator'
 import { generateA5LabelHTML, createA5LabelData } from '@/lib/a5-label-generator'
+import { generateR4LabelHTML, createR4LabelData } from '@/lib/4r-label-generator'
 
 const prisma = new PrismaClient()
 
@@ -296,6 +297,7 @@ export async function GET(
     const url = new URL(request.url)
     const isThermal = url.searchParams.get('thermal') === 'true'
     const isA5 = url.searchParams.get('a5') === 'true'
+    const isR4 = url.searchParams.get('r4') === 'true'
     
     // Get order details with client information and logo config
     const order = await prisma.orders.findUnique({
@@ -422,6 +424,36 @@ export async function GET(
       htmlContent = generateA5LabelHTML(a5Data)
       filename = `a5-waybill-${trackingNumber}.html`
       console.log('✅ A5 waybill generated for order:', orderId, 'Courier:', order.courier_service, 'Logo:', logoInfo ? 'Yes' : 'No', 'Footer Note:', footerNote ? 'Yes' : 'No')
+    } else if (isR4) {
+      // Generate 4R-friendly label
+      const packageInfo = {
+        wbn: trackingNumber,
+        barcode: barcodeDataURL,
+        pt: order.is_cod ? 'COD' : 'Pre-paid',
+        oid: order.reference_number
+      }
+      
+      // Add client address information to order data for 4R label
+      const orderWithClientAddress = {
+        ...order,
+        client_address: order.clients?.address,
+        client_city: order.clients?.city,
+        client_state: order.clients?.state,
+        client_pincode: order.clients?.pincode
+      }
+      
+      const r4Data = createR4LabelData(orderWithClientAddress, packageInfo)
+      // Add logo info to 4R data
+      if (logoInfo) {
+        r4Data.logoInfo = logoInfo;
+      }
+      // Add footer note to 4R data
+      if (footerNote) {
+        r4Data.footerNote = footerNote;
+      }
+      htmlContent = generateR4LabelHTML(r4Data)
+      filename = `4r-waybill-${trackingNumber}.html`
+      console.log('✅ 4R waybill generated for order:', orderId, 'Courier:', order.courier_service, 'Logo:', logoInfo ? 'Yes' : 'No', 'Footer Note:', footerNote ? 'Yes' : 'No')
     } else {
       // Generate universal waybill HTML
       htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service, logoInfo, footerNote)

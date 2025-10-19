@@ -160,8 +160,7 @@ export default function OrderList() {
   const [courierServices, setCourierServices] = useState<Array<{value: string, label: string}>>([])
   const [subGroups, setSubGroups] = useState<Array<{value: string, label: string}>>([])
   const [configLoaded, setConfigLoaded] = useState(false)
-  const [thermalPrintEnabled, setThermalPrintEnabled] = useState(false)
-  const [a5PrintEnabled, setA5PrintEnabled] = useState(false)
+  const [printMode, setPrintMode] = useState<'standard' | 'thermal' | 'a5' | 'r4'>('standard')
   
   // Pagination helper variables
   const hasNextPage = currentPage < (totalPages || 1)
@@ -264,8 +263,7 @@ export default function OrderList() {
 
         if (response.ok) {
           const data = await response.json();
-          setThermalPrintEnabled(data.orderConfig?.enableThermalPrint || false);
-          setA5PrintEnabled(data.orderConfig?.enableA5Print || false);
+          setPrintMode(data.orderConfig?.printmode || 'standard');
         }
       } catch (error) {
         console.error('Error loading print settings:', error);
@@ -900,7 +898,7 @@ export default function OrderList() {
     }
   }
 
-  const downloadWaybill = async (orderId: number, isThermal: boolean = false, isA5: boolean = false) => {
+  const downloadWaybill = async (orderId: number, isThermal: boolean = false, isA5: boolean = false, isR4: boolean = false) => {
     try {
       // Get auth token from localStorage
       const token = localStorage.getItem('authToken');
@@ -914,6 +912,8 @@ export default function OrderList() {
         url.searchParams.set('thermal', 'true')
       } else if (isA5) {
         url.searchParams.set('a5', 'true')
+      } else if (isR4) {
+        url.searchParams.set('r4', 'true')
       }
 
       const response = await fetch(url.toString(), {
@@ -962,7 +962,7 @@ export default function OrderList() {
         return
       }
 
-      console.log(`🚀 Starting bulk download for ${selectedOrderObjects.length} orders (thermal: ${thermalPrintEnabled}, A5: ${a5PrintEnabled})`)
+      console.log(`🚀 Starting bulk download for ${selectedOrderObjects.length} orders (print mode: ${printMode})`)
 
       // Fetch all labels/waybills and combine them
       const labelContents = []
@@ -993,10 +993,12 @@ export default function OrderList() {
 
           // Add print format parameters if needed
           const url = new URL(endpoint, window.location.origin)
-          if (thermalPrintEnabled) {
+          if (printMode === 'thermal') {
             url.searchParams.set('thermal', 'true')
-          } else if (a5PrintEnabled) {
+          } else if (printMode === 'a5') {
             url.searchParams.set('a5', 'true')
+          } else if (printMode === 'r4') {
+            url.searchParams.set('r4', 'true')
           }
 
           const response = await fetch(url.toString(), {
@@ -1029,7 +1031,7 @@ export default function OrderList() {
       }
 
       // Create combined HTML content
-      const combinedHTML = await createCombinedLabelsHTML(labelContents, thermalPrintEnabled, a5PrintEnabled)
+      const combinedHTML = await createCombinedLabelsHTML(labelContents, printMode === 'thermal', printMode === 'a5', printMode === 'r4')
       
       // Create a new window/tab with the combined HTML content
       const newWindow = window.open('', '_blank')
@@ -1041,7 +1043,7 @@ export default function OrderList() {
         newWindow.focus()
         
         console.log('🎉 Bulk download completed!')
-        const labelType = thermalPrintEnabled ? 'thermal printer' : a5PrintEnabled ? 'A5 Label' : 'standard'
+        const labelType = printMode === 'thermal' ? 'thermal printer' : printMode === 'a5' ? 'A5 Label' : printMode === 'r4' ? '4R Label' : 'standard'
         alert(`Bulk download completed! ${labelContents.length} ${labelType} label(s) opened in new tab. Use browser print function (Ctrl+P) to save as PDF.`)
       } else {
         alert('Please allow popups to view the combined labels')
@@ -1053,7 +1055,7 @@ export default function OrderList() {
     }
   }
 
-  const createCombinedLabelsHTML = async (labelContents: Array<{orderId: number, waybill: string, htmlContent: string}>, isThermal: boolean = false, isA5: boolean = false) => {
+  const createCombinedLabelsHTML = async (labelContents: Array<{orderId: number, waybill: string, htmlContent: string}>, isThermal: boolean = false, isA5: boolean = false, isR4: boolean = false) => {
     try {
       // Create a combined HTML page with all labels
       const combinedHTML = `
@@ -1061,12 +1063,12 @@ export default function OrderList() {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Bulk ${isThermal ? 'Thermal' : isA5 ? 'A5 Label' : 'Standard'} Labels & Waybills - ${labelContents.length} Orders</title>
+    <title>Bulk ${isThermal ? 'Thermal' : isA5 ? 'A5 Label' : isR4 ? '4R Label' : 'Standard'} Labels & Waybills - ${labelContents.length} Orders</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: ${isThermal || isA5 ? '0' : '20px'};
+            padding: ${isThermal || isA5 || isR4 ? '0' : '20px'};
             background-color: #f5f5f5;
         }
         .page-break {
@@ -1570,8 +1572,7 @@ export default function OrderList() {
             </td>
             <td className="px-6 py-4">
               <div className="space-y-2">
-                {thermalPrintEnabled ? (
-                  // Show only thermal option when thermal print is enabled
+                {printMode === 'thermal' ? (
                   <button
                     onClick={() => downloadWaybill(order.id, true)}
                     className="text-green-600 hover:text-green-800 text-xs font-medium flex items-center"
@@ -1581,8 +1582,7 @@ export default function OrderList() {
                     </svg>
                     Thermal
                   </button>
-                ) : a5PrintEnabled ? (
-                  // Show only A5 option when A5 print is enabled
+                ) : printMode === 'a5' ? (
                   <button
                     onClick={() => downloadWaybill(order.id, false, true)}
                     className="text-purple-600 hover:text-purple-800 text-xs font-medium flex items-center"
@@ -1592,8 +1592,17 @@ export default function OrderList() {
                     </svg>
                     A5 Label
                   </button>
+                ) : printMode === 'r4' ? (
+                  <button
+                    onClick={() => downloadWaybill(order.id, false, false, true)}
+                    className="text-orange-600 hover:text-orange-800 text-xs font-medium flex items-center"
+                  >
+                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    4R Label
+                  </button>
                 ) : (
-                  // Show only standard option when neither thermal nor A5 print is enabled
                   <button
                     onClick={() => downloadWaybill(order.id, false)}
                     className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center"
@@ -1620,7 +1629,7 @@ export default function OrderList() {
         ))}
       </tbody>
     )
-  }, [orders, selectedOrders, thermalPrintEnabled, getCourierServiceLabel, getPickupLocationLabel])
+  }, [orders, selectedOrders, printMode, getCourierServiceLabel, getPickupLocationLabel])
 
   const deleteOrders = async () => {
     if (selectedOrders.size === 0) return
@@ -1962,7 +1971,7 @@ export default function OrderList() {
               </span>
             </div>
             <div className="flex items-center space-x-3">
-              {thermalPrintEnabled ? (
+              {printMode === 'thermal' ? (
                 <button
                   onClick={() => downloadBulkLabels()}
                   className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center"
@@ -1972,7 +1981,7 @@ export default function OrderList() {
                   </svg>
                   Thermal Labels
                 </button>
-              ) : a5PrintEnabled ? (
+              ) : printMode === 'a5' ? (
                 <button
                   onClick={() => downloadBulkLabels()}
                   className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center"

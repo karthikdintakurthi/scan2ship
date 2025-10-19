@@ -78,11 +78,8 @@ interface ClientConfigData {
     // Reseller settings
     enableResellerFallback: boolean;
     
-    // Thermal print settings
-    enableThermalPrint: boolean;
-    
-    // A5 print settings
-    enableA5Print: boolean;
+    // Print mode settings (radio button selection)
+    printmode: 'standard' | 'thermal' | 'a5' | 'r4';
     
     // Reference number prefix settings
     enableReferencePrefix: boolean;
@@ -111,6 +108,272 @@ export default function ClientSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Individual section saving states
+  const [savingSections, setSavingSections] = useState<Record<string, boolean>>({});
+  const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
+  const [sectionSuccess, setSectionSuccess] = useState<Record<string, string>>({});
+
+  // Helper functions for section-specific saving
+  const setSectionSaving = (section: string, saving: boolean) => {
+    setSavingSections(prev => ({ ...prev, [section]: saving }));
+  };
+
+  const setSectionError = (section: string, error: string) => {
+    setSectionErrors(prev => ({ ...prev, [section]: error }));
+  };
+
+  const setSectionSuccessMessage = (section: string, message: string) => {
+    setSectionSuccess(prev => ({ ...prev, [section]: message }));
+  };
+
+  const clearSectionMessages = (section: string) => {
+    setSectionErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[section];
+      return newErrors;
+    });
+    setSectionSuccess(prev => {
+      const newSuccess = { ...prev };
+      delete newSuccess[section];
+      return newSuccess;
+    });
+  };
+
+  // Individual section save functions
+  const saveApiConfiguration = async (category: string, configs: ClientConfig[]) => {
+    const sectionKey = `api-${category}`;
+    try {
+      setSectionSaving(sectionKey, true);
+      clearSectionMessages(sectionKey);
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('/api/client-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          category,
+          configs
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to save API configuration';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      setSectionSuccessMessage(sectionKey, `${getCategoryName(category)} configuration saved successfully!`);
+      
+      // Refresh the config to show updated data
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error(`❌ [${sectionKey.toUpperCase()}_SAVE] Error:`, error);
+      setSectionError(sectionKey, error instanceof Error ? error.message : 'Failed to save configuration');
+    } finally {
+      setSectionSaving(sectionKey, false);
+    }
+  };
+
+  const savePickupLocations = async () => {
+    const sectionKey = 'pickup-locations';
+    try {
+      setSectionSaving(sectionKey, true);
+      clearSectionMessages(sectionKey);
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('/api/pickup-locations', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          locations: config?.pickupLocations || []
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to save pickup locations';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      setSectionSuccessMessage(sectionKey, 'Pickup locations saved successfully!');
+      
+      // Refresh the config to show updated data
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error(`❌ [${sectionKey.toUpperCase()}_SAVE] Error:`, error);
+      setSectionError(sectionKey, error instanceof Error ? error.message : 'Failed to save pickup locations');
+    } finally {
+      setSectionSaving(sectionKey, false);
+    }
+  };
+
+  const saveCourierServices = async () => {
+    const sectionKey = 'courier-services';
+    try {
+      setSectionSaving(sectionKey, true);
+      clearSectionMessages(sectionKey);
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('/api/courier-services', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          services: config?.courierServices || []
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to save courier services';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      setSectionSuccessMessage(sectionKey, 'Courier services saved successfully!');
+      
+      // Refresh the config to show updated data
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error(`❌ [${sectionKey.toUpperCase()}_SAVE] Error:`, error);
+      setSectionError(sectionKey, error instanceof Error ? error.message : 'Failed to save courier services');
+    } finally {
+      setSectionSaving(sectionKey, false);
+    }
+  };
+
+  const saveOrderConfiguration = async () => {
+    const sectionKey = 'order-config';
+    try {
+      setSectionSaving(sectionKey, true);
+      clearSectionMessages(sectionKey);
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('/api/order-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderConfig: config?.clientOrderConfig
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to save order configuration';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      setSectionSuccessMessage(sectionKey, 'Order configuration saved successfully!');
+      
+      // Refresh the config to show updated data
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error(`❌ [${sectionKey.toUpperCase()}_SAVE] Error:`, error);
+      setSectionError(sectionKey, error instanceof Error ? error.message : 'Failed to save order configuration');
+    } finally {
+      setSectionSaving(sectionKey, false);
+    }
+  };
+
+  const saveDtdcSlips = async () => {
+    const sectionKey = 'dtdc-slips';
+    try {
+      setSectionSaving(sectionKey, true);
+      clearSectionMessages(sectionKey);
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('/api/dtdc-slips', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          dtdcSlips: {
+            ...dtdcSlips,
+            enabled: dtdcSlipsEnabled
+          }
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to save DTDC slips configuration';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      setSectionSuccessMessage(sectionKey, 'DTDC slips configuration saved successfully!');
+      
+      // Refresh the config to show updated data
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error(`❌ [${sectionKey.toUpperCase()}_SAVE] Error:`, error);
+      setSectionError(sectionKey, error instanceof Error ? error.message : 'Failed to save DTDC slips configuration');
+    } finally {
+      setSectionSaving(sectionKey, false);
+    }
+  };
 
 
   // Editing states
@@ -250,7 +513,10 @@ export default function ClientSettingsPage() {
             isActive: service.isActive,
             isDefault: service.isDefault
           })),
-          clientOrderConfig: data.orderConfig,
+          clientOrderConfig: {
+            ...data.orderConfig,
+            printmode: data.orderConfig?.printmode || 'standard'
+          },
           configs: [],
           configByCategory: {}
         };
@@ -638,6 +904,143 @@ export default function ClientSettingsPage() {
           clientOrderConfig: {
             ...prev.clientOrderConfig,
             enableA5Print: !enabled
+          }
+        };
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Function to handle 4R print checkbox change
+  const handleR4PrintChange = async (enabled: boolean) => {
+    if (!config?.clientOrderConfig) return;
+    
+    try {
+      setIsSaving(true);
+      setError('');
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
+
+      // Update the local state immediately for better UX
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableR4Print: enabled
+          }
+        };
+      });
+
+      // Save to database
+      const response = await fetch('/api/order-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          enableR4Print: enabled
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update 4R print setting');
+      }
+
+      setSuccess('4R print setting updated successfully!');
+      
+      // Refresh the config to ensure consistency
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error('❌ [R4_PRINT] Error updating setting:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update 4R print setting');
+      
+      // Revert the local state change on error
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableR4Print: !enabled
+          }
+        };
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Function to handle print mode radio button change
+  const handlePrintModeChange = async (printMode: string) => {
+    if (!config?.clientOrderConfig) return;
+    
+    try {
+      setIsSaving(true);
+      setError('');
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
+
+      // Update the local state immediately for better UX
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            printmode: printMode as 'standard' | 'thermal' | 'a5' | 'r4'
+          }
+        };
+      });
+
+      // Save to database
+      const requestBody = { printmode: printMode };
+      console.log('🔍 [PRINT_MODE] Sending request body:', requestBody);
+      
+      const response = await fetch('/api/order-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update print mode setting');
+      }
+
+      setSuccess('Print mode updated successfully!');
+      
+      // Refresh the config to ensure consistency
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error('❌ [PRINT_MODE] Error updating setting:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update print mode setting');
+      
+      // Revert the local state change on error
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            printmode: 'standard'
           }
         };
       });
@@ -1139,9 +1542,11 @@ export default function ClientSettingsPage() {
       setSuccess('');
       
       const token = localStorage.getItem('authToken');
+      console.log('🔍 [SAVE_CONFIG] Starting to save configuration...');
       
       // Save pickup locations
       if (config.pickupLocations.length > 0) {
+        console.log('🔍 [SAVE_CONFIG] Saving pickup locations...');
         const pickupResponse = await fetch('/api/pickup-locations', {
           method: 'PUT',
           headers: {
@@ -1153,13 +1558,22 @@ export default function ClientSettingsPage() {
           })
         });
         if (!pickupResponse.ok) {
-          const errorData = await pickupResponse.json();
-          throw new Error(errorData.error || 'Failed to save pickup locations');
+          let errorMessage = 'Failed to save pickup locations';
+          try {
+            const errorData = await pickupResponse.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (jsonError) {
+            console.error('❌ [PICKUP_SAVE] Failed to parse error response:', jsonError);
+            errorMessage = `HTTP ${pickupResponse.status}: ${pickupResponse.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
+        console.log('✅ [SAVE_CONFIG] Pickup locations saved successfully');
       }
 
       // Save courier services
       if (config.courierServices.length > 0) {
+        console.log('🔍 [SAVE_CONFIG] Saving courier services...');
         const courierResponse = await fetch('/api/courier-services', {
           method: 'PUT',
           headers: {
@@ -1171,13 +1585,22 @@ export default function ClientSettingsPage() {
           })
         });
         if (!courierResponse.ok) {
-          const errorData = await courierResponse.json();
-          throw new Error(errorData.error || 'Failed to save courier services');
+          let errorMessage = 'Failed to save courier services';
+          try {
+            const errorData = await courierResponse.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (jsonError) {
+            console.error('❌ [COURIER_SAVE] Failed to parse error response:', jsonError);
+            errorMessage = `HTTP ${courierResponse.status}: ${courierResponse.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
+        console.log('✅ [SAVE_CONFIG] Courier services saved successfully');
       }
 
       // Save order configuration
       if (config.clientOrderConfig) {
+        console.log('🔍 [SAVE_CONFIG] Saving order configuration...');
         const orderConfigResponse = await fetch('/api/order-config', {
           method: 'PUT',
           headers: {
@@ -1189,12 +1612,21 @@ export default function ClientSettingsPage() {
           })
         });
         if (!orderConfigResponse.ok) {
-          const errorData = await orderConfigResponse.json();
-          throw new Error(errorData.error || 'Failed to save order configuration');
+          let errorMessage = 'Failed to save order configuration';
+          try {
+            const errorData = await orderConfigResponse.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (jsonError) {
+            console.error('❌ [ORDER_CONFIG_SAVE] Failed to parse error response:', jsonError);
+            errorMessage = `HTTP ${orderConfigResponse.status}: ${orderConfigResponse.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
+        console.log('✅ [SAVE_CONFIG] Order configuration saved successfully');
       }
 
       // Save DTDC slips configuration
+      console.log('🔍 [SAVE_CONFIG] Saving DTDC slips configuration...');
       const dtdcResponse = await fetch('/api/dtdc-slips', {
         method: 'PUT',
         headers: {
@@ -1210,9 +1642,17 @@ export default function ClientSettingsPage() {
       });
 
       if (!dtdcResponse.ok) {
-        const errorData = await dtdcResponse.json();
-        throw new Error(errorData.error || 'Failed to save DTDC slips configuration');
+        let errorMessage = 'Failed to save DTDC slips configuration';
+        try {
+          const errorData = await dtdcResponse.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          console.error('❌ [DTDC_SAVE] Failed to parse error response:', jsonError);
+          errorMessage = `HTTP ${dtdcResponse.status}: ${dtdcResponse.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
+      console.log('✅ [SAVE_CONFIG] DTDC slips configuration saved successfully');
 
       setSuccess('Settings saved successfully!');
       setEditingConfig(null);
@@ -1450,10 +1890,46 @@ export default function ClientSettingsPage() {
           {/* API Configuration */}
           {Object.entries(config.configByCategory).map(([category, configs]) => (
             <div key={category} className="bg-white shadow rounded-lg">
-              <div className="px-6 py-4 border-b border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-900">{getCategoryName(category)}</h2>
+                <button
+                  onClick={() => saveApiConfiguration(category, configs)}
+                  disabled={savingSections[`api-${category}`]}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingSections[`api-${category}`] ? 'Saving...' : 'Save'}
+                </button>
               </div>
               <div className="px-6 py-4">
+                {/* Section-specific success/error messages */}
+                {sectionSuccess[`api-${category}`] && (
+                  <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-3">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-green-800">{sectionSuccess[`api-${category}`]}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {sectionErrors[`api-${category}`] && (
+                  <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-red-800">{sectionErrors[`api-${category}`]}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-4">
                   {configs.map((configItem) => (
                     <div key={configItem.id} className="flex items-center justify-between">
@@ -1525,10 +2001,46 @@ export default function ClientSettingsPage() {
 
           {/* Pickup Locations */}
           <div className="bg-white shadow rounded-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-lg font-medium text-gray-900">Pickup Locations</h2>
+              <button
+                onClick={savePickupLocations}
+                disabled={savingSections['pickup-locations']}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingSections['pickup-locations'] ? 'Saving...' : 'Save'}
+              </button>
             </div>
             <div className="px-6 py-4">
+              {/* Section-specific success/error messages */}
+              {sectionSuccess['pickup-locations'] && (
+                <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-green-800">{sectionSuccess['pickup-locations']}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {sectionErrors['pickup-locations'] && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-800">{sectionErrors['pickup-locations']}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="space-y-4">
                 {config.pickupLocations.map((location, index) => (
                   <div key={location.id || location.value || `pickup-${index}`} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1554,10 +2066,46 @@ export default function ClientSettingsPage() {
 
           {/* Courier Services */}
           <div className="bg-white shadow rounded-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-lg font-medium text-gray-900">Courier Services</h2>
+              <button
+                onClick={saveCourierServices}
+                disabled={savingSections['courier-services']}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingSections['courier-services'] ? 'Saving...' : 'Save'}
+              </button>
             </div>
             <div className="px-6 py-4">
+              {/* Section-specific success/error messages */}
+              {sectionSuccess['courier-services'] && (
+                <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-green-800">{sectionSuccess['courier-services']}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {sectionErrors['courier-services'] && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-800">{sectionErrors['courier-services']}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="space-y-4">
                 {config.courierServices.map((service) => (
                   <div key={service.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1586,12 +2134,48 @@ export default function ClientSettingsPage() {
           </div>
 
           {/* Order Configuration */}
-          {config.clientOrderConfig && (
+          {config.clientOrderConfig ? (
             <div className="bg-white shadow rounded-lg">
-              <div className="px-6 py-4 border-b border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-900">Order Configuration</h2>
+                <button
+                  onClick={saveOrderConfiguration}
+                  disabled={savingSections['order-config']}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingSections['order-config'] ? 'Saving...' : 'Save'}
+                </button>
               </div>
               <div className="px-6 py-4">
+                {/* Section-specific success/error messages */}
+                {sectionSuccess['order-config'] && (
+                  <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-3">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-green-800">{sectionSuccess['order-config']}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* sectionErrors['order-config'] && (
+                  <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-800">{sectionErrors['order-config']}</p>
+                    </div>
+                  </div>
+                ) */}
+
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div>
                     <h3 className="text-sm font-medium text-gray-700 mb-3">Default Values</h3>
@@ -1660,53 +2244,74 @@ export default function ClientSettingsPage() {
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-xs text-gray-500">Thermal Print Mode</dt>
+                        <dt className="text-xs text-gray-500">Print Mode</dt>
                         <dd className="text-sm text-gray-900">
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={config.clientOrderConfig.enableThermalPrint}
-                              onChange={(e) => handleThermalPrintChange(e.target.checked)}
-                              disabled={isSaving}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
-                            />
-                            <span className="ml-2 text-sm text-gray-700">
-                              {config.clientOrderConfig.enableThermalPrint ? 'Enabled' : 'Disabled'}
-                            </span>
+                          <div className="space-y-3">
+                            <label className="flex items-center">
+                              <input
+                                type="radio"
+                                name="printMode"
+                                value="standard"
+                                checked={config.clientOrderConfig.printmode === 'standard'}
+                                onChange={(e) => handlePrintModeChange(e.target.value)}
+                                disabled={isSaving}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 disabled:opacity-50"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">
+                                Standard Print
+                              </span>
+                            </label>
+                            <label className="flex items-center">
+                              <input
+                                type="radio"
+                                name="printMode"
+                                value="thermal"
+                                checked={config.clientOrderConfig.printmode === 'thermal'}
+                                onChange={(e) => handlePrintModeChange(e.target.value)}
+                                disabled={isSaving}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 disabled:opacity-50"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">
+                                Thermal Print (80mm)
+                              </span>
+                            </label>
+                            <label className="flex items-center">
+                              <input
+                                type="radio"
+                                name="printMode"
+                                value="a5"
+                                checked={config.clientOrderConfig.printmode === 'a5'}
+                                onChange={(e) => handlePrintModeChange(e.target.value)}
+                                disabled={isSaving}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 disabled:opacity-50"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">
+                                A5 Print (148mm x 210mm)
+                              </span>
+                            </label>
+                            <label className="flex items-center">
+                              <input
+                                type="radio"
+                                name="printMode"
+                                value="r4"
+                                checked={config.clientOrderConfig.printmode === 'r4'}
+                                onChange={(e) => handlePrintModeChange(e.target.value)}
+                                disabled={isSaving}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 disabled:opacity-50"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">
+                                4R Print (4x6 inch)
+                              </span>
+                            </label>
                             {isSaving && (
-                              <span className="ml-2 text-xs text-gray-500">
+                              <span className="text-xs text-gray-500">
                                 Saving...
                               </span>
                             )}
-                          </label>
+                          </div>
                         </dd>
                         <dd className="text-xs text-gray-500 mt-1">
-                          When enabled, only thermal print options will be shown in order list
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs text-gray-500">A5 Print Mode</dt>
-                        <dd className="text-sm text-gray-900">
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={config.clientOrderConfig.enableA5Print || false}
-                              onChange={(e) => handleA5PrintChange(e.target.checked)}
-                              disabled={isSaving}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
-                            />
-                            <span className="ml-2 text-sm text-gray-700">
-                              {(config.clientOrderConfig.enableA5Print || false) ? 'Enabled' : 'Disabled'}
-                            </span>
-                            {isSaving && (
-                              <span className="ml-2 text-xs text-gray-500">
-                                Saving...
-                              </span>
-                            )}
-                          </label>
-                        </dd>
-                        <dd className="text-xs text-gray-500 mt-1">
-                          When enabled, A5-friendly PDF labels will be generated for printing
+                          Choose the print format for shipping labels. Only one mode can be active at a time.
                         </dd>
                       </div>
                       <div>
@@ -1792,7 +2397,7 @@ export default function ClientSettingsPage() {
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Logo Settings */}
@@ -1995,6 +2600,35 @@ export default function ClientSettingsPage() {
           
           {dtdcSlipsEnabled && (
             <div className="px-6 py-4">
+              {/* Section-specific success/error messages */}
+              {sectionSuccess['dtdc-slips'] && (
+                <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-green-800">{sectionSuccess['dtdc-slips']}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {sectionErrors['dtdc-slips'] && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-800">{sectionErrors['dtdc-slips']}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Summary Section */}
               <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h3 className="text-sm font-medium text-blue-900 mb-2">Current Status</h3>
@@ -2081,66 +2715,17 @@ export default function ClientSettingsPage() {
                   Process Range
                 </button>
                 <button
-                  onClick={async () => {
-                    try {
-                      setIsSaving(true);
-                      setError('');
-                      setSuccess('');
-                      
-                      const token = localStorage.getItem('authToken');
-                      
-                      // Save DTDC slips configuration
-                      const dtdcResponse = await fetch('/api/dtdc-slips', {
-                        method: 'PUT',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({
-                          dtdcSlips: {
-                            ...dtdcSlips,
-                            enabled: dtdcSlipsEnabled
-                          }
-                        })
-                      });
-
-                      if (!dtdcResponse.ok) {
-                        const errorData = await dtdcResponse.json();
-                        throw new Error(errorData.error || 'Failed to save DTDC slips configuration');
-                      }
-
-                      setSuccess('DTDC slips configuration saved successfully!');
-                      
-                      // Reload DTDC slips data from database to ensure consistency
-                      await loadDtdcSlipsFromDatabase();
-                      
-                    } catch (error) {
-                      console.error('Error saving DTDC slips:', error);
-                      setError(error instanceof Error ? error.message : 'Error saving DTDC slips');
-                    } finally {
-                      setIsSaving(false);
-                    }
-                  }}
-                  disabled={isSaving}
+                  onClick={saveDtdcSlips}
+                  disabled={savingSections['dtdc-slips']}
                   className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSaving ? 'Saving...' : 'Save DTDC Slips'}
+                  {savingSections['dtdc-slips'] ? 'Saving...' : 'Save DTDC Slips'}
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Save Button */}
-        <div className="mt-8 flex justify-end">
-          <button
-            onClick={handleSaveConfig}
-            disabled={isSaving}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
       </div>
     </div>
   );
