@@ -290,8 +290,6 @@ export function generateR4LabelHTML(data: R4LabelData): string {
         ${data.referenceNumber ? `
         <div class="reference-section">
             <div>Reference: ${data.referenceNumber}</div>
-            ${data.packageValue ? `<div>Value: ₹${data.packageValue}</div>` : ''}
-            ${data.quantity ? `<div>Qty: ${data.quantity}</div>` : ''}
             ${data.date ? `<div>Date: ${data.date}</div>` : ''}
         </div>
         ` : ''}
@@ -635,8 +633,6 @@ export function generateBulkR4Labels(labelDataArray: R4LabelData[]): string {
             ${data.referenceNumber ? `
             <div class="reference-section">
                 <div>Reference: ${data.referenceNumber}</div>
-                ${data.packageValue ? `<div>Value: ₹${data.packageValue}</div>` : ''}
-                ${data.quantity ? `<div>Qty: ${data.quantity}</div>` : ''}
                 ${data.date ? `<div>Date: ${data.date}</div>` : ''}
             </div>
             ` : ''}
