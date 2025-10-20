@@ -244,7 +244,7 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
         
         ${footerNote && footerNote.enabled && footerNote.text ? `
         <div class="footer-note">
-            ${footerNote.text}
+            <strong>${footerNote.text}</strong>
         </div>
         ` : ''}
         

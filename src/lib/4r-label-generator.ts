@@ -299,7 +299,7 @@ export function generateR4LabelHTML(data: R4LabelData): string {
         ${data.footerNote && data.footerNote.enabled && data.footerNote.text ? `
         <!-- Footer Note -->
         <div class="footer-note">
-            ${data.footerNote.text}
+            <strong>${data.footerNote.text}</strong>
         </div>
         ` : ''}
         

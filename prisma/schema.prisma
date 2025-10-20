@@ -142,6 +142,8 @@ model client_order_configs {
   logoEnabledCouriers       String?
   enableAltMobileNumber     Boolean? @default(false)
   logoUrl                   String?
+  enableFooterNote          Boolean  @default(false)
+  footerNoteText            String?
   pickup_location_overrides Json?    @default("{}")
   clients                   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
