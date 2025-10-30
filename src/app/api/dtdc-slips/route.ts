@@ -33,19 +33,31 @@ export async function GET(request: NextRequest) {
 
     const user = authResult.user!;
     const client = user.client;
-    console.log(`🔍 [API_DTDC_SLIPS_GET] Fetching DTDC slips config for client: ${client.companyName}`);
+    const { searchParams } = new URL(request.url);
+    const courierType = searchParams.get('courier') || 'dtdc'; // Default to dtdc
+    
+    console.log(`🔍 [API_DTDC_SLIPS_GET] Fetching ${courierType} slips config for client: ${client.companyName}`);
+
+    // Validate courier type
+    const validCourierTypes = ['dtdc', 'dtdc_cod', 'dtdc_plus'];
+    if (!validCourierTypes.includes(courierType)) {
+      return NextResponse.json(
+        { error: 'Invalid courier type' },
+        { status: 400 }
+      );
+    }
 
     // Get DTDC slips configuration from client_config table
     const dtdcConfig = await prisma.client_config.findMany({
       where: {
         clientId: client.id,
         key: {
-          startsWith: 'dtdc_slips_'
+          startsWith: `${courierType}_slips_`
         }
       }
     });
 
-    console.log(`📊 [API_DTDC_SLIPS_GET] Found ${dtdcConfig.length} DTDC config entries`);
+    console.log(`📊 [API_DTDC_SLIPS_GET] Found ${dtdcConfig.length} ${courierType} config entries`);
 
     // Transform the config data
     const dtdcSlips = {
@@ -58,29 +70,30 @@ export async function GET(request: NextRequest) {
 
     dtdcConfig.forEach(config => {
       switch (config.key) {
-        case 'dtdc_slips_from':
+        case `${courierType}_slips_from`:
           dtdcSlips.from = config.value;
           break;
-        case 'dtdc_slips_to':
+        case `${courierType}_slips_to`:
           dtdcSlips.to = config.value;
           break;
-        case 'dtdc_slips_unused':
+        case `${courierType}_slips_unused`:
           dtdcSlips.unused = config.value;
           break;
-        case 'dtdc_slips_used':
+        case `${courierType}_slips_used`:
           dtdcSlips.used = config.value;
           break;
-        case 'dtdc_slips_enabled':
+        case `${courierType}_slips_enabled`:
           dtdcSlips.enabled = config.value === 'true';
           break;
       }
     });
 
-    console.log(`✅ [API_DTDC_SLIPS_GET] Returning DTDC slips config:`, dtdcSlips);
+    console.log(`✅ [API_DTDC_SLIPS_GET] Returning ${courierType} slips config:`, dtdcSlips);
 
     const response = NextResponse.json({
       success: true,
-      dtdcSlips
+      dtdcSlips,
+      courierType
     });
 
     // Apply security headers
@@ -129,47 +142,56 @@ export async function PUT(request: NextRequest) {
     const user = authResult.user!;
     const client = user.client;
     const body = await request.json();
-    const { dtdcSlips } = body;
+    const { dtdcSlips, courierType = 'dtdc' } = body;
 
-    console.log(`📝 [API_DTDC_SLIPS_PUT] Updating DTDC slips config for client: ${client.companyName}`);
+    console.log(`📝 [API_DTDC_SLIPS_PUT] Updating ${courierType} slips config for client: ${client.companyName}`);
     console.log(`📋 [API_DTDC_SLIPS_PUT] New config:`, dtdcSlips);
+
+    // Validate courier type
+    const validCourierTypes = ['dtdc', 'dtdc_cod', 'dtdc_plus'];
+    if (!validCourierTypes.includes(courierType)) {
+      return NextResponse.json(
+        { error: 'Invalid courier type' },
+        { status: 400 }
+      );
+    }
 
     // Update or create DTDC slips configuration
     const configUpdates = [
       {
-        key: 'dtdc_slips_from',
+        key: `${courierType}_slips_from`,
         value: dtdcSlips.from || '',
         type: 'string',
-        category: 'dtdc_slips',
-        description: 'Starting DTDC slip number'
+        category: `${courierType}_slips`,
+        description: `Starting ${courierType.toUpperCase()} slip number`
       },
       {
-        key: 'dtdc_slips_to',
+        key: `${courierType}_slips_to`,
         value: dtdcSlips.to || '',
         type: 'string',
-        category: 'dtdc_slips',
-        description: 'Ending DTDC slip number'
+        category: `${courierType}_slips`,
+        description: `Ending ${courierType.toUpperCase()} slip number`
       },
       {
-        key: 'dtdc_slips_unused',
+        key: `${courierType}_slips_unused`,
         value: dtdcSlips.unused || '',
         type: 'string',
-        category: 'dtdc_slips',
-        description: 'Unused DTDC slip numbers'
+        category: `${courierType}_slips`,
+        description: `Unused ${courierType.toUpperCase()} slip numbers`
       },
       {
-        key: 'dtdc_slips_used',
+        key: `${courierType}_slips_used`,
         value: dtdcSlips.used || '',
         type: 'string',
-        category: 'dtdc_slips',
-        description: 'Used DTDC slip numbers'
+        category: `${courierType}_slips`,
+        description: `Used ${courierType.toUpperCase()} slip numbers`
       },
       {
-        key: 'dtdc_slips_enabled',
+        key: `${courierType}_slips_enabled`,
         value: (dtdcSlips.enabled || false).toString(),
         type: 'boolean',
-        category: 'dtdc_slips',
-        description: 'DTDC slips feature enabled'
+        category: `${courierType}_slips`,
+        description: `${courierType.toUpperCase()} slips feature enabled`
       }
     ];
 
@@ -187,7 +209,7 @@ export async function PUT(request: NextRequest) {
           updatedAt: new Date()
         },
         create: {
-          id: `dtdc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `${courierType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           clientId: client.id,
           key: config.key,
           value: config.value,
@@ -200,11 +222,11 @@ export async function PUT(request: NextRequest) {
       });
     }
 
-    console.log(`✅ [API_DTDC_SLIPS_PUT] DTDC slips config updated successfully for ${client.companyName}`);
+    console.log(`✅ [API_DTDC_SLIPS_PUT] ${courierType} slips config updated successfully for ${client.companyName}`);
 
     const response = NextResponse.json({
       success: true,
-      message: 'DTDC slips configuration updated successfully'
+      message: `${courierType.toUpperCase()} slips configuration updated successfully`
     });
 
     // Apply security headers

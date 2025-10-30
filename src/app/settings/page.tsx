@@ -347,7 +347,8 @@ export default function ClientSettingsPage() {
           dtdcSlips: {
             ...dtdcSlips,
             enabled: dtdcSlipsEnabled
-          }
+          },
+          courierType: 'dtdc'
         })
       });
 
@@ -375,6 +376,106 @@ export default function ClientSettingsPage() {
     }
   };
 
+  const saveDtdcCodSlips = async () => {
+    const sectionKey = 'dtdc-cod-slips';
+    try {
+      setSectionSaving(sectionKey, true);
+      clearSectionMessages(sectionKey);
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('/api/dtdc-slips', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          dtdcSlips: {
+            ...dtdcCodSlips,
+            enabled: dtdcCodSlipsEnabled
+          },
+          courierType: 'dtdc_cod'
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to save DTDC COD slips configuration';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      setSectionSuccessMessage(sectionKey, 'DTDC COD slips configuration saved successfully!');
+      
+      // Refresh the config to show updated data
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error(`❌ [${sectionKey.toUpperCase()}_SAVE] Error:`, error);
+      setSectionError(sectionKey, error instanceof Error ? error.message : 'Failed to save DTDC COD slips configuration');
+    } finally {
+      setSectionSaving(sectionKey, false);
+    }
+  };
+
+  const saveDtdcPlusSlips = async () => {
+    const sectionKey = 'dtdc-plus-slips';
+    try {
+      setSectionSaving(sectionKey, true);
+      clearSectionMessages(sectionKey);
+      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('/api/dtdc-slips', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          dtdcSlips: {
+            ...dtdcPlusSlips,
+            enabled: dtdcPlusSlipsEnabled
+          },
+          courierType: 'dtdc_plus'
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to save DTDC Plus slips configuration';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      setSectionSuccessMessage(sectionKey, 'DTDC Plus slips configuration saved successfully!');
+      
+      // Refresh the config to show updated data
+      await fetchClientConfig();
+      
+    } catch (error) {
+      console.error(`❌ [${sectionKey.toUpperCase()}_SAVE] Error:`, error);
+      setSectionError(sectionKey, error instanceof Error ? error.message : 'Failed to save DTDC Plus slips configuration');
+    } finally {
+      setSectionSaving(sectionKey, false);
+    }
+  };
+
 
   // Editing states
   const [editingConfig, setEditingConfig] = useState<string | null>(null);
@@ -382,7 +483,7 @@ export default function ClientSettingsPage() {
   const [editingPickupLocation, setEditingPickupLocation] = useState<string | null>(null);
   const [editingCourierService, setEditingCourierService] = useState<string | null>(null);
 
-  // DTDC Slips state
+  // DTDC Slips state - Support for dtdc, dtdc_cod, dtdc_plus
   const [dtdcSlips, setDtdcSlips] = useState({
     from: '',
     to: '',
@@ -390,6 +491,24 @@ export default function ClientSettingsPage() {
     used: ''
   });
   const [dtdcSlipsEnabled, setDtdcSlipsEnabled] = useState(false);
+
+  // DTDC COD Slips state
+  const [dtdcCodSlips, setDtdcCodSlips] = useState({
+    from: '',
+    to: '',
+    unused: '',
+    used: ''
+  });
+  const [dtdcCodSlipsEnabled, setDtdcCodSlipsEnabled] = useState(false);
+
+  // DTDC Plus Slips state
+  const [dtdcPlusSlips, setDtdcPlusSlips] = useState({
+    from: '',
+    to: '',
+    unused: '',
+    used: ''
+  });
+  const [dtdcPlusSlipsEnabled, setDtdcPlusSlipsEnabled] = useState(false);
 
   // Logo state
   const [logo, setLogo] = useState<{
@@ -448,6 +567,8 @@ export default function ClientSettingsPage() {
     if (currentUser && currentClient && currentUser.role !== 'admin') {
       fetchClientConfig();
       loadDtdcSlipsFromDatabase();
+      loadDtdcCodSlipsFromDatabase();
+      loadDtdcPlusSlipsFromDatabase();
       loadLogo();
     }
   }, [currentUser, currentClient]);
@@ -547,7 +668,7 @@ export default function ClientSettingsPage() {
       const token = localStorage.getItem('authToken');
       if (!token) return;
 
-      const response = await fetch('/api/dtdc-slips', {
+      const response = await fetch('/api/dtdc-slips?courier=dtdc', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -565,6 +686,60 @@ export default function ClientSettingsPage() {
       }
     } catch (error) {
       console.error('❌ [DTDC_SLIPS] Error loading from database:', error);
+    }
+  };
+
+  // Function to load DTDC COD slips from database
+  const loadDtdcCodSlipsFromDatabase = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+
+      const response = await fetch('/api/dtdc-slips?courier=dtdc_cod', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.dtdcSlips) {
+          setDtdcCodSlips(data.dtdcSlips);
+          setDtdcCodSlipsEnabled(data.dtdcSlips.enabled);
+          console.log('🔍 [DTDC_COD_SLIPS] Loaded from database:', data.dtdcSlips);
+        }
+      } else {
+        console.error('❌ [DTDC_COD_SLIPS] Failed to load from database:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ [DTDC_COD_SLIPS] Error loading from database:', error);
+    }
+  };
+
+  // Function to load DTDC Plus slips from database
+  const loadDtdcPlusSlipsFromDatabase = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+
+      const response = await fetch('/api/dtdc-slips?courier=dtdc_plus', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.dtdcSlips) {
+          setDtdcPlusSlips(data.dtdcSlips);
+          setDtdcPlusSlipsEnabled(data.dtdcSlips.enabled);
+          console.log('🔍 [DTDC_PLUS_SLIPS] Loaded from database:', data.dtdcSlips);
+        }
+      } else {
+        console.error('❌ [DTDC_PLUS_SLIPS] Failed to load from database:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ [DTDC_PLUS_SLIPS] Error loading from database:', error);
     }
   };
 
@@ -619,6 +794,108 @@ export default function ClientSettingsPage() {
       }
     } catch (error) {
       console.error('🚀 [PROCESS_DTDC_RANGE] Error:', error);
+      setError('Error processing range');
+    }
+  };
+
+  // Function to process DTDC COD slips range
+  const processDtdcCodSlipsRange = () => {
+    console.log('🚀 [PROCESS_DTDC_COD_RANGE] Starting process for:', { 
+      from: dtdcCodSlips.from, 
+      to: dtdcCodSlips.to 
+    });
+    
+    if (!dtdcCodSlips.from || !dtdcCodSlips.to) {
+      setError('Please enter both From and To values');
+      return;
+    }
+
+    try {
+      const hasLetters = /[A-Za-z]/.test(dtdcCodSlips.from) || /[A-Za-z]/.test(dtdcCodSlips.to);
+      
+      if (hasLetters) {
+        const result = parseAlphanumericRange(dtdcCodSlips.from, dtdcCodSlips.to);
+        if (result.success && result.prefix && result.fromNum !== undefined && result.toNum !== undefined) {
+          const range = generateAlphanumericRange(result.prefix, result.fromNum, result.toNum);
+          setDtdcCodSlips(prev => ({ ...prev, unused: range.join(', ') }));
+          setSuccess(`Processed alphanumeric range: ${result.count} slips generated`);
+        } else {
+          setError('Failed to process alphanumeric range');
+        }
+      } else {
+        const fromNum = parseInt(dtdcCodSlips.from);
+        const toNum = parseInt(dtdcCodSlips.to);
+        
+        if (!isNaN(fromNum) && !isNaN(toNum)) {
+          if (fromNum > toNum) {
+            setError('From value should be less than or equal to To value');
+            return;
+          }
+          
+          const range: string[] = [];
+          for (let i = fromNum; i <= toNum; i++) {
+            range.push(i.toString());
+          }
+          
+          setDtdcCodSlips(prev => ({ ...prev, unused: range.join(', ') }));
+          setSuccess(`Processed numeric range: ${range.length} slips generated`);
+        } else {
+          setError('Invalid numeric values');
+        }
+      }
+    } catch (error) {
+      console.error('🚀 [PROCESS_DTDC_COD_RANGE] Error:', error);
+      setError('Error processing range');
+    }
+  };
+
+  // Function to process DTDC Plus slips range
+  const processDtdcPlusSlipsRange = () => {
+    console.log('🚀 [PROCESS_DTDC_PLUS_RANGE] Starting process for:', { 
+      from: dtdcPlusSlips.from, 
+      to: dtdcPlusSlips.to 
+    });
+    
+    if (!dtdcPlusSlips.from || !dtdcPlusSlips.to) {
+      setError('Please enter both From and To values');
+      return;
+    }
+
+    try {
+      const hasLetters = /[A-Za-z]/.test(dtdcPlusSlips.from) || /[A-Za-z]/.test(dtdcPlusSlips.to);
+      
+      if (hasLetters) {
+        const result = parseAlphanumericRange(dtdcPlusSlips.from, dtdcPlusSlips.to);
+        if (result.success && result.prefix && result.fromNum !== undefined && result.toNum !== undefined) {
+          const range = generateAlphanumericRange(result.prefix, result.fromNum, result.toNum);
+          setDtdcPlusSlips(prev => ({ ...prev, unused: range.join(', ') }));
+          setSuccess(`Processed alphanumeric range: ${result.count} slips generated`);
+        } else {
+          setError('Failed to process alphanumeric range');
+        }
+      } else {
+        const fromNum = parseInt(dtdcPlusSlips.from);
+        const toNum = parseInt(dtdcPlusSlips.to);
+        
+        if (!isNaN(fromNum) && !isNaN(toNum)) {
+          if (fromNum > toNum) {
+            setError('From value should be less than or equal to To value');
+            return;
+          }
+          
+          const range: string[] = [];
+          for (let i = fromNum; i <= toNum; i++) {
+            range.push(i.toString());
+          }
+          
+          setDtdcPlusSlips(prev => ({ ...prev, unused: range.join(', ') }));
+          setSuccess(`Processed numeric range: ${range.length} slips generated`);
+        } else {
+          setError('Invalid numeric values');
+        }
+      }
+    } catch (error) {
+      console.error('🚀 [PROCESS_DTDC_PLUS_RANGE] Error:', error);
       setError('Error processing range');
     }
   };
@@ -703,6 +980,58 @@ export default function ClientSettingsPage() {
       }
     } catch (error) {
       console.error('🧮 [CALCULATE_TOTAL_SLIPS] Error:', error);
+    }
+    
+    return 0;
+  };
+
+  const calculateTotalCodSlips = (): number => {
+    if (!dtdcCodSlips.from || !dtdcCodSlips.to) {
+      return 0;
+    }
+
+    try {
+      const hasLetters = /[A-Za-z]/.test(dtdcCodSlips.from) || /[A-Za-z]/.test(dtdcCodSlips.to);
+      
+      if (hasLetters) {
+        const result = parseAlphanumericRange(dtdcCodSlips.from, dtdcCodSlips.to);
+        return result.success ? result.count : 0;
+      } else {
+        const fromNum = parseInt(dtdcCodSlips.from);
+        const toNum = parseInt(dtdcCodSlips.to);
+        
+        if (!isNaN(fromNum) && !isNaN(toNum)) {
+          return Math.max(0, toNum - fromNum + 1);
+        }
+      }
+    } catch (error) {
+      console.error('🧮 [CALCULATE_TOTAL_COD_SLIPS] Error:', error);
+    }
+    
+    return 0;
+  };
+
+  const calculateTotalPlusSlips = (): number => {
+    if (!dtdcPlusSlips.from || !dtdcPlusSlips.to) {
+      return 0;
+    }
+
+    try {
+      const hasLetters = /[A-Za-z]/.test(dtdcPlusSlips.from) || /[A-Za-z]/.test(dtdcPlusSlips.to);
+      
+      if (hasLetters) {
+        const result = parseAlphanumericRange(dtdcPlusSlips.from, dtdcPlusSlips.to);
+        return result.success ? result.count : 0;
+      } else {
+        const fromNum = parseInt(dtdcPlusSlips.from);
+        const toNum = parseInt(dtdcPlusSlips.to);
+        
+        if (!isNaN(fromNum) && !isNaN(toNum)) {
+          return Math.max(0, toNum - fromNum + 1);
+        }
+      }
+    } catch (error) {
+      console.error('🧮 [CALCULATE_TOTAL_PLUS_SLIPS] Error:', error);
     }
     
     return 0;
@@ -2720,6 +3049,300 @@ export default function ClientSettingsPage() {
                   className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {savingSections['dtdc-slips'] ? 'Saving...' : 'Save DTDC Slips'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* DTDC COD Slips */}
+        <div className="bg-white shadow rounded-lg mb-8 mt-8">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900">DTDC COD Slips</h2>
+                <p className="text-sm text-gray-600 mt-1">Manage your DTDC COD courier slip inventory and tracking</p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={dtdcCodSlipsEnabled}
+                    onChange={(e) => setDtdcCodSlipsEnabled(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">Enable</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          
+          {dtdcCodSlipsEnabled && (
+            <div className="px-6 py-4">
+              {sectionSuccess['dtdc-cod-slips'] && (
+                <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-green-800">{sectionSuccess['dtdc-cod-slips']}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {sectionErrors['dtdc-cod-slips'] && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-800">{sectionErrors['dtdc-cod-slips']}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="text-sm font-medium text-blue-900 mb-2">Current Status</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-blue-700">Range:</span>
+                    <span className="ml-2 text-blue-900">
+                      {dtdcCodSlips.from && dtdcCodSlips.to ? `${dtdcCodSlips.from} - ${dtdcCodSlips.to}` : 'Not set'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700">Total Slips:</span>
+                    <span className="ml-2 text-blue-900">
+                      {dtdcCodSlips.from && dtdcCodSlips.to ? calculateTotalCodSlips() : '0'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="dtdc-cod-from" className="block text-sm font-medium text-gray-700 mb-2">
+                    From <span className="text-gray-500">(Starting slip number)</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="dtdc-cod-from"
+                    value={dtdcCodSlips.from}
+                    onChange={(e) => setDtdcCodSlips(prev => ({ ...prev, from: e.target.value }))}
+                    placeholder="e.g., DTDCCOD001, 1001, A001"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="dtdc-cod-to" className="block text-sm font-medium text-gray-700 mb-2">
+                    To <span className="text-gray-500">(Ending slip number)</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="dtdc-cod-to"
+                    value={dtdcCodSlips.to}
+                    onChange={(e) => setDtdcCodSlips(prev => ({ ...prev, to: e.target.value }))}
+                    placeholder="e.g., DTDCCOD002, 1002, A002"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="dtdc-cod-unused" className="block text-sm font-medium text-gray-700 mb-2">
+                    Unused Slips <span className="text-gray-500">(Comma-separated)</span>
+                  </label>
+                  <textarea
+                    id="dtdc-cod-unused"
+                    value={dtdcCodSlips.unused}
+                    onChange={(e) => setDtdcCodSlips(prev => ({ ...prev, unused: e.target.value }))}
+                    placeholder="List all available/unused DTDC COD slip numbers (comma-separated)"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="dtdc-cod-used" className="block text-sm font-medium text-gray-700 mb-2">
+                    Used Slips <span className="text-gray-500">(Comma-separated)</span>
+                  </label>
+                  <textarea
+                    id="dtdc-cod-used"
+                    value={dtdcCodSlips.used}
+                    onChange={(e) => setDtdcCodSlips(prev => ({ ...prev, used: e.target.value }))}
+                    placeholder="List all used/consumed DTDC COD slip numbers (comma-separated)"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-6 flex justify-center gap-4">
+                <button
+                  onClick={processDtdcCodSlipsRange}
+                  className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                >
+                  Process Range
+                </button>
+                <button
+                  onClick={saveDtdcCodSlips}
+                  disabled={savingSections['dtdc-cod-slips']}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingSections['dtdc-cod-slips'] ? 'Saving...' : 'Save DTDC COD Slips'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* DTDC Plus Slips */}
+        <div className="bg-white shadow rounded-lg mb-8 mt-8">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900">DTDC Plus Slips</h2>
+                <p className="text-sm text-gray-600 mt-1">Manage your DTDC Plus courier slip inventory and tracking</p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={dtdcPlusSlipsEnabled}
+                    onChange={(e) => setDtdcPlusSlipsEnabled(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">Enable</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          
+          {dtdcPlusSlipsEnabled && (
+            <div className="px-6 py-4">
+              {sectionSuccess['dtdc-plus-slips'] && (
+                <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-green-800">{sectionSuccess['dtdc-plus-slips']}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {sectionErrors['dtdc-plus-slips'] && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-800">{sectionErrors['dtdc-plus-slips']}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="text-sm font-medium text-blue-900 mb-2">Current Status</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-blue-700">Range:</span>
+                    <span className="ml-2 text-blue-900">
+                      {dtdcPlusSlips.from && dtdcPlusSlips.to ? `${dtdcPlusSlips.from} - ${dtdcPlusSlips.to}` : 'Not set'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700">Total Slips:</span>
+                    <span className="ml-2 text-blue-900">
+                      {dtdcPlusSlips.from && dtdcPlusSlips.to ? calculateTotalPlusSlips() : '0'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="dtdc-plus-from" className="block text-sm font-medium text-gray-700 mb-2">
+                    From <span className="text-gray-500">(Starting slip number)</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="dtdc-plus-from"
+                    value={dtdcPlusSlips.from}
+                    onChange={(e) => setDtdcPlusSlips(prev => ({ ...prev, from: e.target.value }))}
+                    placeholder="e.g., DTDC+001, 1001, A001"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="dtdc-plus-to" className="block text-sm font-medium text-gray-700 mb-2">
+                    To <span className="text-gray-500">(Ending slip number)</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="dtdc-plus-to"
+                    value={dtdcPlusSlips.to}
+                    onChange={(e) => setDtdcPlusSlips(prev => ({ ...prev, to: e.target.value }))}
+                    placeholder="e.g., DTDC+002, 1002, A002"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="dtdc-plus-unused" className="block text-sm font-medium text-gray-700 mb-2">
+                    Unused Slips <span className="text-gray-500">(Comma-separated)</span>
+                  </label>
+                  <textarea
+                    id="dtdc-plus-unused"
+                    value={dtdcPlusSlips.unused}
+                    onChange={(e) => setDtdcPlusSlips(prev => ({ ...prev, unused: e.target.value }))}
+                    placeholder="List all available/unused DTDC Plus slip numbers (comma-separated)"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="dtdc-plus-used" className="block text-sm font-medium text-gray-700 mb-2">
+                    Used Slips <span className="text-gray-500">(Comma-separated)</span>
+                  </label>
+                  <textarea
+                    id="dtdc-plus-used"
+                    value={dtdcPlusSlips.used}
+                    onChange={(e) => setDtdcPlusSlips(prev => ({ ...prev, used: e.target.value }))}
+                    placeholder="List all used/consumed DTDC Plus slip numbers (comma-separated)"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-6 flex justify-center gap-4">
+                <button
+                  onClick={processDtdcPlusSlipsRange}
+                  className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                >
+                  Process Range
+                </button>
+                <button
+                  onClick={saveDtdcPlusSlips}
+                  disabled={savingSections['dtdc-plus-slips']}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingSections['dtdc-plus-slips'] ? 'Saving...' : 'Save DTDC Plus Slips'}
                 </button>
               </div>
             </div>
