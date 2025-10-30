@@ -130,6 +130,7 @@ export default function OrderList() {
   const [selectedPickupLocation, setSelectedPickupLocation] = useState('')
   const [selectedCourierService, setSelectedCourierService] = useState('')
   const [selectedSubGroup, setSelectedSubGroup] = useState('')
+  const [selectedTrackingStatus, setSelectedTrackingStatus] = useState('')
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set())
   const headerCheckboxRef = useRef<HTMLInputElement>(null)
   const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -244,9 +245,9 @@ export default function OrderList() {
   useEffect(() => {
     if (currentUser?.role === 'child_user' && selectedSubGroup && configLoaded) {
       console.log('🔍 [ORDER_LIST] Auto-fetching orders for child user with sub-group:', selectedSubGroup);
-      fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup);
+      fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup);
     }
-  }, [selectedSubGroup, configLoaded, currentUser?.role, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService]);
+  }, [selectedSubGroup, configLoaded, currentUser?.role, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus]);
 
   // Load print settings
   useEffect(() => {
@@ -293,7 +294,7 @@ export default function OrderList() {
     // If search is cleared, fetch immediately
     if (!searchValue.trim()) {
       setSearchLoading(false)
-      fetchOrders(1, '', fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
+      fetchOrders(1, '', fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup)
       return
     }
     
@@ -308,12 +309,12 @@ export default function OrderList() {
     
     // Set new timeout for debounced search
     const timeoutId = setTimeout(() => {
-      fetchOrders(1, searchValue, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
+      fetchOrders(1, searchValue, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup)
       setSearchLoading(false)
     }, 500) // Increased to 500ms for better UX
     
     setSearchTimeout(timeoutId)
-  }, [searchTimeout, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedSubGroup])
+  }, [searchTimeout, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup])
   
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -328,22 +329,29 @@ export default function OrderList() {
   const handlePickupLocationChange = useCallback((pickupLocation: string) => {
     setSelectedPickupLocation(pickupLocation)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, fromDate, toDate, pickupLocation, selectedCourierService, '', selectedSubGroup)
-  }, [searchTerm, fromDate, toDate, selectedCourierService, selectedSubGroup])
+    fetchOrders(1, searchTerm, fromDate, toDate, pickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup)
+  }, [searchTerm, fromDate, toDate, selectedCourierService, selectedTrackingStatus, selectedSubGroup])
 
   // Handle courier service change
   const handleCourierServiceChange = useCallback((courierService: string) => {
     setSelectedCourierService(courierService)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, courierService, '', selectedSubGroup)
-  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedSubGroup])
+    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, courierService, selectedTrackingStatus, selectedSubGroup)
+  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedTrackingStatus, selectedSubGroup])
 
   // Handle sub-group change
   const handleSubGroupChange = useCallback((subGroup: string) => {
     setSelectedSubGroup(subGroup)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', subGroup)
-  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService])
+    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, subGroup)
+  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus])
+
+  // Handle tracking status change
+  const handleTrackingStatusChange = useCallback((trackingStatus: string) => {
+    setSelectedTrackingStatus(trackingStatus)
+    setCurrentPage(1) // Reset to first page when filtering
+    fetchOrders(1, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, trackingStatus, selectedSubGroup)
+  }, [searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedSubGroup])
 
 
   // Handle date range changes
@@ -351,8 +359,8 @@ export default function OrderList() {
     setFromDate(from)
     setToDate(to)
     setCurrentPage(1) // Reset to first page when filtering
-    fetchOrders(1, searchTerm, from, to, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
-  }, [searchTerm, selectedPickupLocation, selectedCourierService, selectedSubGroup])
+    fetchOrders(1, searchTerm, from, to, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup)
+  }, [searchTerm, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup])
 
 
   // Clear date filters
@@ -360,7 +368,7 @@ export default function OrderList() {
     setFromDate('')
     setToDate('')
     setCurrentPage(1)
-    fetchOrders(1, searchTerm, '', '', selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
+    fetchOrders(1, searchTerm, '', '', selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup)
   }
 
   // Clear all filters
@@ -370,6 +378,7 @@ export default function OrderList() {
     setToDate('')
     setSelectedPickupLocation('')
     setSelectedCourierService('')
+    setSelectedTrackingStatus('')
     // Don't clear sub-group for child users as it's auto-selected
     if (currentUser?.role !== 'child_user') {
       setSelectedSubGroup('')
@@ -381,7 +390,7 @@ export default function OrderList() {
   // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchOrders(page, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
+    fetchOrders(page, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup)
   }
 
   // Handle page size change
@@ -398,8 +407,8 @@ export default function OrderList() {
     setCurrentPage(1);
     
     // Fetch orders with the new page size immediately
-    fetchOrdersWithPageSize(1, newPageSize, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '');
-  }, [ordersPerPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService]);
+    fetchOrdersWithPageSize(1, newPageSize, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup);
+  }, [ordersPerPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup]);
 
 
 
@@ -435,6 +444,12 @@ export default function OrderList() {
       }
       if (courierService) {
         params.append('courierService', courierService)
+      }
+      if (subGroup) {
+        params.append('subGroup', subGroup)
+      }
+      if (trackingStatus) {
+        params.append('trackingStatus', trackingStatus)
       }
 
       const token = getAuthToken();
@@ -540,6 +555,10 @@ export default function OrderList() {
         params.append('subGroup', subGroup)
       }
 
+      if (trackingStatus) {
+        params.append('trackingStatus', trackingStatus)
+      }
+
       
       console.log('🔍 [FETCH_ORDERS] Fetching orders with params:', params.toString())
       
@@ -619,7 +638,7 @@ export default function OrderList() {
       if (response.ok) {
         const result = await response.json()
         alert(`Success! Waybill: ${result.waybill}`)
-        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup) // Refresh the list
+        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup) // Refresh the list
       } else {
         const error = await response.json()
         alert(`Failed to retry: ${error.error}`)
@@ -654,7 +673,7 @@ export default function OrderList() {
         alert(`Order fulfilled successfully! Tracking ID: ${result.trackingId}`)
         
         // Refresh the orders list
-        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
+        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup)
         
         // Update the selected order if it's the same one
         if (selectedOrder && selectedOrder.id === orderId) {
@@ -734,7 +753,7 @@ export default function OrderList() {
             setEditFormData({})
             
             // Refresh the orders list
-            fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
+            fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup)
             
             alert('Order updated successfully!')
           } else {
@@ -764,7 +783,7 @@ export default function OrderList() {
           setEditFormData({})
           
           // Refresh the orders list
-          fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
+          fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup)
           
           alert('Order updated successfully!')
         } else {
@@ -1660,7 +1679,7 @@ export default function OrderList() {
         // Close modal
         setShowDeleteModal(false)
         // Refresh orders to update pagination
-        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, '', selectedSubGroup)
+        fetchOrders(currentPage, searchTerm, fromDate, toDate, selectedPickupLocation, selectedCourierService, selectedTrackingStatus, selectedSubGroup)
         alert(`Successfully deleted ${orderIds.length} order${orderIds.length !== 1 ? 's' : ''}`)
       } else {
         const error = await response.json()
@@ -1802,6 +1821,22 @@ export default function OrderList() {
                 </select>
               </div>
             )}
+
+            {/* Tracking Status Filter */}
+            <div className="lg:col-span-1">
+              <label htmlFor="trackingStatus" className="block text-sm font-medium text-gray-700 mb-2">
+                Status & Tracking
+              </label>
+              <select
+                id="trackingStatus"
+                value={selectedTrackingStatus}
+                onChange={(e) => handleTrackingStatusChange(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+              >
+                <option value="">All Status</option>
+                <option value="pending">Not assigned</option>
+              </select>
+            </div>
           </div>
 
           {/* Row 2 - Date Range */}
