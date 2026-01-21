@@ -194,7 +194,29 @@ export async function GET(
           requireTotalItems: client.client_order_configs.requireTotalItems,
           
           // Reseller settings
-          enableResellerFallback: client.client_order_configs.enableResellerFallback
+          enableResellerFallback: client.client_order_configs.enableResellerFallback,
+          enableReferencePrefix: client.client_order_configs.enableReferencePrefix,
+          
+          // Print mode
+          printmode: client.client_order_configs.printmode,
+          
+          // Footer note settings
+          enableFooterNote: client.client_order_configs.enableFooterNote,
+          footerNoteText: client.client_order_configs.footerNoteText,
+          
+          // Logo settings
+          displayLogoOnWaybill: client.client_order_configs.displayLogoOnWaybill,
+          logoFileName: client.client_order_configs.logoFileName,
+          logoFileSize: client.client_order_configs.logoFileSize,
+          logoFileType: client.client_order_configs.logoFileType,
+          logoEnabledCouriers: client.client_order_configs.logoEnabledCouriers,
+          logoUrl: client.client_order_configs.logoUrl,
+          
+          // Alt mobile number
+          enableAltMobileNumber: client.client_order_configs.enableAltMobileNumber,
+          
+          // Pickup location overrides
+          pickup_location_overrides: client.client_order_configs.pickup_location_overrides
         } : {
           // Default values when no config exists
           id: null,
@@ -214,7 +236,19 @@ export async function GET(
           requirePackageValue: false,
           requireWeight: false,
           requireTotalItems: false,
-          enableResellerFallback: false
+          enableResellerFallback: false,
+          enableReferencePrefix: true,
+          printmode: 'standard',
+          enableFooterNote: false,
+          footerNoteText: null,
+          displayLogoOnWaybill: false,
+          logoFileName: null,
+          logoFileSize: null,
+          logoFileType: null,
+          logoEnabledCouriers: null,
+          logoUrl: null,
+          enableAltMobileNumber: false,
+          pickup_location_overrides: {}
         },
 
         orderConfig: {
@@ -470,7 +504,7 @@ export async function PUT(
           
           // COD settings
           codEnabledByDefault: updateData.clientOrderConfig.codEnabledByDefault,
-          defaultCodAmount: updateData.clientOrderConfig.defaultCodAmount,
+          defaultCodAmount: updateData.clientOrderConfig.defaultCodAmount ?? null,
           
           // Validation rules
           minPackageValue: updateData.clientOrderConfig.minPackageValue,
@@ -487,14 +521,29 @@ export async function PUT(
           requireTotalItems: updateData.clientOrderConfig.requireTotalItems,
           
           // Reseller settings
-          enableResellerFallback: updateData.clientOrderConfig.enableResellerFallback,
-          enableThermalPrint: updateData.clientOrderConfig.enableThermalPrint || false,
-          enableReferencePrefix: updateData.clientOrderConfig.enableReferencePrefix || true,
-          displayLogoOnWaybill: updateData.clientOrderConfig.displayLogoOnWaybill || false,
-          logoFileName: updateData.clientOrderConfig.logoFileName || null,
-          logoFileSize: updateData.clientOrderConfig.logoFileSize || null,
-          logoFileType: updateData.clientOrderConfig.logoFileType || null,
-          logoEnabledCouriers: updateData.clientOrderConfig.logoEnabledCouriers || null
+          enableResellerFallback: updateData.clientOrderConfig.enableResellerFallback ?? true,
+          enableReferencePrefix: updateData.clientOrderConfig.enableReferencePrefix ?? true,
+          
+          // Print mode (replaces enableThermalPrint)
+          printmode: updateData.clientOrderConfig.printmode ?? 'standard',
+          
+          // Footer note settings
+          enableFooterNote: updateData.clientOrderConfig.enableFooterNote ?? false,
+          footerNoteText: updateData.clientOrderConfig.footerNoteText ?? null,
+          
+          // Logo settings
+          displayLogoOnWaybill: updateData.clientOrderConfig.displayLogoOnWaybill ?? false,
+          logoFileName: updateData.clientOrderConfig.logoFileName ?? null,
+          logoFileSize: updateData.clientOrderConfig.logoFileSize ?? null,
+          logoFileType: updateData.clientOrderConfig.logoFileType ?? null,
+          logoEnabledCouriers: updateData.clientOrderConfig.logoEnabledCouriers ?? null,
+          logoUrl: updateData.clientOrderConfig.logoUrl ?? null,
+          
+          // Alt mobile number
+          enableAltMobileNumber: updateData.clientOrderConfig.enableAltMobileNumber ?? false,
+          
+          // Pickup location overrides
+          pickup_location_overrides: updateData.clientOrderConfig.pickup_location_overrides ?? {}
         },
         create: {
           id: `order-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -507,7 +556,7 @@ export async function PUT(
           
           // COD settings
           codEnabledByDefault: updateData.clientOrderConfig.codEnabledByDefault,
-          defaultCodAmount: updateData.clientOrderConfig.defaultCodAmount,
+          defaultCodAmount: updateData.clientOrderConfig.defaultCodAmount ?? null,
           
           // Validation rules
           minPackageValue: updateData.clientOrderConfig.minPackageValue,
@@ -524,14 +573,29 @@ export async function PUT(
           requireTotalItems: updateData.clientOrderConfig.requireTotalItems,
           
           // Reseller settings
-          enableResellerFallback: updateData.clientOrderConfig.enableResellerFallback,
-          enableThermalPrint: updateData.clientOrderConfig.enableThermalPrint || false,
-          enableReferencePrefix: updateData.clientOrderConfig.enableReferencePrefix || true,
-          displayLogoOnWaybill: updateData.clientOrderConfig.displayLogoOnWaybill || false,
-          logoFileName: updateData.clientOrderConfig.logoFileName || null,
-          logoFileSize: updateData.clientOrderConfig.logoFileSize || null,
-          logoFileType: updateData.clientOrderConfig.logoFileType || null,
-          logoEnabledCouriers: updateData.clientOrderConfig.logoEnabledCouriers || null
+          enableResellerFallback: updateData.clientOrderConfig.enableResellerFallback ?? true,
+          enableReferencePrefix: updateData.clientOrderConfig.enableReferencePrefix ?? true,
+          
+          // Print mode (replaces enableThermalPrint)
+          printmode: updateData.clientOrderConfig.printmode ?? 'standard',
+          
+          // Footer note settings
+          enableFooterNote: updateData.clientOrderConfig.enableFooterNote ?? false,
+          footerNoteText: updateData.clientOrderConfig.footerNoteText ?? null,
+          
+          // Logo settings
+          displayLogoOnWaybill: updateData.clientOrderConfig.displayLogoOnWaybill ?? false,
+          logoFileName: updateData.clientOrderConfig.logoFileName ?? null,
+          logoFileSize: updateData.clientOrderConfig.logoFileSize ?? null,
+          logoFileType: updateData.clientOrderConfig.logoFileType ?? null,
+          logoEnabledCouriers: updateData.clientOrderConfig.logoEnabledCouriers ?? null,
+          logoUrl: updateData.clientOrderConfig.logoUrl ?? null,
+          
+          // Alt mobile number
+          enableAltMobileNumber: updateData.clientOrderConfig.enableAltMobileNumber ?? false,
+          
+          // Pickup location overrides
+          pickup_location_overrides: updateData.clientOrderConfig.pickup_location_overrides ?? {}
         }
       });
       
@@ -561,8 +625,9 @@ export async function PUT(
 
   } catch (error) {
     console.error('❌ [API_ADMIN_CLIENT_CONFIG_PUT] Error updating client config:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update client configuration';
     return NextResponse.json(
-      { error: 'Failed to update client configuration' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

@@ -297,11 +297,20 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
         setTimeout(() => setOrderConfigSuccess(''), 3000);
         fetchClientConfig(); // Refresh data
       } else {
-        const data = await response.json();
-        setOrderConfigError(data.error || 'Failed to update order configuration');
+        let errorMessage = 'Failed to update order configuration';
+        try {
+          const data = await response.json();
+          errorMessage = data.error || errorMessage;
+        } catch (jsonError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        console.error('❌ [ORDER_CONFIG_SAVE] Error response:', errorMessage);
+        setOrderConfigError(errorMessage);
       }
     } catch (error) {
-      setOrderConfigError('Error updating order configuration');
+      const errorMessage = error instanceof Error ? error.message : 'Error updating order configuration';
+      console.error('❌ [ORDER_CONFIG_SAVE] Exception:', errorMessage);
+      setOrderConfigError(errorMessage);
     } finally {
       setSavingOrderConfig(false);
     }

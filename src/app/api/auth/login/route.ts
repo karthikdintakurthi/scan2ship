@@ -128,15 +128,29 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Create or update session
-    const session = await prisma.sessions.upsert({
-      where: {
-        sessionToken: loginToken
-      },
-      update: {
-        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours
-      },
-      create: {
+    // Revoke existing active sessions for this user (optional - you can limit concurrent sessions)
+    // This ensures only one active session per user at a time
+    try {
+      await prisma.sessions.updateMany({
+        where: {
+          userId: user.id,
+          isActive: true
+        },
+        data: {
+          isActive: false,
+          revokedAt: new Date()
+        }
+      });
+    } catch (revokeError) {
+      console.warn('⚠️ [LOGIN] Could not revoke existing sessions:', revokeError);
+      // Continue with session creation even if revocation fails
+    }
+
+    // Create new session
+    const sessionExpiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+    const now = new Date();
+    const session = await prisma.sessions.create({
+      data: {
         id: crypto.randomUUID(),
         userId: user.id,
         clientId: user.clientId,
@@ -146,8 +160,10 @@ export async function POST(request: NextRequest) {
         userAgent: request.headers.get('user-agent') || 'unknown',
         role: user.role,
         permissions: JSON.stringify(['read', 'write']),
-        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours
-        createdAt: new Date()
+        expiresAt: sessionExpiresAt,
+        lastActivity: now,
+        isActive: true,
+        createdAt: now
       }
     });
 
@@ -179,9 +195,17 @@ export async function POST(request: NextRequest) {
     return response;
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ [LOGIN] Login error:', error);
+    console.error('❌ [LOGIN] Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    });
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      },
       { status: 500 }
     );
   }
