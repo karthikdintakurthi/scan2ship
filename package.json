@@ -56,6 +56,7 @@
     "fix:sequences": "node scripts/fix-sequences-after-migration.js"
   },
   "dependencies": {
+    "@bwip-js/node": "^4.8.0",
     "@prisma/client": "^6.14.0",
     "@types/lodash": "^4.17.20",
     "@types/qrcode": "^1.5.5",

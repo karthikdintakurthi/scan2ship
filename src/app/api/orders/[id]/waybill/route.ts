@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import jwt from 'jsonwebtoken'
+import bwipjs from '@bwip-js/node'
 import { generateThermalLabelHTML, createThermalLabelData } from '@/lib/thermal-label-generator'
 import { generateA5LabelHTML, createA5LabelData } from '@/lib/a5-label-generator'
 import { generateR4LabelHTML, createR4LabelData } from '@/lib/4r-label-generator'
@@ -11,24 +12,21 @@ const prisma = new PrismaClient()
 
 // Authentication handled by centralized middleware
 
-// Function to generate barcode for tracking number using external service
+/** Generate Code128 barcode locally (no external API). Returns data URL or '' on error. */
 async function generateBarcode(trackingNumber: string): Promise<string> {
   try {
-    // Use a reliable barcode generation service
-    const barcodeUrl = `https://barcodeapi.org/api/Code128/${encodeURIComponent(trackingNumber)}`;
-    const response = await fetch(barcodeUrl);
-    
-    if (response.ok) {
-      const arrayBuffer = await response.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString('base64');
-      return `data:image/png;base64,${base64}`;
-    } else {
-      console.error('Barcode service returned error:', response.status);
-      return '';
-    }
+    const png = await bwipjs.toBuffer({
+      bcid: 'code128',
+      text: trackingNumber,
+      scale: 2,
+      height: 10,
+      includetext: true,
+    })
+    const base64 = (png as Buffer).toString('base64')
+    return `data:image/png;base64,${base64}`
   } catch (error) {
-    console.error('Error generating barcode:', error);
-    return '';
+    console.error('Error generating barcode:', error)
+    return ''
   }
 }
 
