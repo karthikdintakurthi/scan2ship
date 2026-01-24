@@ -370,6 +370,19 @@ model rate_limits {
   @@index([key])
 }
 
+model otp_sessions {
+  id        String   @id
+  sessionId String   @unique
+  mobile    String
+  otp       String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@index([mobile])
+}
+
 model sessions {
   id           String    @id
   userId       String
