@@ -542,6 +542,11 @@ export default function ClientSettingsPage() {
   const [footerNoteEnabled, setFooterNoteEnabled] = useState(false);
   const [footerNoteText, setFooterNoteText] = useState('');
 
+  // Custom from address (per user, per courier)
+  const [customAddressOverwrite, setCustomAddressOverwrite] = useState(false);
+  const [customAddressCourier, setCustomAddressCourier] = useState('');
+  const [customAddressText, setCustomAddressText] = useState('');
+
   // Check authentication and redirect if needed
   useEffect(() => {
     if (!currentUser) {
@@ -570,6 +575,7 @@ export default function ClientSettingsPage() {
       loadDtdcCodSlipsFromDatabase();
       loadDtdcPlusSlipsFromDatabase();
       loadLogo();
+      loadCustomAddress();
     }
   }, [currentUser, currentClient]);
 
@@ -1611,6 +1617,58 @@ export default function ClientSettingsPage() {
     }
   };
 
+  const loadCustomAddress = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+      const response = await fetch('/api/custom-address', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setCustomAddressOverwrite(data.data.overwriteFromAddress ?? false);
+          setCustomAddressCourier(data.data.courierServiceCode ?? '');
+          setCustomAddressText(data.data.customAddress ?? '');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading custom address:', error);
+    }
+  };
+
+  const saveCustomAddress = async () => {
+    const sectionKey = 'custom-address';
+    try {
+      setSectionSaving(sectionKey, true);
+      clearSectionMessages(sectionKey);
+      const token = localStorage.getItem('authToken');
+      if (!token) throw new Error('Authentication token not found');
+      const response = await fetch('/api/custom-address', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          overwriteFromAddress: customAddressOverwrite,
+          courierServiceCode: customAddressCourier || null,
+          customAddress: customAddressText.trim() || null
+        })
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to save custom address');
+      }
+      setSectionSuccessMessage(sectionKey, 'Custom address saved successfully.');
+      await loadCustomAddress();
+    } catch (error) {
+      setSectionError(sectionKey, error instanceof Error ? error.message : 'Failed to save custom address');
+    } finally {
+      setSectionSaving(sectionKey, false);
+    }
+  };
+
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -2458,6 +2516,77 @@ export default function ClientSettingsPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Custom Address (overwrite from address per courier) */}
+          <div className="bg-white shadow rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-lg font-medium text-gray-900">Custom Address</h2>
+              <button
+                onClick={saveCustomAddress}
+                disabled={savingSections['custom-address']}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingSections['custom-address'] ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              {sectionSuccess['custom-address'] && (
+                <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-3">
+                  <p className="text-sm text-green-800">{sectionSuccess['custom-address']}</p>
+                </div>
+              )}
+              {sectionErrors['custom-address'] && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
+                  <p className="text-sm text-red-800">{sectionErrors['custom-address']}</p>
+                </div>
+              )}
+              <p className="text-sm text-gray-600 mb-4">
+                When enabled, orders created with the selected courier will use the address below as the &quot;from address&quot; (e.g. on waybills) instead of the profile address.
+              </p>
+              <div className="space-y-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={customAddressOverwrite}
+                    onChange={(e) => setCustomAddressOverwrite(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-900">Overwrite from address</span>
+                </label>
+                <div>
+                  <label htmlFor="custom-address-courier" className="block text-sm font-medium text-gray-700 mb-1">
+                    Courier service
+                  </label>
+                  <select
+                    id="custom-address-courier"
+                    value={customAddressCourier}
+                    onChange={(e) => setCustomAddressCourier(e.target.value)}
+                    className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select courier</option>
+                    {config.courierServices.filter((s: { isActive: boolean }) => s.isActive).map((service: { id: string; name: string; code: string }) => (
+                      <option key={service.id} value={service.code}>
+                        {service.name} ({service.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="custom-address-text" className="block text-sm font-medium text-gray-700 mb-1">
+                    From address
+                  </label>
+                  <textarea
+                    id="custom-address-text"
+                    value={customAddressText}
+                    onChange={(e) => setCustomAddressText(e.target.value)}
+                    rows={4}
+                    placeholder="Enter the address to use as &quot;from address&quot; for orders with the selected courier..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
               </div>
             </div>
           </div>

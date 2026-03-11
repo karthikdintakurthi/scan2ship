@@ -168,6 +168,21 @@ export async function POST(request: NextRequest) {
       console.log('🔍 [API_ORDERS_POST] Products data saved as JSON:', processedOrderData.products);
     }
     
+    // Apply user's custom from address for this courier (overrides profile/address when order uses selected courier)
+    const customFrom = await prisma.user_custom_from_address.findUnique({
+      where: { userId: user.id }
+    });
+    if (
+      customFrom?.overwriteFromAddress &&
+      customFrom.courierServiceCode &&
+      customFrom.customAddress &&
+      orderData.courier_service &&
+      String(orderData.courier_service).toLowerCase() === customFrom.courierServiceCode.toLowerCase()
+    ) {
+      processedOrderData.seller_address = customFrom.customAddress;
+      console.log('📋 [API_ORDERS_POST] Using custom from address for courier:', orderData.courier_service);
+    }
+
     // Log the processed data for debugging
     console.log('🔍 [API_ORDERS_POST] Processed order data:', processedOrderData);
 

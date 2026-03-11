@@ -445,29 +445,43 @@ model system_config {
   updatedAt   DateTime
 }
 
+model user_custom_from_address {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  overwriteFromAddress Boolean  @default(false)
+  courierServiceCode   String?
+  customAddress        String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  users                users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model users {
-  id                  String                  @id
-  email               String
-  name                String
-  password            String?
-  role                String                  @default("child_user")
-  isActive            Boolean                 @default(true)
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime
-  clientId            String
-  createdBy           String?
-  parentUserId        String?
-  analytics_events    analytics_events[]
-  credit_transactions credit_transactions[]
-  order_analytics     order_analytics[]
-  createdOrders       orders[]                @relation("OrderCreator")
-  pickup_requests     pickup_requests[]
-  sessions            sessions[]
-  userPickupLocations user_pickup_locations[]
-  userSubGroups       user_sub_groups[]
-  clients             clients                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  parentUser          users?                  @relation("UserHierarchy", fields: [parentUserId], references: [id])
-  childUsers          users[]                 @relation("UserHierarchy")
+  id                     String                    @id
+  email                  String
+  name                   String
+  password               String?
+  role                   String                    @default("child_user")
+  isActive               Boolean                   @default(true)
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime
+  clientId               String
+  createdBy              String?
+  parentUserId           String?
+  analytics_events       analytics_events[]
+  credit_transactions    credit_transactions[]
+  order_analytics        order_analytics[]
+  createdOrders          orders[]                  @relation("OrderCreator")
+  pickup_requests        pickup_requests[]
+  sessions               sessions[]
+  userPickupLocations    user_pickup_locations[]
+  userSubGroups          user_sub_groups[]
+  user_custom_from_address user_custom_from_address?
+  clients                clients                   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  parentUser             users?                    @relation("UserHierarchy", fields: [parentUserId], references: [id])
+  childUsers             users[]                   @relation("UserHierarchy")
 
   @@unique([email, clientId])
   @@index([parentUserId])
