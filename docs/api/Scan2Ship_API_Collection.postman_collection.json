@@ -1,8 +1,8 @@
 {
   "info": {
     "name": "Scan2Ship API Collection",
-    "description": "Complete API collection for Scan2Ship logistics courier aggregator application",
-    "version": "1.0.0",
+    "description": "Complete API collection for the Scan2Ship logistics platform.\n\nGenerated from source on 2026-08-08 — covers all 133 handlers across 87 route files.\n\n## Setup\n1. Set `base_url` (default `http://localhost:3000/api`).\n2. Run **Authentication → Create Auth / Login**; the test script stores `auth_token` and `client_id` automatically.\n3. For External API requests, set `api_key`.\n\n## Notes\n- Each request description states its required auth and minimum role, and links to its source file.\n- Query parameters are added disabled by default — enable the ones you need.\n- Request bodies show required fields with sample values; optional fields are omitted.\n- Endpoints marked ⚠️ have no authentication. Several are unintended; see `docs/audits/FULL_APP_AUDIT_2026-08-08.md`.",
+    "version": "2.0.0",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -27,6 +27,11 @@
       "type": "string"
     },
     {
+      "key": "api_key",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "client_id",
       "value": "",
       "type": "string"
@@ -40,9 +45,10 @@
   "item": [
     {
       "name": "Authentication",
+      "description": "6 endpoints",
       "item": [
         {
-          "name": "Login",
+          "name": "Create Auth / Change Password",
           "request": {
             "method": "POST",
             "header": [
@@ -53,23 +59,67 @@
             ],
             "body": {
               "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "**`POST /api/auth/change-password`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/auth/change-password/route.ts`"
+          }
+        },
+        {
+          "name": "Create Auth / Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
               "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/auth/login",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "login"]
-            }
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "**`POST /api/auth/login`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/auth/login/route.ts`"
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
                   "if (pm.response.code === 200) {",
                   "    const response = pm.response.json();",
-                  "    pm.collectionVariables.set('auth_token', response.token);",
-                  "    pm.collectionVariables.set('client_id', response.user.clientId);",
+                  "    if (response.token) pm.collectionVariables.set('auth_token', response.token);",
+                  "    if (response.user && response.user.clientId) pm.collectionVariables.set('client_id', response.user.clientId);",
                   "}"
                 ]
               }
@@ -77,7 +127,7 @@
           ]
         },
         {
-          "name": "Register Client",
+          "name": "Create Auth / Refresh",
           "request": {
             "method": "POST",
             "header": [
@@ -88,17 +138,60 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Client Name\",\n  \"companyName\": \"Company Name\",\n  \"email\": \"client@example.com\",\n  \"phone\": \"+1234567890\",\n  \"address\": \"Client Address\",\n  \"city\": \"City\",\n  \"state\": \"State\",\n  \"country\": \"India\",\n  \"pincode\": \"123456\"\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"refreshToken\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "**`POST /api/auth/refresh`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/auth/refresh/route.ts`"
+          }
+        },
+        {
+          "name": "Create Auth / Register Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"companyName\": \"\",\n  \"email\": \"user@example.com\",\n  \"phone\": \"\",\n  \"address\": \"12 Main Street\",\n  \"city\": \"Hyderabad\",\n  \"state\": \"Telangana\",\n  \"country\": \"India\",\n  \"pincode\": \"500001\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/auth/register-client",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "register-client"]
-            }
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register-client"
+              ]
+            },
+            "description": "**`POST /api/auth/register-client`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/auth/register-client/route.ts`"
           }
         },
         {
-          "name": "Register User",
+          "name": "Create Auth / Register User",
           "request": {
             "method": "POST",
             "header": [
@@ -109,34 +202,52 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"User Name\",\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"clientId\": \"{{client_id}}\"\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"clientId\": \"{{client_id}}\",\n  \"role\": \"user\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/auth/register-user",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "register-user"]
-            }
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register-user"
+              ]
+            },
+            "description": "**`POST /api/auth/register-user`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/auth/register-user/route.ts`"
           }
         },
         {
-          "name": "Verify Token",
+          "name": "Get Auth / Verify",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{base_url}}/auth/verify",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "verify"]
-            }
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "verify"
+              ]
+            },
+            "description": "**`GET /api/auth/verify`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/auth/verify/route.ts`"
           }
         }
       ]
     },
     {
       "name": "Orders",
+      "description": "11 endpoints",
       "item": [
         {
-          "name": "Create Order",
+          "name": "Create Orders",
           "request": {
             "method": "POST",
             "header": [
@@ -147,27 +258,189 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Customer Name\",\n  \"mobile\": \"9876543210\",\n  \"phone\": \"9876543210\",\n  \"address\": \"Delivery Address\",\n  \"city\": \"City\",\n  \"state\": \"State\",\n  \"country\": \"India\",\n  \"pincode\": \"123456\",\n  \"courier_service\": \"DELHIVERY\",\n  \"pickup_location\": \"Pickup Location\",\n  \"package_value\": 1000.00,\n  \"weight\": 1.5,\n  \"total_items\": 1,\n  \"is_cod\": false,\n  \"cod_amount\": null,\n  \"reference_number\": \"REF123\",\n  \"tracking_id\": \"TRK123\",\n  \"reseller_name\": \"Reseller Name\",\n  \"reseller_mobile\": \"9876543210\",\n  \"product_description\": \"Product Description\",\n  \"shipment_length\": 10.0,\n  \"shipment_breadth\": 10.0,\n  \"shipment_height\": 10.0,\n  \"return_address\": \"Return Address\",\n  \"return_pincode\": \"123456\",\n  \"fragile_shipment\": false,\n  \"seller_name\": \"Seller Name\",\n  \"seller_address\": \"Seller Address\",\n  \"seller_gst\": \"GST123\",\n  \"invoice_number\": \"INV123\",\n  \"commodity_value\": 1000.00,\n  \"tax_value\": 180.00,\n  \"category_of_goods\": \"Electronics\",\n  \"vendor_pickup_location\": \"Vendor Location\",\n  \"hsn_code\": \"8517\",\n  \"seller_cst_no\": \"CST123\",\n  \"seller_tin\": \"TIN123\",\n  \"invoice_date\": \"2024-01-01\"\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"mobile\": \"9876543210\",\n  \"address\": \"12 Main Street\",\n  \"city\": \"Hyderabad\",\n  \"state\": \"Telangana\",\n  \"country\": \"India\",\n  \"pincode\": \"500001\",\n  \"courier_service\": \"delhivery\",\n  \"pickup_location\": \"Main Warehouse\",\n  \"package_value\": 1500,\n  \"weight\": 500,\n  \"total_items\": 1\n}"
             },
             "url": {
               "raw": "{{base_url}}/orders",
-              "host": ["{{base_url}}"],
-              "path": ["orders"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    const response = pm.response.json();",
-                  "    pm.collectionVariables.set('order_id', response.order.id);",
-                  "}"
-                ]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "description": "**`POST /api/orders`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/orders/route.ts`"
+          }
+        },
+        {
+          "name": "Create Orders / :id / Fulfill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
               }
-            }
-          ]
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/:id/fulfill",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ":id",
+                "fulfill"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`POST /api/orders/[id]/fulfill`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/orders/[id]/fulfill/route.ts`"
+          }
+        },
+        {
+          "name": "Create Orders / :id / Retry Delhivery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/:id/retry-delhivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ":id",
+                "retry-delhivery"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`POST /api/orders/[id]/retry-delhivery`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/orders/[id]/retry-delhivery/route.ts`"
+          }
+        },
+        {
+          "name": "Create Orders / Refresh Statuses",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"orderIds\": [1, 2]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/refresh-statuses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "refresh-statuses"
+              ]
+            },
+            "description": "**`POST /api/orders/refresh-statuses`**\n\nBearer JWT required. Minimum role: `any authenticated`.\n\nSource: `src/app/api/orders/refresh-statuses/route.ts`"
+          }
+        },
+        {
+          "name": "Delete Orders",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"orderIds\": [1, 2]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "description": "**`DELETE /api/orders`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/orders/route.ts`"
+          }
+        },
+        {
+          "name": "Delete Orders / :id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`DELETE /api/orders/[id]`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/orders/[id]/route.ts`"
+          }
         },
         {
           "name": "Get Orders",
@@ -175,56 +448,164 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/orders?page=1&limit=10&search=&fromDate=&toDate=&pickupLocation=&courierService=",
-              "host": ["{{base_url}}"],
-              "path": ["orders"],
+              "raw": "{{base_url}}/orders?page=1&limit=20&search=&fromDate=&toDate=&pickupLocation=&courierService=&trackingStatus=&subGroup=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders"
+              ],
               "query": [
                 {
                   "key": "page",
-                  "value": "1"
+                  "value": "1",
+                  "disabled": true
                 },
                 {
                   "key": "limit",
-                  "value": "10"
+                  "value": "20",
+                  "disabled": true
                 },
                 {
                   "key": "search",
-                  "value": ""
+                  "value": "",
+                  "disabled": true
                 },
                 {
                   "key": "fromDate",
-                  "value": ""
+                  "value": "",
+                  "disabled": true
                 },
                 {
                   "key": "toDate",
-                  "value": ""
+                  "value": "",
+                  "disabled": true
                 },
                 {
                   "key": "pickupLocation",
-                  "value": ""
+                  "value": "",
+                  "disabled": true
                 },
                 {
                   "key": "courierService",
-                  "value": ""
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "trackingStatus",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "subGroup",
+                  "value": "",
+                  "disabled": true
                 }
               ]
-            }
+            },
+            "description": "**`GET /api/orders`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/orders/route.ts`"
           }
         },
         {
-          "name": "Get Order by ID",
+          "name": "Get Orders / :id",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["orders", "{{order_id}}"]
-            }
+              "raw": "{{base_url}}/orders/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/orders/[id]`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/orders/[id]/route.ts`"
           }
         },
         {
-          "name": "Update Order",
+          "name": "Get Orders / :id / Shipping Label",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders/:id/shipping-label?thermal=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ":id",
+                "shipping-label"
+              ],
+              "query": [
+                {
+                  "key": "thermal",
+                  "value": "",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/orders/[id]/shipping-label`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/orders/[id]/shipping-label/route.ts`"
+          }
+        },
+        {
+          "name": "Get Orders / :id / Waybill",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders/:id/waybill?thermal=&a5=&r4=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ":id",
+                "waybill"
+              ],
+              "query": [
+                {
+                  "key": "thermal",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "a5",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "r4",
+                  "value": "",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/orders/[id]/waybill`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/orders/[id]/waybill/route.ts`"
+          }
+        },
+        {
+          "name": "Update Orders / :id",
           "request": {
             "method": "PUT",
             "header": [
@@ -235,115 +616,47 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Customer Name\",\n  \"mobile\": \"9876543210\",\n  \"address\": \"Updated Delivery Address\",\n  \"city\": \"Updated City\",\n  \"state\": \"Updated State\",\n  \"country\": \"India\",\n  \"pincode\": \"123456\",\n  \"courier_service\": \"DELHIVERY\",\n  \"pickup_location\": \"Pickup Location\",\n  \"package_value\": 1500.00,\n  \"weight\": 2.0,\n  \"total_items\": 2\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"address\": \"12 Main Street\",\n  \"city\": \"Hyderabad\",\n  \"state\": \"Telangana\",\n  \"pincode\": \"500001\",\n  \"tracking_status\": \"pending\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["orders", "{{order_id}}"]
-            }
-          }
-        },
-        {
-          "name": "Delete Order",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["orders", "{{order_id}}"]
-            }
-          }
-        },
-        {
-          "name": "Get Shipping Label",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}/shipping-label",
-              "host": ["{{base_url}}"],
-              "path": ["orders", "{{order_id}}", "shipping-label"]
-            }
-          }
-        },
-        {
-          "name": "Get Waybill",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}/waybill",
-              "host": ["{{base_url}}"],
-              "path": ["orders", "{{order_id}}", "waybill"]
-            }
-          }
-        },
-        {
-          "name": "Retry Delhivery",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{}"
+              "raw": "{{base_url}}/orders/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
             },
-            "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}/retry-delhivery",
-              "host": ["{{base_url}}"],
-              "path": ["orders", "{{order_id}}", "retry-delhivery"]
-            }
+            "description": "**`PUT /api/orders/[id]`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/orders/[id]/route.ts`"
           }
         }
       ]
     },
     {
-      "name": "Courier Services",
+      "name": "External API (API key)",
+      "description": "2 endpoints",
       "item": [
         {
-          "name": "Get Courier Services",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/courier-services",
-              "host": ["{{base_url}}"],
-              "path": ["courier-services"]
-            }
-          }
-        },
-        {
-          "name": "Create Courier Service",
+          "name": "Create External / Orders",
           "request": {
             "method": "POST",
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Service Name\",\n  \"code\": \"SERVICE_CODE\",\n  \"isActive\": true\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/courier-services",
-              "host": ["{{base_url}}"],
-              "path": ["courier-services"]
-            }
-          }
-        },
-        {
-          "name": "Update Courier Service",
-          "request": {
-            "method": "PUT",
-            "header": [
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -351,79 +664,167 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"service-id\",\n  \"name\": \"Updated Service Name\",\n  \"code\": \"UPDATED_CODE\",\n  \"isActive\": true\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"mobile\": \"9876543210\",\n  \"address\": \"12 Main Street\",\n  \"city\": \"Hyderabad\",\n  \"state\": \"Telangana\",\n  \"pincode\": \"500001\",\n  \"courier_service\": \"delhivery\",\n  \"pickup_location\": \"Main Warehouse\",\n  \"package_value\": 1500,\n  \"weight\": 500,\n  \"total_items\": 1\n}"
             },
             "url": {
-              "raw": "{{base_url}}/courier-services",
-              "host": ["{{base_url}}"],
-              "path": ["courier-services"]
-            }
+              "raw": "{{base_url}}/external/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "external",
+                "orders"
+              ]
+            },
+            "description": "**`POST /api/external/orders`**\n\nAPI key auth (`x-api-key` header). Scope-checked.\n\nSource: `src/app/api/external/orders/route.ts`"
           }
-        }
-      ]
-    },
-    {
-      "name": "Pickup Locations",
-      "item": [
+        },
         {
-          "name": "Get Pickup Locations",
+          "name": "Get External / Orders",
           "request": {
             "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/pickup-locations",
-              "host": ["{{base_url}}"],
-              "path": ["pickup-locations"]
-            }
-          }
-        },
-        {
-          "name": "Create Pickup Location",
-          "request": {
-            "method": "POST",
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/json"
+                "key": "x-api-key",
+                "value": "{{api_key}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"value\": \"LOCATION_CODE\",\n  \"label\": \"Location Name\",\n  \"delhiveryApiKey\": \"api-key\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/pickup-locations",
-              "host": ["{{base_url}}"],
-              "path": ["pickup-locations"]
-            }
-          }
-        },
-        {
-          "name": "Update Pickup Location",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"id\": \"location-id\",\n  \"value\": \"UPDATED_CODE\",\n  \"label\": \"Updated Location Name\",\n  \"delhiveryApiKey\": \"updated-api-key\"\n}"
+              "raw": "{{base_url}}/external/orders?page=1&limit=20&search=&fromDate=&toDate=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "external",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fromDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "toDate",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
             },
-            "url": {
-              "raw": "{{base_url}}/pickup-locations",
-              "host": ["{{base_url}}"],
-              "path": ["pickup-locations"]
-            }
+            "description": "**`GET /api/external/orders`**\n\nAPI key auth (`x-api-key` header). Scope-checked.\n\nSource: `src/app/api/external/orders/route.ts`"
           }
         }
       ]
     },
     {
       "name": "Credits",
+      "description": "4 endpoints",
       "item": [
+        {
+          "name": "Create Credits / Verify Payment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "transactionRef",
+                  "value": "TXN123456",
+                  "type": "text"
+                },
+                {
+                  "key": "amount",
+                  "value": "100",
+                  "type": "text"
+                },
+                {
+                  "key": "utrNumber",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "paymentDetails",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "extractedAmount",
+                  "value": "",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/credits/verify-payment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "credits",
+                "verify-payment"
+              ]
+            },
+            "description": "**`POST /api/credits/verify-payment`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/credits/verify-payment/route.ts`"
+          }
+        },
+        {
+          "name": "Create Validate Payment Screenshot",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "screenshot",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "transactionRef",
+                  "value": "TXN123456",
+                  "type": "text"
+                },
+                {
+                  "key": "expectedAmount",
+                  "value": "",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/validate-payment-screenshot",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "validate-payment-screenshot"
+              ]
+            },
+            "description": "**`POST /api/validate-payment-screenshot`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/validate-payment-screenshot/route.ts`"
+          }
+        },
         {
           "name": "Get Credits",
           "request": {
@@ -431,61 +832,90 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/credits",
-              "host": ["{{base_url}}"],
-              "path": ["credits"]
-            }
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "credits"
+              ]
+            },
+            "description": "**`GET /api/credits`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/credits/route.ts`"
           }
         },
         {
-          "name": "Get Credit Transactions",
+          "name": "Get Credits / Transactions",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/credits/transactions?page=1&limit=10",
-              "host": ["{{base_url}}"],
-              "path": ["credits", "transactions"],
+              "raw": "{{base_url}}/credits/transactions?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "credits",
+                "transactions"
+              ],
               "query": [
                 {
                   "key": "page",
-                  "value": "1"
+                  "value": "1",
+                  "disabled": true
                 },
                 {
                   "key": "limit",
-                  "value": "10"
+                  "value": "20",
+                  "disabled": true
                 }
               ]
-            }
-          }
-        },
-        {
-          "name": "Verify Payment",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount\": 1000,\n  \"utrNumber\": \"UTR123456789\",\n  \"screenshot\": \"base64-encoded-image\"\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/credits/verify-payment",
-              "host": ["{{base_url}}"],
-              "path": ["credits", "verify-payment"]
-            }
+            "description": "**`GET /api/credits/transactions`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/credits/transactions/route.ts`"
           }
         }
       ]
     },
     {
-      "name": "Analytics",
+      "name": "Courier Services",
+      "description": "7 endpoints",
       "item": [
         {
-          "name": "Track Event",
+          "name": "Create Carrier / Rates",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/carrier/rates",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "carrier",
+                "rates"
+              ]
+            },
+            "description": "**`POST /api/carrier/rates`**\n\nAPI key auth (`x-api-key` header). Scope-checked.\n\nSource: `src/app/api/carrier/rates/route.ts`"
+          }
+        },
+        {
+          "name": "Create Courier Services",
           "request": {
             "method": "POST",
             "header": [
@@ -496,103 +926,91 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventType\": \"order_created\",\n  \"eventData\": {\n    \"orderId\": 123,\n    \"courierService\": \"DELHIVERY\",\n    \"packageValue\": 1000\n  }\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
             },
             "url": {
-              "raw": "{{base_url}}/analytics/track",
-              "host": ["{{base_url}}"],
-              "path": ["analytics", "track"]
-            }
+              "raw": "{{base_url}}/courier-services",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier-services"
+              ]
+            },
+            "description": "**`POST /api/courier-services`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/courier-services/route.ts`"
           }
         },
         {
-          "name": "Get Platform Analytics",
+          "name": "Get Carrier / Rates",
           "request": {
             "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/analytics/platform",
-              "host": ["{{base_url}}"],
-              "path": ["analytics", "platform"]
-            }
-          }
-        },
-        {
-          "name": "Get Client Analytics",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/analytics/clients",
-              "host": ["{{base_url}}"],
-              "path": ["analytics", "clients"]
-            }
-          }
-        },
-        {
-          "name": "Get Client Analytics by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/analytics/clients/{{client_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["analytics", "clients", "{{client_id}}"]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Admin APIs",
-      "item": [
-        {
-          "name": "Get All Clients",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/admin/clients",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "clients"]
-            }
-          }
-        },
-        {
-          "name": "Create Client",
-          "request": {
-            "method": "POST",
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/json"
+                "key": "x-api-key",
+                "value": "{{api_key}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Client Name\",\n  \"companyName\": \"Company Name\",\n  \"email\": \"client@example.com\",\n  \"phone\": \"+1234567890\",\n  \"address\": \"Client Address\",\n  \"city\": \"City\",\n  \"state\": \"State\",\n  \"country\": \"India\",\n  \"pincode\": \"123456\",\n  \"subscriptionPlan\": \"basic\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/admin/clients",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "clients"]
-            }
+              "raw": "{{base_url}}/carrier/rates",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "carrier",
+                "rates"
+              ]
+            },
+            "description": "**`GET /api/carrier/rates`**\n\nAPI key auth (`x-api-key` header). Scope-checked.\n\nSource: `src/app/api/carrier/rates/route.ts`"
           }
         },
         {
-          "name": "Get Client by ID",
+          "name": "Get Courier Services",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/admin/clients/{{client_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "clients", "{{client_id}}"]
-            }
+              "raw": "{{base_url}}/courier-services",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier-services"
+              ]
+            },
+            "description": "**`GET /api/courier-services`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/courier-services/route.ts`"
           }
         },
         {
-          "name": "Update Client",
+          "name": "Get Dtdc Slips",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/dtdc-slips?courier=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "dtdc-slips"
+              ],
+              "query": [
+                {
+                  "key": "courier",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**`GET /api/dtdc-slips`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/dtdc-slips/route.ts`"
+          }
+        },
+        {
+          "name": "Update Courier Services",
           "request": {
             "method": "PUT",
             "header": [
@@ -603,107 +1021,603 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Client Name\",\n  \"companyName\": \"Updated Company Name\",\n  \"email\": \"updated@example.com\",\n  \"phone\": \"+1234567890\",\n  \"address\": \"Updated Address\",\n  \"city\": \"Updated City\",\n  \"state\": \"Updated State\",\n  \"country\": \"India\",\n  \"pincode\": \"123456\",\n  \"subscriptionPlan\": \"premium\",\n  \"isActive\": true\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
             },
             "url": {
-              "raw": "{{base_url}}/admin/clients/{{client_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "clients", "{{client_id}}"]
-            }
+              "raw": "{{base_url}}/courier-services",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier-services"
+              ]
+            },
+            "description": "**`PUT /api/courier-services`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/courier-services/route.ts`"
           }
         },
         {
-          "name": "Delete Client",
+          "name": "Update Dtdc Slips",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/dtdc-slips",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "dtdc-slips"
+              ]
+            },
+            "description": "**`PUT /api/dtdc-slips`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/dtdc-slips/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pickup Locations",
+      "description": "2 endpoints",
+      "item": [
+        {
+          "name": "Create Pickup Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"selectedPickupLocations\": \"\",\n  \"pickup_date\": \"\",\n  \"pickup_time\": \"\",\n  \"expected_package_count\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pickup-request",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pickup-request"
+              ]
+            },
+            "description": "**`POST /api/pickup-request`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/pickup-request/route.ts`"
+          }
+        },
+        {
+          "name": "Get Pickup Locations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pickup-locations?clientId={{client_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pickup-locations"
+              ],
+              "query": [
+                {
+                  "key": "clientId",
+                  "value": "{{client_id}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**`GET /api/pickup-locations`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/pickup-locations/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tracking",
+      "description": "3 endpoints",
+      "item": [
+        {
+          "name": "Create Tracking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"mobile\": \"9876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tracking"
+              ]
+            },
+            "description": "**`POST /api/tracking`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/tracking/route.ts`"
+          }
+        },
+        {
+          "name": "Create Tracking / Update Single",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"orderId\": \"\",\n  \"trackingId\": \"\",\n  \"apiKey\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tracking/update-single",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tracking",
+                "update-single"
+              ]
+            },
+            "description": "**`POST /api/tracking/update-single`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/tracking/update-single/route.ts`"
+          }
+        },
+        {
+          "name": "Get Tracking / Delhivery",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tracking/delhivery?waybill=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tracking",
+                "delhivery"
+              ],
+              "query": [
+                {
+                  "key": "waybill",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**`GET /api/tracking/delhivery`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/tracking/delhivery/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delhivery",
+      "description": "2 endpoints",
+      "item": [
+        {
+          "name": "Create Delhivery / Update Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/delhivery/update-order",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "delhivery",
+                "update-order"
+              ]
+            },
+            "description": "**`POST /api/delhivery/update-order`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/delhivery/update-order/route.ts`"
+          }
+        },
+        {
+          "name": "Get Validate Pincode",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/validate-pincode?pincode=500001",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "validate-pincode"
+              ],
+              "query": [
+                {
+                  "key": "pincode",
+                  "value": "500001",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**`GET /api/validate-pincode`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/validate-pincode/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shopify",
+      "description": "5 endpoints",
+      "item": [
+        {
+          "name": "Create Shopify / Auth",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"code\": \"\",\n  \"state\": \"Telangana\",\n  \"shop\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/shopify/auth",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "shopify",
+                "auth"
+              ]
+            },
+            "description": "**`POST /api/shopify/auth`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/shopify/auth/route.ts`"
+          }
+        },
+        {
+          "name": "Create Shopify / Webhooks",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/shopify/webhooks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "shopify",
+                "webhooks"
+              ]
+            },
+            "description": "**`POST /api/shopify/webhooks`**\n\nShopify HMAC signature verification (`X-Shopify-Hmac-Sha256`).\n\nSource: `src/app/api/shopify/webhooks/route.ts`"
+          }
+        },
+        {
+          "name": "Get Shopify / Auth",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/shopify/auth?client_id=&shop=&redirect_uri=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "shopify",
+                "auth"
+              ],
+              "query": [
+                {
+                  "key": "client_id",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "shop",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**`GET /api/shopify/auth`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/shopify/auth/route.ts`"
+          }
+        },
+        {
+          "name": "Get Shopify / Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/shopify/config",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "shopify",
+                "config"
+              ]
+            },
+            "description": "**`GET /api/shopify/config`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/shopify/config/route.ts`"
+          }
+        },
+        {
+          "name": "Update Shopify / Config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"autoCreateOrders\": \"\",\n  \"webhookSecret\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/shopify/config",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "shopify",
+                "config"
+              ]
+            },
+            "description": "**`PUT /api/shopify/config`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/shopify/config/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "description": "7 endpoints",
+      "item": [
+        {
+          "name": "Create Webhooks",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"url\": \"\",\n  \"events\": \"\",\n  \"name\": \"Test Customer\",\n  \"secret\": \"\",\n  \"isActive\": \"\",\n  \"retryCount\": \"\",\n  \"timeout\": \"\",\n  \"headers\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "webhooks"
+              ]
+            },
+            "description": "**`POST /api/webhooks`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/webhooks/route.ts`"
+          }
+        },
+        {
+          "name": "Create Webhooks / Delhivery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"tracking_data\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/delhivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "webhooks",
+                "delhivery"
+              ]
+            },
+            "description": "**`POST /api/webhooks/delhivery`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/webhooks/delhivery/route.ts`"
+          }
+        },
+        {
+          "name": "Create Webhooks / Retry / :logId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/retry/:logId",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "webhooks",
+                "retry",
+                ":logId"
+              ],
+              "variable": [
+                {
+                  "key": "logId",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`POST /api/webhooks/retry/[logId]`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/webhooks/retry/[logId]/route.ts`"
+          }
+        },
+        {
+          "name": "Delete Webhooks / :id",
           "request": {
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/admin/clients/{{client_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "clients", "{{client_id}}"]
-            }
-          }
-        },
-        {
-          "name": "Get All Users",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/admin/users",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "users"]
-            }
-          }
-        },
-        {
-          "name": "Create User",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"User Name\",\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"user\",\n  \"clientId\": \"{{client_id}}\"\n}"
+              "raw": "{{base_url}}/webhooks/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "webhooks",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
             },
-            "url": {
-              "raw": "{{base_url}}/admin/users",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "users"]
-            }
+            "description": "**`DELETE /api/webhooks/[id]`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/webhooks/[id]/route.ts`"
           }
         },
         {
-          "name": "Get All Credits",
+          "name": "Get Webhooks",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/admin/credits",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "credits"]
-            }
-          }
-        },
-        {
-          "name": "Get Client Credits",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/admin/credits/{{client_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "credits", "{{client_id}}"]
-            }
-          }
-        },
-        {
-          "name": "Add Credits to Client",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount\": 1000,\n  \"description\": \"Credit addition\"\n}"
+              "raw": "{{base_url}}/webhooks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "webhooks"
+              ]
             },
-            "url": {
-              "raw": "{{base_url}}/admin/credits/{{client_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "credits", "{{client_id}}"]
-            }
+            "description": "**`GET /api/webhooks`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/webhooks/route.ts`"
           }
         },
         {
-          "name": "Update Client Credits",
+          "name": "Get Webhooks / :id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "webhooks",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/webhooks/[id]`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/webhooks/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Update Webhooks / :id",
           "request": {
             "method": "PUT",
             "header": [
@@ -714,285 +1628,2109 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"balance\": 2000,\n  \"totalAdded\": 3000,\n  \"totalUsed\": 1000\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"url\": \"\",\n  \"events\": \"\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/admin/credits/{{client_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "credits", "{{client_id}}"]
-            }
-          }
-        },
-        {
-          "name": "Get Client Credit Transactions",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/admin/credits/{{client_id}}/transactions",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "credits", "{{client_id}}", "transactions"]
-            }
-          }
-        },
-        {
-          "name": "Get Client Credit Costs",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/admin/credits/{{client_id}}/costs",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "credits", "{{client_id}}", "costs"]
-            }
-          }
-        },
-        {
-          "name": "Set Client Credit Costs",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"feature\": \"ORDER\",\n  \"cost\": 10\n}"
+              "raw": "{{base_url}}/webhooks/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "webhooks",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
             },
-            "url": {
-              "raw": "{{base_url}}/admin/credits/{{client_id}}/costs",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "credits", "{{client_id}}", "costs"]
-            }
-          }
-        },
-        {
-          "name": "Update Client Credit Costs",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"feature\": \"ORDER\",\n  \"cost\": 15\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/credits/{{client_id}}/costs",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "credits", "{{client_id}}", "costs"]
-            }
-          }
-        },
-        {
-          "name": "Get System Config",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/admin/system-config",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "system-config"]
-            }
-          }
-        },
-        {
-          "name": "Create System Config",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"key\": \"config_key\",\n  \"value\": \"config_value\",\n  \"type\": \"string\",\n  \"category\": \"general\",\n  \"description\": \"Configuration description\",\n  \"isEncrypted\": false\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/system-config",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "system-config"]
-            }
-          }
-        },
-        {
-          "name": "Update System Config",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"key\": \"config_key\",\n  \"value\": \"updated_config_value\",\n  \"type\": \"string\",\n  \"category\": \"general\",\n  \"description\": \"Updated configuration description\",\n  \"isEncrypted\": false\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/system-config",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "system-config"]
-            }
-          }
-        },
-        {
-          "name": "Get Client Configurations",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/admin/client-configurations",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "client-configurations"]
-            }
+            "description": "**`PUT /api/webhooks/[id]`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/webhooks/[id]/route.ts`"
           }
         }
       ]
     },
     {
-      "name": "Utility APIs",
+      "name": "Users & Profile",
+      "description": "14 endpoints",
       "item": [
         {
-          "name": "Validate Pincode",
+          "name": "Create Sub Groups",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/sub-groups",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sub-groups"
+              ]
+            },
+            "description": "**`POST /api/sub-groups`**\n\nBearer JWT required. Minimum role: `client_admin`.\n\nSource: `src/app/api/sub-groups/route.ts`"
+          }
+        },
+        {
+          "name": "Create Users",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": "**`POST /api/users`**\n\nBearer JWT required. Minimum role: `client_admin`.\n\nSource: `src/app/api/users/route.ts`"
+          }
+        },
+        {
+          "name": "Delete Sub Groups / :id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/sub-groups/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sub-groups",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`DELETE /api/sub-groups/[id]`**\n\nBearer JWT required. Minimum role: `client_admin`.\n\nSource: `src/app/api/sub-groups/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Get Custom Address",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/validate-pincode?pincode=123456",
-              "host": ["{{base_url}}"],
-              "path": ["validate-pincode"],
+              "raw": "{{base_url}}/custom-address",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "custom-address"
+              ]
+            },
+            "description": "**`GET /api/custom-address`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/custom-address/route.ts`"
+          }
+        },
+        {
+          "name": "Get Sub Groups",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/sub-groups?clientId={{client_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sub-groups"
+              ],
               "query": [
                 {
-                  "key": "pincode",
-                  "value": "123456"
+                  "key": "clientId",
+                  "value": "{{client_id}}",
+                  "disabled": true
                 }
               ]
-            }
-          }
-        },
-        {
-          "name": "Process Image",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"image\": \"base64-encoded-image\",\n  \"operation\": \"ocr\"\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/process-image",
-              "host": ["{{base_url}}"],
-              "path": ["process-image"]
-            }
+            "description": "**`GET /api/sub-groups`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/sub-groups/route.ts`"
           }
         },
         {
-          "name": "Process Text",
+          "name": "Get Sub Groups / :id",
           "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"text\": \"Text to process\",\n  \"operation\": \"extract_address\"\n}"
-            },
+            "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/process-text",
-              "host": ["{{base_url}}"],
-              "path": ["process-text"]
-            }
+              "raw": "{{base_url}}/sub-groups/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sub-groups",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/sub-groups/[id]`**\n\nBearer JWT required. Minimum role: `client_admin`.\n\nSource: `src/app/api/sub-groups/[id]/route.ts`"
           }
         },
         {
-          "name": "Format Address",
+          "name": "Get Users",
           "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"address\": \"Raw address string\"\n}"
-            },
+            "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/format-address",
-              "host": ["{{base_url}}"],
-              "path": ["format-address"]
-            }
+              "raw": "{{base_url}}/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": "**`GET /api/users`**\n\nBearer JWT required. Minimum role: `client_admin`.\n\nSource: `src/app/api/users/route.ts`"
           }
         },
         {
-          "name": "Format Address from Image",
+          "name": "Get Users / :id",
           "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"image\": \"base64-encoded-image\"\n}"
-            },
+            "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/format-address-image",
-              "host": ["{{base_url}}"],
-              "path": ["format-address-image"]
-            }
+              "raw": "{{base_url}}/users/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/users/[id]`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/users/[id]/route.ts`"
           }
         },
         {
-          "name": "Validate Payment Screenshot",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"image\": \"base64-encoded-image\",\n  \"expectedAmount\": 1000\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/validate-payment-screenshot",
-              "host": ["{{base_url}}"],
-              "path": ["validate-payment-screenshot"]
-            }
-          }
-        },
-        {
-          "name": "Get User Profile",
+          "name": "Get Users / Profile",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{base_url}}/users/profile",
-              "host": ["{{base_url}}"],
-              "path": ["users", "profile"]
-            }
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "profile"
+              ]
+            },
+            "description": "**`GET /api/users/profile`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/users/profile/route.ts`"
+          }
+        },
+        {
+          "name": "Update Custom Address",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"overwriteFromAddress\": \"\",\n  \"courierServiceCode\": \"\",\n  \"customAddress\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/custom-address",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "custom-address"
+              ]
+            },
+            "description": "**`PUT /api/custom-address`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/custom-address/route.ts`"
+          }
+        },
+        {
+          "name": "Update Sub Groups / :id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/sub-groups/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sub-groups",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/sub-groups/[id]`**\n\nBearer JWT required. Minimum role: `client_admin`.\n\nSource: `src/app/api/sub-groups/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Update Users / :id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/users/[id]`**\n\nBearer JWT required. Minimum role: `client_admin`.\n\nSource: `src/app/api/users/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Update Users / Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "change-password"
+              ]
+            },
+            "description": "**`PUT /api/users/change-password`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/users/change-password/route.ts`"
+          }
+        },
+        {
+          "name": "Update Users / Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "profile"
+              ]
+            },
+            "description": "**`PUT /api/users/profile`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/users/profile/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "API Keys",
+      "description": "4 endpoints",
+      "item": [
+        {
+          "name": "Create Api Keys",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"permissions\": [\"orders:read\"],\n  \"expiresInDays\": 90\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api-keys",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api-keys"
+              ]
+            },
+            "description": "**`POST /api/api-keys`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/api-keys/route.ts`"
+          }
+        },
+        {
+          "name": "Delete Api Keys / :id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api-keys/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api-keys",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`DELETE /api/api-keys/[id]`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/api-keys/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Get Api Keys",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api-keys",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api-keys"
+              ]
+            },
+            "description": "**`GET /api/api-keys`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/api-keys/route.ts`"
+          }
+        },
+        {
+          "name": "Update Api Keys / :id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"permissions\": [\"orders:read\"],\n  \"isActive\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api-keys/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api-keys",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/api-keys/[id]`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/api-keys/[id]/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics & Reports",
+      "description": "5 endpoints",
+      "item": [
+        {
+          "name": "Create Analytics / Track",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/analytics/track",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "analytics",
+                "track"
+              ]
+            },
+            "description": "**`POST /api/analytics/track`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/analytics/track/route.ts`"
+          }
+        },
+        {
+          "name": "Get Analytics / Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/analytics/clients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "analytics",
+                "clients"
+              ]
+            },
+            "description": "**`GET /api/analytics/clients`**\n\nBearer JWT required. Minimum role: `master_admin`.\n\nSource: `src/app/api/analytics/clients/route.ts`"
+          }
+        },
+        {
+          "name": "Get Analytics / Clients / :id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/analytics/clients/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "analytics",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/analytics/clients/[id]`**\n\nBearer JWT required. Minimum role: `master_admin`.\n\nSource: `src/app/api/analytics/clients/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Get Analytics / Platform",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/analytics/platform",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "analytics",
+                "platform"
+              ]
+            },
+            "description": "**`GET /api/analytics/platform`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/analytics/platform/route.ts`"
+          }
+        },
+        {
+          "name": "Get Reports",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reports?startDate=&endDate=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reports"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**`GET /api/reports`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/reports/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "37 endpoints",
+      "item": [
+        {
+          "name": "Create Admin / Api Keys",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"clientId\": \"{{client_id}}\",\n  \"permissions\": [\"orders:read\"],\n  \"expiresAt\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/api-keys",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "api-keys"
+              ]
+            },
+            "description": "**`POST /api/admin/api-keys`**\n\nBearer JWT required. Minimum role: `super_admin`.\n\nSource: `src/app/api/admin/api-keys/route.ts`"
+          }
+        },
+        {
+          "name": "Create Admin / Clients",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"companyName\": \"\",\n  \"email\": \"user@example.com\",\n  \"name\": \"Test Customer\",\n  \"phone\": \"\",\n  \"address\": \"12 Main Street\",\n  \"city\": \"Hyderabad\",\n  \"state\": \"Telangana\",\n  \"country\": \"India\",\n  \"pincode\": \"500001\",\n  \"subscriptionPlan\": \"\",\n  \"subscriptionStatus\": \"\",\n  \"subscriptionExpiresAt\": \"\",\n  \"isActive\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/clients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clients"
+              ]
+            },
+            "description": "**`POST /api/admin/clients`**\n\nBearer JWT required. Minimum role: `master_admin`.\n\nSource: `src/app/api/admin/clients/route.ts`"
+          }
+        },
+        {
+          "name": "Create Admin / Credits / :clientId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/credits/:clientId",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "credits",
+                ":clientId"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "{{client_id}}"
+                }
+              ]
+            },
+            "description": "**`POST /api/admin/credits/[clientId]`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/credits/[clientId]/route.ts`"
+          }
+        },
+        {
+          "name": "Create Admin / Credits / :clientId / Costs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/credits/:clientId/costs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "credits",
+                ":clientId",
+                "costs"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "{{client_id}}"
+                }
+              ]
+            },
+            "description": "**`POST /api/admin/credits/[clientId]/costs`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/credits/[clientId]/costs/route.ts`"
+          }
+        },
+        {
+          "name": "Create Admin / Cross App Mappings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"scan2shipClientId\": \"\",\n  \"catalogClientId\": \"\",\n  \"catalogApiKey\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/cross-app-mappings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "cross-app-mappings"
+              ]
+            },
+            "description": "**`POST /api/admin/cross-app-mappings`**\n\n**⚠️ UNAUTHENTICATED — the auth call is present but commented out in source** (`// TODO: Restore authentication in production`). Anyone can call this.\n\nSource: `src/app/api/admin/cross-app-mappings/route.ts`"
+          }
+        },
+        {
+          "name": "Create Admin / Database Health",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"action\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/database-health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "database-health"
+              ]
+            },
+            "description": "**`POST /api/admin/database-health`**\n\nBearer JWT required. Minimum role: `master_admin`.\n\nSource: `src/app/api/admin/database-health/route.ts`"
+          }
+        },
+        {
+          "name": "Create Admin / Fix Database",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/fix-database",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "fix-database"
+              ]
+            },
+            "description": "**`POST /api/admin/fix-database`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/admin/fix-database/route.ts`"
+          }
+        },
+        {
+          "name": "Create Admin / Jwt Secrets",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"action\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/jwt-secrets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "jwt-secrets"
+              ]
+            },
+            "description": "**`POST /api/admin/jwt-secrets`**\n\nBearer JWT required. Minimum role: `master_admin`.\n\nSource: `src/app/api/admin/jwt-secrets/route.ts`"
+          }
+        },
+        {
+          "name": "Create Admin / System Config",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/system-config",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "system-config"
+              ]
+            },
+            "description": "**`POST /api/admin/system-config`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/system-config/route.ts`"
+          }
+        },
+        {
+          "name": "Create Admin / Update Order Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"orderId\": \"\",\n  \"newStatus\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/update-order-status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "update-order-status"
+              ]
+            },
+            "description": "**`POST /api/admin/update-order-status`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/admin/update-order-status/route.ts`"
+          }
+        },
+        {
+          "name": "Create Admin / Users",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"email\": \"user@example.com\",\n  \"role\": \"user\",\n  \"clientId\": \"{{client_id}}\",\n  \"password\": \"password123\",\n  \"isActive\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "**`POST /api/admin/users`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/users/route.ts`"
+          }
+        },
+        {
+          "name": "Delete Admin / Api Keys / :id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/api-keys/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "api-keys",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`DELETE /api/admin/api-keys/[id]`**\n\nBearer JWT required. Minimum role: `super_admin`.\n\nSource: `src/app/api/admin/api-keys/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Delete Admin / Clients / :id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/clients/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`DELETE /api/admin/clients/[id]`**\n\nBearer JWT required. Minimum role: `master_admin`.\n\nSource: `src/app/api/admin/clients/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Delete Admin / Cross App Mappings / :id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/cross-app-mappings/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "cross-app-mappings",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`DELETE /api/admin/cross-app-mappings/[id]`**\n\n**⚠️ UNAUTHENTICATED — the auth call is present but commented out in source** (`// TODO: Restore authentication in production`). Anyone can call this.\n\nSource: `src/app/api/admin/cross-app-mappings/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Api Keys",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/api-keys",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "api-keys"
+              ]
+            },
+            "description": "**`GET /api/admin/api-keys`**\n\nBearer JWT required. Minimum role: `super_admin`.\n\nSource: `src/app/api/admin/api-keys/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Client Configurations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/client-configurations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "client-configurations"
+              ]
+            },
+            "description": "**`GET /api/admin/client-configurations`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/client-configurations/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/clients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clients"
+              ]
+            },
+            "description": "**`GET /api/admin/clients`**\n\nBearer JWT required. Minimum role: `master_admin`.\n\nSource: `src/app/api/admin/clients/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Clients / :id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/clients/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/admin/clients/[id]`**\n\nBearer JWT required. Minimum role: `master_admin`.\n\nSource: `src/app/api/admin/clients/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Credits",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/credits",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "credits"
+              ]
+            },
+            "description": "**`GET /api/admin/credits`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/credits/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Credits / :clientId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/credits/:clientId",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "credits",
+                ":clientId"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "{{client_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/admin/credits/[clientId]`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/credits/[clientId]/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Credits / :clientId / Costs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/credits/:clientId/costs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "credits",
+                ":clientId",
+                "costs"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "{{client_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/admin/credits/[clientId]/costs`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/credits/[clientId]/costs/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Credits / :clientId / Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/credits/:clientId/transactions?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "credits",
+                ":clientId",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "{{client_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/admin/credits/[clientId]/transactions`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/credits/[clientId]/transactions/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Cross App Mappings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/cross-app-mappings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "cross-app-mappings"
+              ]
+            },
+            "description": "**`GET /api/admin/cross-app-mappings`**\n\n**⚠️ UNAUTHENTICATED — the auth call is present but commented out in source** (`// TODO: Restore authentication in production`). Anyone can call this.\n\nSource: `src/app/api/admin/cross-app-mappings/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Database Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/database-health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "database-health"
+              ]
+            },
+            "description": "**`GET /api/admin/database-health`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/database-health/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Jwt Secrets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/jwt-secrets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "jwt-secrets"
+              ]
+            },
+            "description": "**`GET /api/admin/jwt-secrets`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/jwt-secrets/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Settings / Clients / :id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/settings/clients/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "settings",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`GET /api/admin/settings/clients/[id]`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/settings/clients/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / System Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/system-config",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "system-config"
+              ]
+            },
+            "description": "**`GET /api/admin/system-config`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/system-config/route.ts`"
+          }
+        },
+        {
+          "name": "Get Admin / Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/users?clientId={{client_id}}&page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "clientId",
+                  "value": "{{client_id}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**`GET /api/admin/users`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/users/route.ts`"
+          }
+        },
+        {
+          "name": "Update Admin / Api Keys / :id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"isActive\": \"\",\n  \"permissions\": [\"orders:read\"],\n  \"expiresAt\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/api-keys/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "api-keys",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/admin/api-keys/[id]`**\n\nBearer JWT required. Minimum role: `super_admin`.\n\nSource: `src/app/api/admin/api-keys/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Update Admin / Clients / :id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"companyName\": \"\",\n  \"email\": \"user@example.com\",\n  \"phone\": \"\",\n  \"address\": \"12 Main Street\",\n  \"city\": \"Hyderabad\",\n  \"state\": \"Telangana\",\n  \"country\": \"India\",\n  \"pincode\": \"500001\",\n  \"subscriptionPlan\": \"\",\n  \"subscriptionStatus\": \"\",\n  \"subscriptionExpiresAt\": \"\",\n  \"isActive\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/clients/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/admin/clients/[id]`**\n\nBearer JWT required. Minimum role: `master_admin`.\n\nSource: `src/app/api/admin/clients/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Update Admin / Clients / :id / Update Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"newPassword\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/clients/:id/update-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clients",
+                ":id",
+                "update-password"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/admin/clients/[id]/update-password`**\n\nBearer JWT required. Minimum role: `super_admin`.\n\nSource: `src/app/api/admin/clients/[id]/update-password/route.ts`"
+          }
+        },
+        {
+          "name": "Update Admin / Credits / :clientId",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/credits/:clientId",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "credits",
+                ":clientId"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "{{client_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/admin/credits/[clientId]`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/credits/[clientId]/route.ts`"
+          }
+        },
+        {
+          "name": "Update Admin / Credits / :clientId / Costs",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/credits/:clientId/costs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "credits",
+                ":clientId",
+                "costs"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "{{client_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/admin/credits/[clientId]/costs`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/credits/[clientId]/costs/route.ts`"
+          }
+        },
+        {
+          "name": "Update Admin / Cross App Mappings / :id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"catalogClientId\": \"\",\n  \"catalogApiKey\": \"\",\n  \"isActive\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/cross-app-mappings/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "cross-app-mappings",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/admin/cross-app-mappings/[id]`**\n\nBearer JWT required. Minimum role: `super_admin`.\n\nSource: `src/app/api/admin/cross-app-mappings/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Update Admin / Settings / Clients / :id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"client\": \"\",\n  \"configs\": \"\",\n  \"pickupLocations\": \"\",\n  \"courierServices\": \"\",\n  \"clientOrderConfig\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/settings/clients/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "settings",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/admin/settings/clients/[id]`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/settings/clients/[id]/route.ts`"
+          }
+        },
+        {
+          "name": "Update Admin / System Config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/system-config",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "system-config"
+              ]
+            },
+            "description": "**`PUT /api/admin/system-config`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/admin/system-config/route.ts`"
+          }
+        },
+        {
+          "name": "Update Admin / Users / :id / Update Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"newPassword\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/users/:id/update-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                ":id",
+                "update-password"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{order_id}}"
+                }
+              ]
+            },
+            "description": "**`PUT /api/admin/users/[id]/update-password`**\n\nBearer JWT required. Minimum role: `super_admin`.\n\nSource: `src/app/api/admin/users/[id]/update-password/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI / Address Processing",
+      "description": "4 endpoints",
+      "item": [
+        {
+          "name": "Create Format Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"addressText\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/format-address",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "format-address"
+              ]
+            },
+            "description": "**`POST /api/format-address`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/format-address/route.ts`"
+          }
+        },
+        {
+          "name": "Create Format Address Image",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/format-address-image",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "format-address-image"
+              ]
+            },
+            "description": "**`POST /api/format-address-image`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/format-address-image/route.ts`"
+          }
+        },
+        {
+          "name": "Create Process Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/process-image",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "process-image"
+              ]
+            },
+            "description": "**`POST /api/process-image`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/process-image/route.ts`"
+          }
+        },
+        {
+          "name": "Create Process Text",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/process-text",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "process-text"
+              ]
+            },
+            "description": "**`POST /api/process-text`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/process-text/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalog",
+      "description": "2 endpoints",
+      "item": [
+        {
+          "name": "Create Catalog",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"action\": \"\",\n  \"data\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/catalog",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "catalog"
+              ]
+            },
+            "description": "**`POST /api/catalog`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/catalog/route.ts`"
+          }
+        },
+        {
+          "name": "Create Catalog Simple",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"action\": \"\",\n  \"data\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/catalog-simple",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "catalog-simple"
+              ]
+            },
+            "description": "**`POST /api/catalog-simple`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/catalog-simple/route.ts`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Config & Settings",
+      "description": "9 endpoints",
+      "item": [
+        {
+          "name": "Create Logo",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "displayLogoOnWaybill",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "logoEnabledCouriers",
+                  "value": "",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/logo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "logo"
+              ]
+            },
+            "description": "**`POST /api/logo`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/logo/route.ts`"
+          }
+        },
+        {
+          "name": "Create Upload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/upload",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "upload"
+              ]
+            },
+            "description": "**`POST /api/upload`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/upload/route.ts`"
+          }
+        },
+        {
+          "name": "Delete Logo",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/logo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "logo"
+              ]
+            },
+            "description": "**`DELETE /api/logo`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/logo/route.ts`"
+          }
+        },
+        {
+          "name": "Get Logo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/logo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "logo"
+              ]
+            },
+            "description": "**`GET /api/logo`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/logo/route.ts`"
+          }
+        },
+        {
+          "name": "Get Order Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/order-config",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "order-config"
+              ]
+            },
+            "description": "**`GET /api/order-config`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/order-config/route.ts`"
+          }
+        },
+        {
+          "name": "Get Pwa / Manifest",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pwa/manifest",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pwa",
+                "manifest"
+              ]
+            },
+            "description": "**`GET /api/pwa/manifest`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/pwa/manifest/route.ts`"
           }
         },
         {
@@ -1007,25 +3745,60 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"setting_key\": \"setting_value\"\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
             },
             "url": {
               "raw": "{{base_url}}/client-settings",
-              "host": ["{{base_url}}"],
-              "path": ["client-settings"]
-            }
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client-settings"
+              ]
+            },
+            "description": "**`PUT /api/client-settings`**\n\nBearer JWT required. Minimum role: `user`.\n\nSource: `src/app/api/client-settings/route.ts`"
           }
         },
         {
-          "name": "Get Order Config",
+          "name": "Update Logo",
           "request": {
-            "method": "GET",
+            "method": "PUT",
             "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "displayLogoOnWaybill",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "logoEnabledCouriers",
+                  "value": "",
+                  "type": "text"
+                }
+              ]
+            },
             "url": {
-              "raw": "{{base_url}}/order-config",
-              "host": ["{{base_url}}"],
-              "path": ["order-config"]
-            }
+              "raw": "{{base_url}}/logo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "logo"
+              ]
+            },
+            "description": "**`PUT /api/logo`**\n\nBearer JWT required. Minimum role: `child_user`.\n\nSource: `src/app/api/logo/route.ts`"
           }
         },
         {
@@ -1040,31 +3813,35 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"defaultProductDescription\": \"ARTIFICAL JEWELLERY\",\n  \"defaultPackageValue\": 5000,\n  \"defaultWeight\": 100,\n  \"defaultTotalItems\": 1,\n  \"codEnabledByDefault\": false,\n  \"minPackageValue\": 100,\n  \"maxPackageValue\": 100000,\n  \"minWeight\": 1,\n  \"maxWeight\": 50000,\n  \"minTotalItems\": 1,\n  \"maxTotalItems\": 100,\n  \"requireProductDescription\": true,\n  \"requirePackageValue\": true,\n  \"requireWeight\": true,\n  \"requireTotalItems\": true,\n  \"enableResellerFallback\": true,\n  \"enableThermalPrint\": false,\n  \"enableReferencePrefix\": true\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"hasOwnProperty\": function hasOwnProperty() { [native code] },\n  \"enableResellerFallback\": \"\",\n  \"printmode\": \"\",\n  \"enableReferencePrefix\": \"\",\n  \"enableFooterNote\": \"\",\n  \"footerNoteText\": \"\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/order-config",
-              "host": ["{{base_url}}"],
-              "path": ["order-config"]
-            }
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "order-config"
+              ]
+            },
+            "description": "**`PUT /api/order-config`**\n\nBearer JWT required. Minimum role: `any authenticated`.\n\nSource: `src/app/api/order-config/route.ts`"
           }
-        },
+        }
+      ]
+    },
+    {
+      "name": "Debug & Test (should not exist in production)",
+      "description": "9 endpoints",
+      "item": [
         {
-          "name": "Get DTDC Slips",
+          "name": "Create Cache / Clear",
           "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/dtdc-slips",
-              "host": ["{{base_url}}"],
-              "path": ["dtdc-slips"]
-            }
-          }
-        },
-        {
-          "name": "Update DTDC Slips",
-          "request": {
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -1073,37 +3850,205 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"slip_data\": \"updated slip data\"\n}"
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
             },
             "url": {
-              "raw": "{{base_url}}/dtdc-slips",
-              "host": ["{{base_url}}"],
-              "path": ["dtdc-slips"]
-            }
+              "raw": "{{base_url}}/cache/clear",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cache",
+                "clear"
+              ]
+            },
+            "description": "**`POST /api/cache/clear`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/cache/clear/route.ts`"
           }
         },
         {
-          "name": "Get PWA Manifest",
+          "name": "Create Cron / Test Tracking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/cron/test-tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cron",
+                "test-tracking"
+              ]
+            },
+            "description": "**`POST /api/cron/test-tracking`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/cron/test-tracking/route.ts`"
+          }
+        },
+        {
+          "name": "Create Test Catalog",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/test-catalog",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "test-catalog"
+              ]
+            },
+            "description": "**`POST /api/test-catalog`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/test-catalog/route.ts`"
+          }
+        },
+        {
+          "name": "Create Test Clear Cache",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/test-clear-cache",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "test-clear-cache"
+              ]
+            },
+            "description": "**`POST /api/test-clear-cache`**\n\nBearer JWT required. Minimum role: `admin`.\n\nSource: `src/app/api/test-clear-cache/route.ts`"
+          }
+        },
+        {
+          "name": "Get Cache / Clear",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/pwa/manifest",
-              "host": ["{{base_url}}"],
-              "path": ["pwa", "manifest"]
-            }
+              "raw": "{{base_url}}/cache/clear",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cache",
+                "clear"
+              ]
+            },
+            "description": "**`GET /api/cache/clear`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/cache/clear/route.ts`"
           }
         },
         {
-          "name": "Environment Check",
+          "name": "Get Cron / Test Tracking",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/env-check",
-              "host": ["{{base_url}}"],
-              "path": ["env-check"]
-            }
+              "raw": "{{base_url}}/cron/test-tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cron",
+                "test-tracking"
+              ]
+            },
+            "description": "**`GET /api/cron/test-tracking`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/cron/test-tracking/route.ts`"
+          }
+        },
+        {
+          "name": "Get Debug Env",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/debug-env",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "debug-env"
+              ]
+            },
+            "description": "**`GET /api/debug-env`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/debug-env/route.ts`"
+          }
+        },
+        {
+          "name": "Get Test Admin",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/test-admin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "test-admin"
+              ]
+            },
+            "description": "**`GET /api/test-admin`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/test-admin/route.ts`"
+          }
+        },
+        {
+          "name": "Get Test Auth",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/test-auth",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "test-auth"
+              ]
+            },
+            "description": "**`GET /api/test-auth`**\n\n**⚠️ No authentication.** Either public by design (login, webhooks) or an unintended gap — see docs/audits/FULL_APP_AUDIT_2026-08-08.md.\n\nSource: `src/app/api/test-auth/route.ts`"
           }
         }
       ]

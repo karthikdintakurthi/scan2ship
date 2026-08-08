@@ -1,5 +1,7 @@
 # Deploy user_custom_from_address migration (with backup)
 
+> **Note (reviewed 2026-08-08):** the content below is accurate — migration `20260123120000_add_user_custom_from_address` exists and its columns match `prisma/schema.prisma:448-459`. However, **`scripts/` is gitignored** (`.gitignore:83`), so `scripts/deploy-migration-with-backup.sh` and `scripts/backup-prod-db.sh` are not in version control. They exist on machines where they were created; in a fresh clone they will be missing. If so, use the manual `pg_dump` commands in `prisma/migrate-protection.md`.
+
 This migration **only adds** a new table `user_custom_from_address`. It does **not** alter or drop any existing tables, so there is no risk of data loss to current data. A full backup is still required before any production deploy.
 
 ## Option A: One command (backup + migrate)

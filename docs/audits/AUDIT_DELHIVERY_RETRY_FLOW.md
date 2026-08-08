@@ -1,8 +1,20 @@
 # Audit Report: Delhivery Retry Flow Analysis
 
+> **⚠️ STATUS — reviewed 2026-08-08: PARTIALLY RESOLVED. Do not read this document as "closed."**
+>
+> The specific fix described here (passing `clientId` from the retry endpoint) **was applied and is still in place**. But the underlying vulnerability class it belongs to — cross-client Delhivery API key selection — **is still live** through other paths:
+>
+> - `src/lib/pickup-location-config.ts:153` still takes `clientId` as **optional** and **fails open**. When it is absent, `findFirst` matches a pickup location *by name across all tenants* and returns whichever key it finds first. The guard is a `console.warn`, not a constraint.
+> - `src/lib/delhivery.ts:365` (`getOrderStatus`) and `:395` (`validatePincode`) still call `getDelhiveryApiKey(pickupLocation)` with **no `clientId` at all**.
+> - `src/app/api/orders/[id]/route.ts:265` passes `parseInt(order.clientId)` — but `clientId` is a UUID, so this is `NaN`, which is falsy, so the tenant filter is silently dropped.
+>
+> The fix below patched one caller. It did not fix the root cause. See `docs/audits/FULL_APP_AUDIT_2026-08-08.md` (HIGH — "parseInt on a UUID") for the full picture.
+>
+> **The section titled "Retry Endpoint (BROKEN)" below describes the state BEFORE the fix.** It is retained as a historical record.
+
 ## Executive Summary
 
-**✅ BUG FOUND AND FIXED**: The Delhivery retry endpoint was **NOT passing the `clientId`** to the Delhivery service, which could have caused it to use the **WRONG API key** when retrying failed orders. This has now been corrected.
+**⚠️ BUG FOUND AND PARTIALLY FIXED**: The Delhivery retry endpoint was **NOT passing the `clientId`** to the Delhivery service, which could have caused it to use the **WRONG API key** when retrying failed orders. The retry endpoint itself has been corrected; the shared helper it depends on still fails open. See the status banner above.
 
 ---
 
@@ -197,7 +209,7 @@ delhiveryResponse = await delhiveryService.createOrder(order);  // ✅ Has clien
 
 **Status**: ✅ This works because it passes the full order object which includes `clientId`
 
-### Retry Endpoint (BROKEN)
+### Retry Endpoint (BROKEN — state *before* the fix; see "Fix Applied" below)
 **File**: `src/app/api/orders/[id]/retry-delhivery/route.ts`
 
 ```typescript
@@ -315,10 +327,12 @@ After fixing, verify:
 
 ---
 
-## Fix Applied ✅
+## Fix Applied ✅ (scope: retry endpoint only)
 
-**Date**: Today  
+**Date**: 2026-01-21 (per git history)
 **File Modified**: `src/app/api/orders/[id]/retry-delhivery/route.ts`
+**Verified still present**: 2026-08-08 — `clientId: order.clientId` at line 86, logging at lines 63-64 and 91.
+**Not fixed by this change**: the fail-open in `getDelhiveryApiKey`, and the two callers in `delhivery.ts` that pass no `clientId`. See the status banner at the top of this document.
 
 ### Changes Made:
 

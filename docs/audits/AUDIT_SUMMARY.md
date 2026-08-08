@@ -1,11 +1,17 @@
 # Delhivery Retry Flow - Audit Summary
 
+> **⚠️ STATUS — reviewed 2026-08-08: PARTIALLY RESOLVED.**
+>
+> The retry-endpoint fix described here is real and still in place. The **root cause is not fixed**: `getDelhiveryApiKey` (`src/lib/pickup-location-config.ts:153`) still treats `clientId` as optional and falls back to an unfiltered, cross-tenant `findFirst` when it is missing — guarded only by a `console.warn`. Two callers in `src/lib/delhivery.ts` (`:365`, `:395`) still pass no `clientId`, and `src/app/api/orders/[id]/route.ts:265` passes `parseInt()` of a UUID, which is `NaN` and therefore falsy.
+>
+> Treat the "Impact — After Fix" and "Status" sections below as **scoped to the retry endpoint only**, not to the vulnerability class. Full detail: `docs/audits/FULL_APP_AUDIT_2026-08-08.md`.
+
 ## Question Asked
 "When Delhivery Retry call is clicked in view order - which client ID and API key are being sent to Delhivery? Is it picking the right API key from that client and pickup location config?"
 
 ---
 
-## Answer: Critical Bug Found & Fixed ✅
+## Answer: Critical Bug Found & Partially Fixed ⚠️
 
 ### The Bug
 The Delhivery retry endpoint was **NOT passing the `clientId`** to the Delhivery service, which meant:
@@ -98,21 +104,34 @@ Retrying Delhivery order creation for order ID: 123
 - Potential cross-client data leakage
 - Security vulnerability if multiple clients share pickup location names
 
-### After Fix ✅
-- Always uses correct client's API key
+### After Fix ⚠️ (retry endpoint only)
+- The retry endpoint now passes `clientId`, so **this path** selects the correct client's API key
 - Successful retry attempts with proper credentials
-- Proper client isolation and security
 - Clear audit trail in logs showing which client and API key are used
+
+### Still Outstanding ❌
+- `getDelhiveryApiKey` **fails open**: with no `clientId` it matches a pickup location by name across **all** tenants and returns the first key found (`pickup-location-config.ts:179`)
+- `delhivery.ts:365` (`getOrderStatus`) and `:395` (`validatePincode`) pass **no** `clientId`
+- `orders/[id]/route.ts:265` passes `parseInt(<uuid>)` → `NaN` → filter silently dropped
+- The API key value is written to logs in plaintext (`pickup-location-config.ts:212`, `delhivery.ts:95-97`)
+
+**Client isolation is therefore not yet guaranteed for Delhivery API key selection.** The durable fix is to make `clientId` a required parameter and remove the unfiltered fallback entirely.
 
 ---
 
 ## Status
 
-| Endpoint | Client ID Passed | API Key Selection | Status |
+Re-verified 2026-08-08:
+
+| Caller | Client ID Passed | API Key Selection | Status |
 |----------|-----------------|-------------------|---------|
 | `/api/orders` (Create) | ✅ Yes | Correct (client-filtered) | ✅ Working |
-| `/api/orders/[id]/fulfill` | ✅ Yes | Correct (client-filtered) | ✅ Working |
-| `/api/orders/[id]/retry-delhivery` | ✅ **NOW Yes** | **Correct (client-filtered)** | ✅ **FIXED** |
+| `/api/orders/[id]/fulfill` | ✅ Yes | Correct (client-filtered) | ⚠️ Key selection OK, but the endpoint has **no authentication** — see FULL_APP_AUDIT_2026-08-08.md |
+| `/api/orders/[id]/retry-delhivery` | ✅ Yes | Correct (client-filtered) | ✅ Fixed 2026-01-21, still in place |
+| `/api/orders/[id]` DELETE (cancel) | ❌ `parseInt(<uuid>)` → `NaN` | **Unfiltered — cross-tenant** | ❌ Broken |
+| `delhivery.ts:365` `getOrderStatus` | ❌ Not passed | **Unfiltered — cross-tenant** | ❌ Broken |
+| `delhivery.ts:395` `validatePincode` | ❌ Not passed | **Unfiltered — cross-tenant** | ❌ Broken |
+| `getDelhiveryApiKey` itself | `clientId` is **optional** | Falls back to unfiltered `findFirst` | ❌ Root cause |
 
 ---
 
