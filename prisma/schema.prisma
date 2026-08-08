@@ -145,6 +145,10 @@ model client_order_configs {
   enableFooterNote          Boolean  @default(false)
   footerNoteText            String?
   pickup_location_overrides Json?    @default("{}")
+  // Customer order history: on entering a mobile number in the create-order
+  // screen, show that customer's recent orders so the operator can spot duplicates.
+  enableCustomerOrderHistory Boolean @default(false)
+  customerOrderHistoryDays   Int     @default(30)
   clients                   clients  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 

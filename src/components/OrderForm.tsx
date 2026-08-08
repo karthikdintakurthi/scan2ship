@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import CustomerOrderHistoryModal, { CustomerHistoryOrder } from '@/components/CustomerOrderHistoryModal'
 import { getOrderFormConfig } from '@/lib/order-form-config'
 import { usePickupLocation } from '@/hooks/usePickupLocation'
 import { useAuth } from '@/contexts/AuthContext'
@@ -50,7 +51,18 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
   const [orderConfig, setOrderConfig] = useState<any>(null)
   const [clientOrderConfig, setClientOrderConfig] = useState<any>(null)
   const [configLoaded, setConfigLoaded] = useState(false)
-  
+
+  // Customer order history (duplicate-order check) — gated by a per-client flag.
+  const [historyModalOpen, setHistoryModalOpen] = useState(false)
+  const [historyOrders, setHistoryOrders] = useState<CustomerHistoryOrder[]>([])
+  const [historyDays, setHistoryDays] = useState(0)
+  const [historyMobile, setHistoryMobile] = useState('')
+  const [historyTruncated, setHistoryTruncated] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  // The last mobile we looked up, so re-blurring the same value doesn't refetch.
+  const lastHistoryLookup = useRef<string>('')
+  const historyAbortRef = useRef<AbortController | null>(null)
+
   // Use the persistent pickup location hook
   const { selectedPickupLocation, updatePickupLocation, pickupLocations, isLoaded } = usePickupLocation()
   
@@ -526,7 +538,13 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
         
         setSuccess('Address processed successfully! Form fields have been auto-filled.')
         setTimeout(() => setSuccess(''), 5000)
-        
+
+        // The mobile field was filled programmatically, so it never blurs and the
+        // onBlur lookup won't fire. Run the duplicate check on the AI-extracted number.
+        if (formatted.mobile_number) {
+          checkCustomerOrderHistory(formatted.mobile_number)
+        }
+
         // Refresh credit balance after successful text processing
         refreshCredits();
       } else {
@@ -608,7 +626,12 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
         
         setSuccess('Image processed successfully! Form fields have been auto-filled.')
         setTimeout(() => setSuccess(''), 5000)
-        
+
+        // Same as the text path: the field is filled programmatically, so no blur fires.
+        if (formatted.mobile_number) {
+          checkCustomerOrderHistory(formatted.mobile_number)
+        }
+
         // Refresh credit balance after successful image processing
         refreshCredits();
       } else {
@@ -736,6 +759,76 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
     
     return false;
   };
+
+  /**
+   * Look up this customer's recent orders and surface them for review.
+   *
+   * Runs when the mobile field loses focus with a valid number. The day window
+   * and the feature flag itself are enforced server-side; the client-side flag
+   * check here only avoids a pointless request.
+   */
+  const checkCustomerOrderHistory = useCallback(async (rawMobile: string) => {
+    if (!clientOrderConfig?.enableCustomerOrderHistory) return
+    if (!validateMobileNumber(rawMobile)) return
+
+    const normalised = rawMobile.replace(/\D/g, '').slice(-10)
+    if (!normalised || normalised === lastHistoryLookup.current) return
+
+    // Claim this number *before* awaiting. Both the onBlur handler and the
+    // AI-fill path can fire for the same number in the same tick; recording it
+    // after the fetch would let two identical requests race through this guard.
+    lastHistoryLookup.current = normalised
+
+    // Supersede any in-flight lookup so a slow earlier response can't overwrite
+    // a newer one.
+    historyAbortRef.current?.abort()
+    const controller = new AbortController()
+    historyAbortRef.current = controller
+
+    setHistoryLoading(true)
+    try {
+      const token = localStorage.getItem('authToken')
+      const response = await fetch(
+        `/api/orders/customer-history?mobile=${encodeURIComponent(normalised)}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          signal: controller.signal
+        }
+      )
+
+      if (!response.ok) {
+        console.warn('[CUSTOMER_HISTORY] Lookup failed with status', response.status)
+        lastHistoryLookup.current = '' // release the claim so a retry can run
+        return
+      }
+
+      const data = await response.json()
+
+      if (data?.enabled && Array.isArray(data.orders) && data.orders.length > 0) {
+        setHistoryOrders(data.orders)
+        setHistoryDays(data.days ?? 0)
+        setHistoryMobile(data.mobile ?? normalised)
+        setHistoryTruncated(Boolean(data.truncated))
+        setHistoryModalOpen(true)
+      }
+    } catch (err) {
+      // An abort is expected when the operator edits the number again.
+      if ((err as Error)?.name !== 'AbortError') {
+        console.warn('[CUSTOMER_HISTORY] Lookup error:', err)
+        lastHistoryLookup.current = '' // release the claim so a retry can run
+      }
+    } finally {
+      if (historyAbortRef.current === controller) {
+        historyAbortRef.current = null
+        setHistoryLoading(false)
+      }
+    }
+  }, [clientOrderConfig])
+
+  // Cancel any in-flight lookup if the form unmounts.
+  useEffect(() => {
+    return () => historyAbortRef.current?.abort()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1480,9 +1573,22 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
                   id="mobile_number"
                   value={formData.mobile_number}
                   onChange={(e) => handleInputChange('mobile_number', e.target.value)}
+                  onBlur={(e) => checkCustomerOrderHistory(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
+                {historyLoading && (
+                  <p className="mt-1 text-xs text-gray-500">Checking previous orders…</p>
+                )}
+                {!historyLoading && historyOrders.length > 0 && !historyModalOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setHistoryModalOpen(true)}
+                    className="mt-1 text-xs text-blue-600 underline hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                  >
+                    {historyOrders.length} previous order{historyOrders.length === 1 ? '' : 's'} in the last {historyDays} days — review
+                  </button>
+                )}
               </div>
               
               
@@ -1794,6 +1900,15 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
           </p>
         </div>
       )}
+
+      <CustomerOrderHistoryModal
+        isOpen={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        mobile={historyMobile}
+        days={historyDays}
+        orders={historyOrders}
+        truncated={historyTruncated}
+      />
     </div>
   )
 }

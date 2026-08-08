@@ -105,7 +105,11 @@ export async function GET(request: NextRequest) {
           // Footer note settings
           enableFooterNote: false,
           footerNoteText: null,
-          
+
+          // Customer order history settings
+          enableCustomerOrderHistory: false,
+          customerOrderHistoryDays: 30,
+
           // Logo settings
           displayLogoOnWaybill: false,
           logoFileName: null,
@@ -166,7 +170,11 @@ export async function GET(request: NextRequest) {
         // Footer note settings
         enableFooterNote: orderConfig.enableFooterNote,
         footerNoteText: orderConfig.footerNoteText,
-        
+
+        // Customer order history settings
+        enableCustomerOrderHistory: orderConfig.enableCustomerOrderHistory,
+        customerOrderHistoryDays: orderConfig.customerOrderHistoryDays,
+
         // Logo settings
         displayLogoOnWaybill: orderConfig.displayLogoOnWaybill,
         logoFileName: orderConfig.logoFileName,
@@ -235,6 +243,9 @@ export async function PUT(request: NextRequest) {
         (body.hasOwnProperty('enableReferencePrefix') && Object.keys(body).length === 1) ||
         (body.hasOwnProperty('enableFooterNote') && Object.keys(body).length === 1) ||
         (body.hasOwnProperty('footerNoteText') && Object.keys(body).length === 1) ||
+        (body.hasOwnProperty('enableCustomerOrderHistory') && Object.keys(body).length === 1) ||
+        (body.hasOwnProperty('customerOrderHistoryDays') && Object.keys(body).length === 1) ||
+        ((body.hasOwnProperty('enableCustomerOrderHistory') && body.hasOwnProperty('customerOrderHistoryDays')) && Object.keys(body).length === 2) ||
         ((body.hasOwnProperty('enableFooterNote') && body.hasOwnProperty('footerNoteText')) && Object.keys(body).length === 2)) {
               // Partial update - just update the specific setting
         const updateData: any = {};
@@ -263,7 +274,24 @@ export async function PUT(request: NextRequest) {
           updateData.footerNoteText = body.footerNoteText;
           console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - footer note text: ${body.footerNoteText}`);
         }
-        
+
+        if (body.hasOwnProperty('enableCustomerOrderHistory')) {
+          updateData.enableCustomerOrderHistory = Boolean(body.enableCustomerOrderHistory);
+          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - customer order history enabled: ${body.enableCustomerOrderHistory}`);
+        }
+
+        if (body.hasOwnProperty('customerOrderHistoryDays')) {
+          const days = parseInt(body.customerOrderHistoryDays, 10);
+          if (!Number.isFinite(days) || days < 1 || days > 365) {
+            return NextResponse.json(
+              { error: 'customerOrderHistoryDays must be a whole number between 1 and 365' },
+              { status: 400 }
+            );
+          }
+          updateData.customerOrderHistoryDays = days;
+          console.log(`📝 [API_ORDER_CONFIG_PUT] Partial update - customer order history days: ${days}`);
+        }
+
         
         const updatedConfig = await prisma.client_order_configs.update({
           where: { clientId: client.id },
@@ -288,6 +316,12 @@ export async function PUT(request: NextRequest) {
       } else if (body.hasOwnProperty('footerNoteText')) {
         settingName = 'footer note text';
         settingValue = body.footerNoteText;
+      } else if (body.hasOwnProperty('enableCustomerOrderHistory')) {
+        settingName = 'customer order history';
+        settingValue = body.enableCustomerOrderHistory;
+      } else if (body.hasOwnProperty('customerOrderHistoryDays')) {
+        settingName = 'customer order history days';
+        settingValue = body.customerOrderHistoryDays;
       } else if (body.hasOwnProperty('enableFooterNote') && body.hasOwnProperty('footerNoteText')) {
         settingName = 'footer note settings';
         settingValue = `${body.enableFooterNote ? 'enabled' : 'disabled'} with text: ${body.footerNoteText || 'none'}`;

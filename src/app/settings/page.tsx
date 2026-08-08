@@ -87,7 +87,11 @@ interface ClientConfigData {
     // Footer note settings
     enableFooterNote: boolean;
     footerNoteText: string | null;
-    
+
+    // Customer order history settings
+    enableCustomerOrderHistory: boolean;
+    customerOrderHistoryDays: number;
+
   };
   dtdcSlips?: {
     from: string;
@@ -1103,6 +1107,84 @@ export default function ClientSettingsPage() {
           clientOrderConfig: {
             ...prev.clientOrderConfig,
             enableResellerFallback: !enabled
+          }
+        };
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Toggle the customer order history (duplicate-order check) feature.
+  const handleCustomerOrderHistoryChange = async (enabled: boolean) => {
+    await saveCustomerOrderHistory({ enableCustomerOrderHistory: enabled });
+  };
+
+  // Persist the lookback window. Validated here and again server-side.
+  const handleCustomerOrderHistoryDaysChange = async (rawDays: string) => {
+    const days = parseInt(rawDays, 10);
+    if (!Number.isFinite(days) || days < 1 || days > 365) {
+      setError('Order history window must be between 1 and 365 days');
+      return;
+    }
+    await saveCustomerOrderHistory({ customerOrderHistoryDays: days });
+  };
+
+  const saveCustomerOrderHistory = async (
+    payload: { enableCustomerOrderHistory?: boolean; customerOrderHistoryDays?: number }
+  ) => {
+    const previous = config?.clientOrderConfig;
+    try {
+      setIsSaving(true);
+      setError('');
+
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
+
+      // Optimistic update
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig) return prev;
+        return { ...prev, clientOrderConfig: { ...prev.clientOrderConfig, ...payload } };
+      });
+
+      const response = await fetch('/api/order-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update customer order history setting');
+      }
+
+      // The create-order screen reads this flag through getOrderConfig(), which
+      // caches for 5 minutes at module scope. Without clearing it, the change
+      // wouldn't take effect on /orders until the cache expired or a hard reload.
+      const { clearOrderConfigCache } = await import('@/lib/order-config');
+      clearOrderConfigCache();
+
+      setSuccess('Customer order history setting updated successfully!');
+      await fetchClientConfig();
+    } catch (error) {
+      console.error('❌ [CUSTOMER_ORDER_HISTORY] Error updating setting:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update customer order history setting');
+
+      // Roll back to the values we had before the optimistic update.
+      setConfig(prev => {
+        if (!prev?.clientOrderConfig || !previous) return prev;
+        return {
+          ...prev,
+          clientOrderConfig: {
+            ...prev.clientOrderConfig,
+            enableCustomerOrderHistory: previous.enableCustomerOrderHistory,
+            customerOrderHistoryDays: previous.customerOrderHistoryDays
           }
         };
       });
@@ -2700,6 +2782,58 @@ export default function ClientSettingsPage() {
                         <dd className="text-xs text-gray-500 mt-1">
                           When enabled, empty reseller fields automatically use company name/phone
                         </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-gray-500">Customer Order History Check</dt>
+                        <dd className="text-sm text-gray-900">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={config.clientOrderConfig.enableCustomerOrderHistory ?? false}
+                              onChange={(e) => handleCustomerOrderHistoryChange(e.target.checked)}
+                              disabled={isSaving}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                              {config.clientOrderConfig.enableCustomerOrderHistory ? 'Enabled' : 'Disabled'}
+                            </span>
+                            {isSaving && (
+                              <span className="ml-2 text-xs text-gray-500">
+                                Saving...
+                              </span>
+                            )}
+                          </label>
+                        </dd>
+                        <dd className="text-xs text-gray-500 mt-1">
+                          When enabled, entering a mobile number on the create-order screen shows that
+                          customer&apos;s recent orders so duplicates can be caught before shipping
+                        </dd>
+                        {config.clientOrderConfig.enableCustomerOrderHistory && (
+                          <dd className="mt-2">
+                            <label
+                              htmlFor="customerOrderHistoryDays"
+                              className="block text-xs text-gray-500 mb-1"
+                            >
+                              Look back this many days
+                            </label>
+                            <input
+                              id="customerOrderHistoryDays"
+                              type="number"
+                              min={1}
+                              max={365}
+                              defaultValue={config.clientOrderConfig.customerOrderHistoryDays ?? 30}
+                              onBlur={(e) => {
+                                const next = parseInt(e.target.value, 10);
+                                if (next !== config?.clientOrderConfig?.customerOrderHistoryDays) {
+                                  handleCustomerOrderHistoryDaysChange(e.target.value);
+                                }
+                              }}
+                              disabled={isSaving}
+                              className="w-28 px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                            />
+                            <span className="ml-2 text-xs text-gray-500">1–365 days</span>
+                          </dd>
+                        )}
                       </div>
                       <div>
                         <dt className="text-xs text-gray-500">Print Mode</dt>

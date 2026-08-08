@@ -25,6 +25,10 @@ export interface OrderConfig {
   
   // Reseller settings
   enableResellerFallback: boolean;
+
+  // Customer order history (duplicate-order check on the create-order screen)
+  enableCustomerOrderHistory?: boolean;
+  customerOrderHistoryDays?: number;
 }
 
 // Default fallback configuration
@@ -54,7 +58,11 @@ const defaultOrderConfig: OrderConfig = {
   requireTotalItems: true,
   
   // Reseller settings
-  enableResellerFallback: true
+  enableResellerFallback: true,
+
+  // Customer order history — off unless the client enables it
+  enableCustomerOrderHistory: false,
+  customerOrderHistoryDays: 30
 };
 
 // Cache for order configuration

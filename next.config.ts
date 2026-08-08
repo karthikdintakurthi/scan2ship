@@ -51,7 +51,14 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            // Production chunk filenames are content-hashed, so caching them
+            // forever is safe. In dev the filenames are stable (e.g.
+            // app/orders/page.js), so an immutable header makes the browser
+            // hold on to stale application code for a year — every source
+            // change then needs a hard reload to become visible.
+            value: process.env.NODE_ENV === 'production'
+              ? 'public, max-age=31536000, immutable'
+              : 'no-cache, no-store, must-revalidate',
           },
         ],
       },
