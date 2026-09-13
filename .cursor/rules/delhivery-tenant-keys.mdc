@@ -1,0 +1,19 @@
+---
+description: Delhivery API keys are per pickup location and must be tenant-scoped
+globs: src/lib/delhivery.ts,src/lib/delhivery-*.ts,src/lib/pickup-location-config.ts,src/app/api/orders/**/*.ts,src/app/api/delhivery/**/*.ts,src/app/api/webhooks/delhivery/**/*.ts,src/app/api/tracking/**/*.ts
+alwaysApply: false
+---
+
+# Delhivery keys and tracking
+
+Carrier keys live on `pickup_locations.delhiveryApiKey`, not env (env has `DELHIVERY_BASE_URL` + webhook secret only).
+
+`getDelhiveryApiKey(pickupLocation, clientId?)` **must** receive a real tenant `clientId` (UUID string). If omitted it `findFirst`s across tenants. Never `parseInt(order.clientId)` — that is `NaN` and drops the filter.
+
+Always pass `clientId` into `delhiveryService.createOrder` / edit / track. Do not log raw API keys.
+
+**Tracking:** match Delhivery results by `tracking_id` / AWB, never by array index. `refresh-statuses` currently zips positionally and reindexes from 0 each batch — do not copy that. Filter `orders` by `clientId` before refresh.
+
+Waybill purchase then DB insert is not transactional today. Prefer: persist the order (or a pending row) and compensate/`cancel` if the carrier call or insert fails. Do not leave live Delhivery waybills with no `orders` row.
+
+DTDC is slip-pool management only (`/api/dtdc-slips`) — there is no DTDC HTTP API.

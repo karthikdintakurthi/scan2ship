@@ -1,0 +1,20 @@
+---
+description: Scan2Ship product, stack, tenancy invariant, and commands that actually work
+alwaysApply: true
+---
+
+# Scan2Ship
+
+Multi-tenant India logistics SaaS (npm name `vanitha-logistics-app`). Merchants create orders, generate Delhivery/DTDC labels, track shipments, and pay from a credit wallet. Shopify + Catalog app integrations. Deployed on Vercel.
+
+**Stack:** Next.js 15 App Router · React 19 · Prisma 6 · PostgreSQL · Tailwind. There is **no** `src/middleware.ts`. Each API route authenticates itself.
+
+**Tenant = `clients` row.** Almost every table has `clientId`. Isolation is **manual per query** — no Prisma middleware, no RLS. Any new query on a tenant-scoped table **must** include `clientId` in `where`. Deleting a `clients` row cascades orders **and** the credit ledger.
+
+**Roles (ascending):** `child_user` → `user` → `client_admin` → `super_admin` → `master_admin`. There is **no** `UserRole.ADMIN`. Never pass `UserRole.ADMIN` — the gate defaults to `user` and fails open.
+
+**Do not treat a green Vercel build as a quality signal.** `next.config.ts` sets `typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds`. `scripts/` is gitignored; `npm start` and most `db:*` wrappers are broken.
+
+**Working commands:** `npm run dev`, `npm run build`, `npx prisma migrate deploy`, `npx next start`. Never `npm run db:reset` against a non-local `DATABASE_URL`.
+
+Before auth, billing, or Delhivery work, read `docs/audits/FULL_APP_AUDIT_2026-08-08.md`. Full API surface: `docs/api/Scan2Ship_API_Collection.postman_collection.json`.

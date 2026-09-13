@@ -550,6 +550,7 @@ export default function ClientSettingsPage() {
   const [customAddressOverwrite, setCustomAddressOverwrite] = useState(false);
   const [customAddressCourier, setCustomAddressCourier] = useState('');
   const [customAddressText, setCustomAddressText] = useState('');
+  const [indiaPostCustomerId, setIndiaPostCustomerId] = useState('');
 
   // Check authentication and redirect if needed
   useEffect(() => {
@@ -580,6 +581,7 @@ export default function ClientSettingsPage() {
       loadDtdcPlusSlipsFromDatabase();
       loadLogo();
       loadCustomAddress();
+      loadIndiaPostCustomerId();
     }
   }, [currentUser, currentClient]);
 
@@ -750,6 +752,52 @@ export default function ClientSettingsPage() {
       }
     } catch (error) {
       console.error('❌ [DTDC_PLUS_SLIPS] Error loading from database:', error);
+    }
+  };
+
+  const loadIndiaPostCustomerId = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+      const response = await fetch('/api/india-post-customer-id', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      setIndiaPostCustomerId(data.customerId || '');
+    } catch (error) {
+      console.error('❌ [INDIA_POST_CUSTOMER_ID] Error loading:', error);
+    }
+  };
+
+  const saveIndiaPostCustomerId = async () => {
+    const sectionKey = 'india-post-customer-id';
+    try {
+      setSectionSaving(sectionKey, true);
+      clearSectionMessages(sectionKey);
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setSectionError(sectionKey, 'Authentication token not found');
+        return;
+      }
+      const response = await fetch('/api/india-post-customer-id', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ customerId: indiaPostCustomerId })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save India Post Customer ID');
+      }
+      setIndiaPostCustomerId(data.customerId || '');
+      setSectionSuccessMessage(sectionKey, 'India Post Customer ID saved');
+    } catch (error) {
+      setSectionError(sectionKey, error instanceof Error ? error.message : 'Failed to save India Post Customer ID');
+    } finally {
+      setSectionSaving(sectionKey, false);
     }
   };
 
@@ -2599,6 +2647,47 @@ export default function ClientSettingsPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+
+          {/* India Post Customer ID — tenant booking ID printed on India Post waybills */}
+          <div className="bg-white shadow rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900">India Post Customer ID</h2>
+                <p className="text-sm text-gray-600 mt-1">Printed on India Post waybills just below the heading</p>
+              </div>
+              <button
+                onClick={saveIndiaPostCustomerId}
+                disabled={savingSections['india-post-customer-id']}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingSections['india-post-customer-id'] ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              {sectionSuccess['india-post-customer-id'] && (
+                <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-3">
+                  <p className="text-sm text-green-800">{sectionSuccess['india-post-customer-id']}</p>
+                </div>
+              )}
+              {sectionErrors['india-post-customer-id'] && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
+                  <p className="text-sm text-red-800">{sectionErrors['india-post-customer-id']}</p>
+                </div>
+              )}
+              <label htmlFor="india-post-customer-id" className="block text-sm font-medium text-gray-700 mb-1">
+                Customer ID
+              </label>
+              <input
+                id="india-post-customer-id"
+                type="text"
+                value={indiaPostCustomerId}
+                onChange={(e) => setIndiaPostCustomerId(e.target.value)}
+                maxLength={80}
+                placeholder="Enter your India Post Customer ID"
+                className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
           </div>
 

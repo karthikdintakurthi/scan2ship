@@ -322,6 +322,9 @@ model orders {
   order_analytics          order_analytics?
   clients                  clients               @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdByUser            users?                @relation("OrderCreator", fields: [created_by], references: [id])
+
+  @@index([clientId, mobile, created_at(sort: Desc)], map: "orders_clientId_mobile_created_at_idx")
+  @@index([clientId, reseller_mobile, created_at(sort: Desc)], map: "orders_clientId_reseller_mobile_created_at_idx")
 }
 
 model pickup_locations {

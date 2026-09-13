@@ -1,0 +1,27 @@
+---
+description: Credit wallet mutations must be atomic, gated, and never fail-open
+globs: src/lib/credit-service.ts,src/lib/client-credit-costs-service.ts,src/app/api/credits/**/*.ts,src/app/api/admin/credits/**/*.ts,src/app/api/external/orders/route.ts,src/app/api/orders/**/*.ts
+alwaysApply: false
+---
+
+# Credits
+
+`CREDIT_COSTS` in `src/lib/credit-service.ts`: `ORDER: 1`, `IMAGE_PROCESSING: 2`, `TEXT_PROCESSING: 1`. Per-tenant `client_credit_costs` exists but is **not applied** at runtime — do not assume admin-configured prices take effect until you wire `deductCreditsForFeature`.
+
+**Mutations:**
+
+```ts
+// BAD — lost-update at READ COMMITTED
+const credits = await tx.client_credits.findUnique({ where: { clientId } });
+await tx.client_credits.update({ data: { balance: credits.balance - amount } });
+
+// GOOD
+await tx.client_credits.updateMany({
+  where: { clientId, balance: { gte: amount } },
+  data: { balance: { decrement: amount }, totalUsed: { increment: amount } },
+});
+```
+
+- Wrap order-create + deduction in the same `$transaction`. If deduction fails, **fail the request** — do not swallow and return 200.
+- Never credit from a request-body `amount` (`credits/verify-payment` does this today). Retry-Delhivery and Shopify webhook creates currently skip credits; do not add more free paths.
+- `external/orders` must not `decrement` without a `gte` guard. Ledger `balance` must come from the row after the update, not a stale pre-read.

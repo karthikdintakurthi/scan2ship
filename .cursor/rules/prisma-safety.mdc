@@ -1,0 +1,14 @@
+---
+description: Prisma queries, indexes, and migration safety
+globs: prisma/**,src/lib/prisma.ts
+alwaysApply: false
+---
+
+# Prisma
+
+- Reuse the singleton in `src/lib/prisma.ts`. Do **not** `new PrismaClient()` inside request handlers (`pickup-location-config.ts` still does this on the order hot path).
+- Tenant tables: always `where: { clientId, ... }`. `orders` has **zero** indexes — add `@@index([clientId, created_at(sort: Desc)])` before relying on list/report performance.
+- Money fields are `Float` today (`package_value`, `cod_amount`, rates). Prefer `Decimal` for new money columns.
+- Most FKs are `onDelete: Cascade`. Never delete a `clients` row in a "cleanup" path without an explicit, reviewed backup.
+- Migrate with `npx prisma migrate deploy` after a manual `pg_dump`. Do not use `npm run db:migrate:*` (they chain a missing `scripts/` backup) or `npm run db:reset` against shared databases.
+- Read `prisma/migrate-protection.md` before any production schema change.

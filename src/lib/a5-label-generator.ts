@@ -3,6 +3,8 @@
  * Optimized for A5 paper size (148mm x 210mm) with proper scaling and layout
  */
 
+import { indiaPostCustomerIdHeadingHtml } from '@/lib/india-post-customer-id'
+
 export interface A5LabelData {
   waybillNumber: string
   barcode?: string
@@ -30,6 +32,7 @@ export interface A5LabelData {
     enabled: boolean
     text: string | null
   }
+  indiaPostCustomerId?: string | null
 }
 
 export function generateA5LabelHTML(data: A5LabelData): string {
@@ -112,6 +115,13 @@ export function generateA5LabelHTML(data: A5LabelData): string {
             text-transform: uppercase;
         }
         
+        .customer-id {
+            font-size: 14px;
+            margin: 1mm 0;
+            color: #000;
+            font-weight: bold;
+        }
+
         .payment-info {
             font-size: 14px;
             margin: 1mm 0;
@@ -236,6 +246,7 @@ export function generateA5LabelHTML(data: A5LabelData): string {
                 ` : ''}
                 <div class="header-text">
                     <div class="courier-name">${data.courierService}</div>
+                    ${indiaPostCustomerIdHeadingHtml(data.courierService, data.indiaPostCustomerId)}
                     <div class="payment-info">Payment: ${data.paymentType}${data.paymentType === 'COD' && data.codAmount ? ` (₹${data.codAmount})` : ''}</div>
                 </div>
             </div>
@@ -454,6 +465,13 @@ export function generateBulkA5Labels(labelDataArray: A5LabelData[]): string {
             text-transform: uppercase;
         }
         
+        .customer-id {
+            font-size: 14px;
+            margin: 1mm 0;
+            color: #000;
+            font-weight: bold;
+        }
+
         .payment-info {
             font-size: 14px;
             margin: 1mm 0;
@@ -567,6 +585,7 @@ export function generateBulkA5Labels(labelDataArray: A5LabelData[]): string {
                     ` : ''}
                     <div class="header-text">
                         <div class="courier-name">${data.courierService}</div>
+                        ${indiaPostCustomerIdHeadingHtml(data.courierService, data.indiaPostCustomerId)}
                         <div class="payment-info">${data.paymentType}</div>
                     </div>
                 </div>

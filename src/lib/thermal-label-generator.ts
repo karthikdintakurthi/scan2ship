@@ -3,6 +3,8 @@
  * Optimized for thermal printers with 80mm width and proper scaling
  */
 
+import { indiaPostCustomerIdHeadingHtml } from '@/lib/india-post-customer-id'
+
 export interface ThermalLabelData {
   waybillNumber: string
   barcode?: string
@@ -30,6 +32,7 @@ export interface ThermalLabelData {
     enabled: boolean
     text: string | null
   }
+  indiaPostCustomerId?: string | null
 }
 
 export function generateThermalLabelHTML(data: ThermalLabelData): string {
@@ -112,6 +115,13 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
             text-transform: uppercase;
         }
         
+        .customer-id {
+            font-size: 16px;
+            margin: 1mm 0;
+            color: #000;
+            font-weight: bold;
+        }
+
         .payment-info {
             font-size: 16px;
             margin: 1mm 0;
@@ -240,6 +250,7 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
                 ` : ''}
                 <div class="header-text">
                     <div class="courier-name">${data.courierService.toUpperCase()}</div>
+                    ${indiaPostCustomerIdHeadingHtml(data.courierService, data.indiaPostCustomerId)}
                     <div class="payment-info">Payment: ${data.paymentType}${data.paymentType === 'COD' && data.codAmount ? ` (₹${data.codAmount})` : ''}</div>
                 </div>
             </div>
@@ -443,6 +454,13 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
             text-transform: uppercase;
         }
         
+        .customer-id {
+            font-size: 16px;
+            margin: 1mm 0;
+            color: #000;
+            font-weight: bold;
+        }
+
         .payment-info {
             font-size: 16px;
             margin: 1mm 0;
@@ -552,6 +570,7 @@ export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): s
                 <!-- Header -->
                 <div class="header">
                     <div class="courier-name">${data.courierService.toUpperCase()}</div>
+                    ${indiaPostCustomerIdHeadingHtml(data.courierService, data.indiaPostCustomerId)}
                     <div class="payment-info">Payment: ${data.paymentType}</div>
                 </div>
                 

@@ -7,6 +7,7 @@ import bwipjs from '@bwip-js/node'
 import { generateThermalLabelHTML, createThermalLabelData } from '@/lib/thermal-label-generator'
 import { generateA5LabelHTML, createA5LabelData } from '@/lib/a5-label-generator'
 import { generateR4LabelHTML, createR4LabelData } from '@/lib/4r-label-generator'
+import { INDIA_POST_CUSTOMER_ID_KEY, indiaPostCustomerIdHeadingHtml, isIndiaPostCourier } from '@/lib/india-post-customer-id'
 
 const prisma = new PrismaClient()
 
@@ -42,7 +43,7 @@ function getCourierServiceName(courierCode: string): string {
 }
 
 // Function to generate universal waybill HTML
-function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courierService: string, logoInfo?: { url: string; displayLogoOnWaybill: boolean }, footerNote?: { enabled: boolean; text: string | null }): string {
+function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courierService: string, logoInfo?: { url: string; displayLogoOnWaybill: boolean }, footerNote?: { enabled: boolean; text: string | null }, indiaPostCustomerId?: string | null): string {
   const html = `
 <!DOCTYPE html>
 <html>
@@ -101,6 +102,12 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
             margin: 10px 0;
             color: #000;
             font-size: 18px;
+        }
+        .customer-id {
+            margin: 8px 0;
+            color: #000;
+            font-size: 16px;
+            font-weight: bold;
         }
         .payment-status {
             margin: 10px 0;
@@ -192,6 +199,7 @@ function generateUniversalWaybillHTML(order: any, barcodeDataURL: string, courie
                 ` : ''}
                 <div class="header-text">
                     <h1>${getCourierServiceName(courierService)} Courier</h1>
+                    ${indiaPostCustomerIdHeadingHtml(courierService, indiaPostCustomerId)}
                     <div class="payment-status">Payment: ${order.is_cod ? 'COD' : 'Pre-paid'}${order.is_cod && order.cod_amount ? ` (₹${order.cod_amount})` : ''}</div>
                 </div>
             </div>
@@ -368,6 +376,20 @@ export async function GET(
         text: orderConfig.footerNoteText
       };
     }
+
+    let indiaPostCustomerId: string | null = null;
+    if (isIndiaPostCourier(order.courier_service)) {
+      const indiaPostConfig = await prisma.client_config.findUnique({
+        where: {
+          clientId_key: {
+            clientId: order.clientId,
+            key: INDIA_POST_CUSTOMER_ID_KEY,
+          },
+        },
+        select: { value: true },
+      });
+      indiaPostCustomerId = indiaPostConfig?.value?.trim() || null;
+    }
     
     let htmlContent: string
     let filename: string
@@ -388,6 +410,9 @@ export async function GET(
       // Add footer note to thermal data
       if (footerNote) {
         thermalData.footerNote = footerNote;
+      }
+      if (indiaPostCustomerId) {
+        thermalData.indiaPostCustomerId = indiaPostCustomerId;
       }
       htmlContent = generateThermalLabelHTML(thermalData)
       filename = `thermal-waybill-${trackingNumber}.html`
@@ -419,6 +444,9 @@ export async function GET(
       if (footerNote) {
         a5Data.footerNote = footerNote;
       }
+      if (indiaPostCustomerId) {
+        a5Data.indiaPostCustomerId = indiaPostCustomerId;
+      }
       htmlContent = generateA5LabelHTML(a5Data)
       filename = `a5-waybill-${trackingNumber}.html`
       console.log('✅ A5 waybill generated for order:', orderId, 'Courier:', order.courier_service, 'Logo:', logoInfo ? 'Yes' : 'No', 'Footer Note:', footerNote ? 'Yes' : 'No')
@@ -449,12 +477,15 @@ export async function GET(
       if (footerNote) {
         r4Data.footerNote = footerNote;
       }
+      if (indiaPostCustomerId) {
+        r4Data.indiaPostCustomerId = indiaPostCustomerId;
+      }
       htmlContent = generateR4LabelHTML(r4Data)
       filename = `4r-waybill-${trackingNumber}.html`
       console.log('✅ 4R waybill generated for order:', orderId, 'Courier:', order.courier_service, 'Logo:', logoInfo ? 'Yes' : 'No', 'Footer Note:', footerNote ? 'Yes' : 'No')
     } else {
       // Generate universal waybill HTML
-      htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service, logoInfo, footerNote)
+      htmlContent = generateUniversalWaybillHTML(order, barcodeDataURL, order.courier_service, logoInfo, footerNote, indiaPostCustomerId)
       filename = `waybill-${trackingNumber}.html`
       console.log('✅ Universal waybill generated for order:', orderId, 'Courier:', order.courier_service, 'Logo:', logoInfo ? 'Yes' : 'No', 'Footer Note:', footerNote ? 'Yes' : 'No')
     }

@@ -1,0 +1,14 @@
+---
+description: Auth, roles, and tenant isolation for API routes
+globs: src/app/api/**/*.ts,src/lib/auth-middleware.ts,src/lib/api-key-auth.ts,src/contexts/AuthContext.tsx
+alwaysApply: false
+---
+
+# Auth and tenancy
+
+- Authenticate every mutating or PII-returning route. Use `authorizeUser` / `authorizeSuperAdmin` from `src/lib/auth-middleware.ts`. Do not leave "temporarily bypass" comments.
+- Valid roles: `child_user | user | client_admin | super_admin | master_admin`. **Never** `UserRole.ADMIN` — it is `undefined` and the required-role default becomes `user`.
+- Scope reads/writes with `clientId` (and creator/sub-group for `child_user`). Integer order IDs are enumerable; unscoped `findUnique({ where: { id } })` is an IDOR.
+- Never `data: body` on Prisma updates. Allowlist fields. Never let the client set `clientId`, `role`, or credit amounts unless the caller is `master_admin` / `super_admin` and you intend that.
+- JWT lives in `localStorage` (`authToken`). Partner APIs use `src/lib/api-key-auth.ts`. Do not honor `permissions: ['*']` from an ordinary user-created key without an allowlist.
+- `POST /api/auth/register-user` currently has **no auth** and accepts `role` + `clientId` from the body. Do not copy that pattern. New user-create paths must auth, allowlist roles, and bind `clientId` to the caller.

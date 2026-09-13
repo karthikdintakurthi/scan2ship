@@ -3,6 +3,8 @@
  * Optimized for 4R photo paper size with proper scaling and layout
  */
 
+import { indiaPostCustomerIdHeadingHtml } from '@/lib/india-post-customer-id'
+
 export interface R4LabelData {
   waybillNumber: string
   barcode?: string
@@ -30,6 +32,7 @@ export interface R4LabelData {
     enabled: boolean
     text: string | null
   }
+  indiaPostCustomerId?: string | null
 }
 
 export function generateR4LabelHTML(data: R4LabelData): string {
@@ -118,6 +121,13 @@ export function generateR4LabelHTML(data: R4LabelData): string {
             text-transform: uppercase;
         }
         
+        .customer-id {
+            font-size: 14px;
+            margin: 1mm 0;
+            color: #000;
+            font-weight: bold;
+        }
+
         .payment-info {
             font-size: 14px;
             margin: 1mm 0;
@@ -251,6 +261,7 @@ export function generateR4LabelHTML(data: R4LabelData): string {
                 ` : ''}
                 <div class="header-text">
                     <div class="courier-name">${data.courierService}</div>
+                    ${indiaPostCustomerIdHeadingHtml(data.courierService, data.indiaPostCustomerId)}
                     <div class="payment-info">Payment: ${data.paymentType}${data.paymentType === 'COD' && data.codAmount ? ` (₹${data.codAmount})` : ''}</div>
                 </div>
             </div>
@@ -473,6 +484,13 @@ export function generateBulkR4Labels(labelDataArray: R4LabelData[]): string {
             text-transform: uppercase;
         }
         
+        .customer-id {
+            font-size: 14px;
+            margin: 1mm 0;
+            color: #000;
+            font-weight: bold;
+        }
+
         .payment-info {
             font-size: 14px;
             margin: 1mm 0;
@@ -594,6 +612,7 @@ export function generateBulkR4Labels(labelDataArray: R4LabelData[]): string {
                     ` : ''}
                     <div class="header-text">
                         <div class="courier-name">${data.courierService}</div>
+                        ${indiaPostCustomerIdHeadingHtml(data.courierService, data.indiaPostCustomerId)}
                         <div class="payment-info">${data.paymentType}</div>
                     </div>
                 </div>
