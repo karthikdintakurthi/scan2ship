@@ -1,6 +1,6 @@
 /**
  * Thermal Label Generator for 3-inch (76.2mm) thermal printers
- * Optimized for thermal printers with 80mm width and proper scaling
+ * High-contrast black/white only — gray fills and 1px hairlines wash out on 203dpi heads.
  */
 
 import { indiaPostCustomerIdHeadingHtml } from '@/lib/india-post-customer-id'
@@ -35,213 +35,228 @@ export interface ThermalLabelData {
   indiaPostCustomerId?: string | null
 }
 
-export function generateThermalLabelHTML(data: ThermalLabelData): string {
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Thermal Label - ${data.waybillNumber}</title>
-    <style>
+/** Shared CSS for single and bulk thermal labels. */
+const THERMAL_LABEL_CSS = `
         @page {
             size: 80mm auto;
             margin: 0;
         }
-        
+
         * {
             box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }
-        
+
         body {
-            font-family: 'Courier New', monospace;
+            font-family: Arial, Helvetica, sans-serif;
             margin: 0;
             padding: 0;
             width: 80mm;
             max-width: 80mm;
-            background-color: white;
-            font-size: 16px;
-            line-height: 1.2;
-            color: #000;
-            font-weight: bold;
+            background-color: #ffffff;
+            font-size: 13px;
+            line-height: 1.18;
+            color: #000000;
+            font-weight: 700;
         }
-        
+
+        .label-page {
+            width: 80mm;
+            max-width: 80mm;
+            margin: 0 auto;
+            page-break-after: always;
+        }
+
+        .label-page:last-child {
+            page-break-after: avoid;
+        }
+
         .label-container {
             width: 80mm;
             max-width: 80mm;
-            padding: 0;
-            margin: 2mm;
-            background-color: white;
-            border: 1px solid #000;
+            padding: 1mm;
+            margin: 0;
+            background-color: #ffffff;
+            border: 2px solid #000000;
         }
-        
-        /* Header Section */
+
         .header {
             text-align: center;
-            border-bottom: 1px solid #000;
-            padding-bottom: 2mm;
-            margin-bottom: 2mm;
+            margin-bottom: 0.8mm;
             position: relative;
         }
-        
+
         .header-content {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 2mm;
+            gap: 0.5mm;
             flex-wrap: wrap;
         }
-        
+
         .logo-container {
             position: absolute;
             left: 5px;
             top: 0px;
         }
-        
+
         .logo-container img {
-            max-height: 15mm;
-            max-width: 30mm;
+            max-height: 8mm;
+            max-width: 20mm;
             object-fit: contain;
+            filter: grayscale(1) contrast(1.6);
         }
-        
+
         .header-text {
             flex: 1;
             min-width: 40mm;
         }
-        
+
         .courier-name {
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 15px;
+            font-weight: 800;
             margin: 0;
+            padding: 0.8mm 1.5mm;
             text-transform: uppercase;
+            letter-spacing: 0.3px;
+            background: #000000;
+            color: #ffffff;
         }
-        
+
         .customer-id {
-            font-size: 16px;
-            margin: 1mm 0;
-            color: #000;
-            font-weight: bold;
+            font-size: 12px;
+            margin: 0.6mm 0 0 0;
+            padding: 0.6mm 1.5mm;
+            color: #000000;
+            font-weight: 800;
+            border: 2px solid #000000;
         }
 
         .payment-info {
-            font-size: 16px;
-            margin: 1mm 0;
-            color: #000;
-            font-weight: bold;
+            font-size: 13px;
+            margin: 0.6mm 0 0 0;
+            padding: 0.6mm 1.5mm;
+            color: #000000;
+            font-weight: 800;
+            border: 2px solid #000000;
+            text-transform: uppercase;
         }
-        
-        /* Barcode Section */
+
+        .payment-info.cod {
+            background: #000000;
+            color: #ffffff;
+        }
+
         .barcode-section {
             text-align: center;
-            margin: 2mm 0;
-            padding: 1mm;
-            border: 1px solid #000;
+            margin: 0.8mm 0;
+            padding: 0.8mm;
+            border: 2px solid #000000;
+            background: #ffffff;
         }
-        
+
         .barcode-image {
             max-width: 100%;
             height: auto;
-            max-height: 25mm;
+            max-height: 16mm;
             display: block;
             margin: 0 auto;
+            image-rendering: pixelated;
         }
-        
-        /* Address Section */
-        .address-section {
-            margin: 2mm 0;
-            border: 1px solid #000;
-            padding: 2mm;
+
+        .address-section,
+        .sender-section,
+        .reference-section,
+        .footer-note {
+            margin: 0.8mm 0;
+            border: 2px solid #000000;
+            padding: 0.8mm 1.5mm;
+            background: #ffffff;
         }
-        
+
         .section-title {
-            font-size: 16px;
-            font-weight: bold;
+            font-size: 12px;
+            font-weight: 800;
             text-transform: uppercase;
-            margin-bottom: 1mm;
-            border-bottom: 1px solid #000;
-            padding-bottom: 1mm;
+            margin: 0 0 0.5mm 0;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 0.4mm;
+            color: #000000;
         }
-        
-        .address-details {
-            font-size: 16px;
-            line-height: 1.3;
-            color: #000;
-            font-weight: bold;
-        }
-        
+
+        .address-details,
         .address-line {
-            margin: 0.5mm 0;
+            font-size: 13px;
+            line-height: 1.2;
+            color: #000000;
+            font-weight: 700;
             word-wrap: break-word;
-            color: #000;
-            font-weight: bold;
         }
-        
-        /* Sender Section */
-        .sender-section {
-            margin: 2mm 0;
-            border: 1px solid #000;
-            padding: 2mm;
-            background-color: #f8f8f8;
+
+        .address-line {
+            margin: 0.15mm 0;
         }
-        
-        /* Reference Section */
+
         .reference-section {
             text-align: left;
-            margin: 2mm 0;
-            padding: 1mm;
-            border: 1px solid #000;
-            font-size: 16px;
-            color: #000;
-            font-weight: bold;
+            font-size: 13px;
+            font-weight: 800;
+            color: #000000;
         }
-        
-        /* Footer */
+
         .footer {
             text-align: center;
-            font-size: 16px;
-            margin-top: 2mm;
-            padding-top: 1mm;
-            border-top: 1px solid #000;
-            color: #000;
-            font-weight: bold;
+            font-size: 11px;
+            margin-top: 0.8mm;
+            padding-top: 0.6mm;
+            border-top: 2px solid #000000;
+            color: #000000;
+            font-weight: 700;
         }
-        
-        /* Footer Note */
+
         .footer-note {
-            margin-top: 2mm;
-            padding: 1mm;
-            border: 1px solid #000;
-            font-size: 14px;
-            color: #000;
-            font-weight: bold;
+            font-size: 12px;
+            font-weight: 800;
             text-align: center;
-            background-color: #f8f8f8;
+            color: #000000;
         }
-        
-        /* Utility classes */
-        .text-center { text-align: center; color: #000; font-weight: bold; }
-        .text-bold { font-weight: bold; color: #000; }
-        .text-small { font-size: 16px; color: #000; font-weight: bold; }
-        .text-large { font-size: 20px; color: #000; font-weight: bold; }
-        
-        /* Print optimizations */
+
+        .text-center { text-align: center; color: #000000; font-weight: 700; }
+        .text-bold { font-weight: 800; color: #000000; }
+        .text-small { font-size: 12px; color: #000000; font-weight: 700; }
+        .text-large { font-size: 15px; color: #000000; font-weight: 800; }
+
         @media print {
-            body {
+            html, body {
                 margin: 0;
                 padding: 0;
+                background: #ffffff;
+                color: #000000;
             }
-            
+
+            .label-page,
             .label-container {
                 page-break-inside: avoid;
-                margin: 2mm;
-                padding: 0;
+                margin: 0;
+            }
+
+            .courier-name,
+            .payment-info.cod {
+                background: #000000 !important;
+                color: #ffffff !important;
             }
         }
-    </style>
-</head>
-<body>
-    <div class="label-container">
-        <!-- Header -->
-        <div class="header">
+`
+
+function paymentClass(paymentType: string): string {
+  return paymentType.toUpperCase().includes('COD') ? 'payment-info cod' : 'payment-info'
+}
+
+function thermalLabelBody(data: ThermalLabelData, includeHeaderFlex: boolean): string {
+  const paymentLine = `Payment: ${data.paymentType}${data.paymentType === 'COD' && data.codAmount ? ` (₹${data.codAmount})` : ''}`
+  const headerInner = includeHeaderFlex
+    ? `
             <div class="header-content">
                 ${data.logoInfo && data.logoInfo.displayLogoOnWaybill ? `
                 <div class="logo-container">
@@ -251,116 +266,112 @@ export function generateThermalLabelHTML(data: ThermalLabelData): string {
                 <div class="header-text">
                     <div class="courier-name">${data.courierService.toUpperCase()}</div>
                     ${indiaPostCustomerIdHeadingHtml(data.courierService, data.indiaPostCustomerId)}
-                    <div class="payment-info">Payment: ${data.paymentType}${data.paymentType === 'COD' && data.codAmount ? ` (₹${data.codAmount})` : ''}</div>
+                    <div class="${paymentClass(data.paymentType)}">${paymentLine}</div>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Barcode Section -->
-        <div class="barcode-section">
-            ${data.barcode ? `
-                <img src="${data.barcode}" alt="Barcode" class="barcode-image" />
-            ` : ''}
-        </div>
-        
-        <!-- Recipient Address -->
-        <div class="address-section">
-            <div class="section-title">Ship To:</div>
-            <div class="address-details">
-                <div class="address-line text-bold">${data.recipientName}</div>
-                <div class="address-line">${data.recipientAddress}</div>
-                <div class="address-line">${data.recipientCity}, ${data.recipientState}</div>
-                <div class="address-line">PIN: ${data.recipientPincode}</div>
-                <div class="address-line">Mobile: ${data.recipientMobile}</div>
-            </div>
-        </div>
-        
-        <!-- Sender Information -->
-        ${data.senderName ? `
-        <div class="sender-section">
-            <div class="section-title">From:</div>
-            <div class="address-details">
-                <div class="address-line text-bold">${data.senderName}</div>
-                ${data.senderAddress && data.courierService.toLowerCase() === 'india_post' ? `<div class="address-line">${data.senderAddress}</div>` : ''}
-                ${data.senderMobile ? `<div class="address-line">Mobile: ${data.senderMobile}</div>` : ''}
-            </div>
-        </div>
-        ` : ''}
-        
-        <!-- Reference -->
-        ${data.referenceNumber ? `
-        <div class="reference-section">
-            <div class="text-bold">${data.referenceNumber}</div>
-        </div>
-        ` : ''}
-        
-        <!-- Package Details -->
-        ${data.quantity ? `
-        <div class="reference-section">
-            <div class="text-bold">Quantity: ${data.quantity} item${data.quantity > 1 ? 's' : ''}</div>
-        </div>
-        ` : ''}
-        
-        <!-- Date -->
-        ${data.date ? `
-        <div class="reference-section">
-            <div class="text-small">Date: ${data.date}</div>
-        </div>
-        ` : ''}
-        
-        ${data.footerNote && data.footerNote.enabled && data.footerNote.text ? `
-        <!-- Footer Note -->
-        <div class="footer-note">
-            <strong>${data.footerNote.text}</strong>
-        </div>
-        ` : ''}
-        
-        <!-- Footer -->
-        <div class="footer">
-            <div>Generated by Scan2Ship</div>
-        </div>
-    </div>
+            </div>`
+    : `
+                    <div class="courier-name">${data.courierService.toUpperCase()}</div>
+                    ${indiaPostCustomerIdHeadingHtml(data.courierService, data.indiaPostCustomerId)}
+                    <div class="${paymentClass(data.paymentType)}">${paymentLine}</div>`
+
+  return `
+            <div class="label-container">
+                <div class="header">${headerInner}
+                </div>
+
+                <div class="barcode-section">
+                    ${data.barcode ? `<img src="${data.barcode}" alt="Barcode" class="barcode-image" />` : ''}
+                </div>
+
+                <div class="address-section">
+                    <div class="section-title">Ship To:</div>
+                    <div class="address-details">
+                        <div class="address-line text-bold">${data.recipientName}</div>
+                        <div class="address-line">${data.recipientAddress}</div>
+                        <div class="address-line">${data.recipientCity}, ${data.recipientState}</div>
+                        <div class="address-line">PIN: ${data.recipientPincode}</div>
+                        <div class="address-line">Mobile: ${data.recipientMobile}</div>
+                    </div>
+                </div>
+
+                ${data.senderName ? `
+                <div class="sender-section">
+                    <div class="section-title">From:</div>
+                    <div class="address-details">
+                        <div class="address-line text-bold">${data.senderName}</div>
+                        ${data.senderAddress && data.courierService.toLowerCase() === 'india_post' ? `<div class="address-line">${data.senderAddress}</div>` : ''}
+                        ${data.senderMobile ? `<div class="address-line">Mobile: ${data.senderMobile}</div>` : ''}
+                    </div>
+                </div>
+                ` : ''}
+
+                ${data.referenceNumber || data.quantity || data.date ? `
+                <div class="reference-section">
+                    ${data.referenceNumber ? `<div class="text-bold">${data.referenceNumber}</div>` : ''}
+                    ${data.quantity ? `<div class="text-small">Qty: ${data.quantity}</div>` : ''}
+                    ${data.date ? `<div class="text-small">${data.date}</div>` : ''}
+                </div>
+                ` : ''}
+
+                ${data.footerNote && data.footerNote.enabled && data.footerNote.text ? `
+                <div class="footer-note">
+                    <strong>${data.footerNote.text}</strong>
+                </div>
+                ` : ''}
+
+                <div class="footer">
+                    <div>Generated by Scan2Ship</div>
+                </div>
+            </div>`
+}
+
+export function generateThermalLabelHTML(data: ThermalLabelData): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Thermal Label - ${data.waybillNumber}</title>
+    <style>
+${THERMAL_LABEL_CSS}
+    </style>
+</head>
+<body>
+${thermalLabelBody(data, true)}
 </body>
 </html>
   `
-  
-  return html
 }
 
 /**
  * Generate thermal label data from order and package info
  */
 export function createThermalLabelData(order: any, packageInfo: any): ThermalLabelData {
-  // Determine sender name and mobile
-  const senderName = order.reseller_name && 
-                    order.reseller_name.trim() !== '' && 
-                    order.reseller_name.toLowerCase() !== 'no name' 
-                    ? order.reseller_name : undefined;
-  
-  const senderMobile = order.reseller_mobile && 
-                      order.reseller_mobile.trim() !== '' && 
-                      order.reseller_mobile.toLowerCase() !== 'no number' 
-                      ? order.reseller_mobile : undefined;
+  const senderName = order.reseller_name &&
+                    order.reseller_name.trim() !== '' &&
+                    order.reseller_name.toLowerCase() !== 'no name'
+                    ? order.reseller_name : undefined
 
-  // Determine sender address - use seller_address if available, otherwise use client address as fallback
-  let senderAddress = undefined;
-  
-  // First try seller_address field
-  if (order.seller_address && 
-      order.seller_address.trim() !== '' && 
+  const senderMobile = order.reseller_mobile &&
+                      order.reseller_mobile.trim() !== '' &&
+                      order.reseller_mobile.toLowerCase() !== 'no number'
+                      ? order.reseller_mobile : undefined
+
+  let senderAddress = undefined
+
+  if (order.seller_address &&
+      order.seller_address.trim() !== '' &&
       order.seller_address.toLowerCase() !== 'no address') {
-    senderAddress = order.seller_address;
-  }
-  // If no seller_address, try to construct from client address fields
-  else if (order.client_address || order.client_city || order.client_state || order.client_pincode) {
-    const addressParts = [];
-    if (order.client_address) addressParts.push(order.client_address);
-    if (order.client_city) addressParts.push(order.client_city);
-    if (order.client_state) addressParts.push(order.client_state);
-    if (order.client_pincode) addressParts.push(order.client_pincode);
-    
+    senderAddress = order.seller_address
+  } else if (order.client_address || order.client_city || order.client_state || order.client_pincode) {
+    const addressParts = []
+    if (order.client_address) addressParts.push(order.client_address)
+    if (order.client_city) addressParts.push(order.client_city)
+    if (order.client_state) addressParts.push(order.client_state)
+    if (order.client_pincode) addressParts.push(order.client_pincode)
+
     if (addressParts.length > 0) {
-      senderAddress = addressParts.join(', ');
+      senderAddress = addressParts.join(', ')
     }
   }
 
@@ -392,245 +403,24 @@ export function createThermalLabelData(order: any, packageInfo: any): ThermalLab
   }
 }
 
-/**
- * Generate multiple thermal labels for bulk printing
- */
 export function generateBulkThermalLabels(labelDataArray: ThermalLabelData[]): string {
-  const html = `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>Bulk Thermal Labels - ${labelDataArray.length} Labels</title>
     <style>
-        @page {
-            size: 80mm auto;
-            margin: 0;
-        }
-        
-        * {
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Courier New', monospace;
-            margin: 0;
-            padding: 0;
-            background-color: white;
-        }
-        
-        .label-page {
-            width: 80mm;
-            max-width: 80mm;
-            margin: 2mm auto;
-            page-break-after: always;
-        }
-        
-        .label-page:last-child {
-            page-break-after: avoid;
-        }
-        
-        /* Include all the thermal label styles here */
-        .label-container {
-            width: 80mm;
-            max-width: 80mm;
-            padding: 0;
-            margin: 2mm;
-            background-color: white;
-            border: 1px solid #000;
-        }
-        
-        .header {
-            text-align: center;
-            border-bottom: 1px solid #000;
-            padding-bottom: 2mm;
-            margin-bottom: 2mm;
-        }
-        
-        .courier-name {
-            font-size: 18px;
-            font-weight: bold;
-            margin: 0;
-            text-transform: uppercase;
-        }
-        
-        .customer-id {
-            font-size: 16px;
-            margin: 1mm 0;
-            color: #000;
-            font-weight: bold;
-        }
-
-        .payment-info {
-            font-size: 16px;
-            margin: 1mm 0;
-            color: #000;
-            font-weight: bold;
-        }
-        
-        .barcode-section {
-            text-align: center;
-            margin: 2mm 0;
-            padding: 1mm;
-            border: 1px solid #000;
-        }
-        
-        .barcode-image {
-            max-width: 100%;
-            height: auto;
-            max-height: 25mm;
-            display: block;
-            margin: 0 auto;
-        }
-        
-        .address-section {
-            margin: 2mm 0;
-            border: 1px solid #000;
-            padding: 2mm;
-        }
-        
-        .section-title {
-            font-size: 16px;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin-bottom: 1mm;
-            border-bottom: 1px solid #000;
-            padding-bottom: 1mm;
-        }
-        
-        .address-details {
-            font-size: 16px;
-            line-height: 1.3;
-            color: #000;
-            font-weight: bold;
-        }
-        
-        .address-line {
-            margin: 0.5mm 0;
-            word-wrap: break-word;
-            color: #000;
-            font-weight: bold;
-        }
-        
-        .sender-section {
-            margin: 2mm 0;
-            border: 1px solid #000;
-            padding: 2mm;
-            background-color: #f8f8f8;
-        }
-        
-        .reference-section {
-            text-align: center;
-            margin: 2mm 0;
-            padding: 1mm;
-            border: 1px solid #000;
-            font-size: 16px;
-            color: #000;
-            font-weight: bold;
-        }
-        
-        .footer {
-            text-align: center;
-            font-size: 16px;
-            margin-top: 2mm;
-            padding-top: 1mm;
-            border-top: 1px solid #000;
-            color: #000;
-            font-weight: bold;
-        }
-        
-        .text-center { text-align: center; color: #000; font-weight: bold; }
-        .text-bold { font-weight: bold; color: #000; }
-        .text-small { font-size: 16px; color: #000; font-weight: bold; }
-        .text-large { font-size: 20px; color: #000; font-weight: bold; }
-        
-        @media print {
-            body {
-                margin: 0;
-                padding: 0;
-            }
-            
-            .label-page {
-                page-break-inside: avoid;
-                margin: 2mm auto;
-            }
-            
-            .label-container {
-                page-break-inside: avoid;
-                margin: 2mm;
-                padding: 0;
-            }
-        }
+${THERMAL_LABEL_CSS}
     </style>
 </head>
 <body>
-    ${labelDataArray.map((data, index) => `
+    ${labelDataArray.map((data) => `
         <div class="label-page">
-            <div class="label-container">
-                <!-- Header -->
-                <div class="header">
-                    <div class="courier-name">${data.courierService.toUpperCase()}</div>
-                    ${indiaPostCustomerIdHeadingHtml(data.courierService, data.indiaPostCustomerId)}
-                    <div class="payment-info">Payment: ${data.paymentType}</div>
-                </div>
-                
-                <!-- Barcode Section -->
-                <div class="barcode-section">
-                    ${data.barcode ? `
-                        <img src="${data.barcode}" alt="Barcode" class="barcode-image" />
-                    ` : ''}
-                </div>
-                
-                <!-- Recipient Address -->
-                <div class="address-section">
-                    <div class="section-title">Ship To:</div>
-                    <div class="address-details">
-                        <div class="address-line text-bold">${data.recipientName}</div>
-                        <div class="address-line">${data.recipientAddress}</div>
-                        <div class="address-line">${data.recipientCity}, ${data.recipientState}</div>
-                        <div class="address-line">PIN: ${data.recipientPincode}</div>
-                        <div class="address-line">Mobile: ${data.recipientMobile}</div>
-                    </div>
-                </div>
-                
-                <!-- Sender Information -->
-                ${data.senderName ? `
-                <div class="sender-section">
-                    <div class="section-title">From:</div>
-                    <div class="address-details">
-                        <div class="address-line text-bold">${data.senderName}</div>
-                        ${data.senderAddress && data.courierService.toLowerCase() === 'india_post' ? `<div class="address-line">${data.senderAddress}</div>` : ''}
-                        ${data.senderMobile ? `<div class="address-line">Mobile: ${data.senderMobile}</div>` : ''}
-                    </div>
-                </div>
-                ` : ''}
-                
-                <!-- Reference -->
-                ${data.referenceNumber ? `
-                <div class="reference-section">
-                    <div class="text-bold">${data.referenceNumber}</div>
-                </div>
-                ` : ''}
-                
-
-                
-                <!-- Date -->
-                ${data.date ? `
-                <div class="reference-section">
-                    <div class="text-small">Date: ${data.date}</div>
-                </div>
-                ` : ''}
-                
-                <!-- Footer -->
-                <div class="footer">
-                    <div>Generated by Scan2Ship</div>
-                </div>
-            </div>
+${thermalLabelBody(data, true)}
         </div>
     `).join('')}
 </body>
 </html>
   `
-  
-  return html
 }

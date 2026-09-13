@@ -14,14 +14,18 @@ const prisma = new PrismaClient()
 // Authentication handled by centralized middleware
 
 /** Generate Code128 barcode locally (no external API). Returns data URL or '' on error. */
-async function generateBarcode(trackingNumber: string): Promise<string> {
+async function generateBarcode(trackingNumber: string, options?: { thermal?: boolean }): Promise<string> {
   try {
+    const thermal = options?.thermal === true
     const png = await bwipjs.toBuffer({
       bcid: 'code128',
       text: trackingNumber,
-      scale: 2,
-      height: 10,
+      scale: thermal ? 3 : 2,
+      height: thermal ? 10 : 10,
       includetext: true,
+      textxalign: 'center',
+      barcolor: '000000',
+      backgroundcolor: 'FFFFFF',
     })
     const base64 = (png as Buffer).toString('base64')
     return `data:image/png;base64,${base64}`
@@ -331,7 +335,7 @@ export async function GET(
     
     // For ALL courier services, only generate barcode if tracking_id exists (not empty or "null")
     if (order.tracking_id && order.tracking_id.trim() !== '' && order.tracking_id !== 'null') {
-      barcodeDataURL = await generateBarcode(order.tracking_id);
+      barcodeDataURL = await generateBarcode(order.tracking_id, { thermal: isThermal });
     }
     
     // Determine tracking number for display
