@@ -165,6 +165,18 @@ const THERMAL_LABEL_CSS = `
             image-rendering: pixelated;
         }
 
+        .barcode-number {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 15px;
+            font-weight: 900;
+            color: #000000;
+            letter-spacing: 0.6px;
+            margin-top: 0.6mm;
+            line-height: 1.15;
+            -webkit-text-stroke: 0.3px #000000;
+            text-rendering: geometricPrecision;
+        }
+
         .address-section,
         .sender-section,
         .reference-section,
@@ -281,6 +293,7 @@ function thermalLabelBody(data: ThermalLabelData, includeHeaderFlex: boolean): s
 
                 <div class="barcode-section">
                     ${data.barcode ? `<img src="${data.barcode}" alt="Barcode" class="barcode-image" />` : ''}
+                    <div class="barcode-number">${data.waybillNumber}</div>
                 </div>
 
                 <div class="address-section">

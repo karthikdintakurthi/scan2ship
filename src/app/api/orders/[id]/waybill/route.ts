@@ -22,7 +22,8 @@ async function generateBarcode(trackingNumber: string, options?: { thermal?: boo
       text: trackingNumber,
       scale: thermal ? 3 : 2,
       height: thermal ? 10 : 10,
-      includetext: true,
+      // Thermal prints the tracking number as HTML so it stays bold; PNG text washes out.
+      includetext: !thermal,
       textxalign: 'center',
       barcolor: '000000',
       backgroundcolor: 'FFFFFF',
