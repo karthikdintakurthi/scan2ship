@@ -4,7 +4,7 @@
  */
 
 import { NextRequest } from 'next/server';
-import { GET, POST, PUT, DELETE } from '../admin/users/route';
+import { GET, POST, PUT, DELETE } from '@/app/api/admin/users/route';
 import { prisma } from '@/lib/prisma';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 

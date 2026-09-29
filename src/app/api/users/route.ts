@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel, canManageUsers, canCreateChildUsers } from '@/lib/auth-middleware';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 export async function GET(request: NextRequest) {
   try {
@@ -279,7 +280,6 @@ export async function POST(request: NextRequest) {
     // Hash password if provided
     let hashedPassword = null;
     if (password) {
-      const bcrypt = require('bcrypt');
       hashedPassword = await bcrypt.hash(password, 10);
     }
 

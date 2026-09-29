@@ -17,7 +17,7 @@ if (ENCRYPTION_KEY.length < 32) {
 }
 
 // Cache for system configurations
-let configCache: Map<string, { value: string; timestamp: number }> = new Map();
+const configCache: Map<string, { value: string; timestamp: number }> = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Helper function to encrypt sensitive data with proper IV

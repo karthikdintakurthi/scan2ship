@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import jwt from 'jsonwebtoken';
 
 // User roles and permissions
 export enum UserRole {
@@ -125,8 +126,7 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
     }
     
     // Use basic JWT verification to match the login endpoint
-    const jwt = require('jsonwebtoken');
-    let decoded;
+    let decoded: jwt.JwtPayload | undefined;
     
     try {
       console.log('🔍 [JWT_VERIFY] Starting JWT verification');
@@ -147,7 +147,7 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
           issuer: process.env.JWT_ISSUER || 'scan2ship-saas',
           audience: process.env.JWT_AUDIENCE || 'scan2ship-users',
           algorithms: ['HS256']
-        });
+        }) as jwt.JwtPayload;
         console.log('✅ [JWT_VERIFY] Strategy 1 successful');
       } catch (error) {
         console.log('❌ [JWT_VERIFY] Strategy 1 failed:', error.message);
@@ -158,7 +158,7 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
           console.log('🔍 [JWT_VERIFY] Trying Strategy 2: no issuer/audience');
           decoded = jwt.verify(token, process.env.JWT_SECRET, {
             algorithms: ['HS256']
-          });
+          }) as jwt.JwtPayload;
           console.log('✅ [JWT_VERIFY] Strategy 2 successful');
         } catch (error2) {
           console.log('❌ [JWT_VERIFY] Strategy 2 failed:', error2.message);
@@ -169,7 +169,7 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
               issuer: 'vanitha-logistics',
               audience: 'vanitha-logistics-users',
               algorithms: ['HS256']
-            });
+            }) as jwt.JwtPayload;
             console.log('✅ [JWT_VERIFY] Strategy 3 successful');
           } catch (error3) {
             console.log('❌ [JWT_VERIFY] All strategies failed');

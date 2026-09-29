@@ -11,7 +11,10 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals"),
+  {
+    ignores: [".next/**", "node_modules/**", "coverage/**", "next-env.d.ts"],
+  },
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
@@ -19,6 +22,13 @@ const eslintConfig = [
       "react-hooks/exhaustive-deps": "warn",
       "react/no-unescaped-entities": "warn",
       "@next/next/no-img-element": "warn"
+    }
+  },
+  {
+    // Jest mock factories and CommonJS config/scripts load modules with require().
+    files: ["**/__tests__/**", "**/*.test.{ts,tsx}", "src/test-utils/**", "**/*.js", "**/*.cjs"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off"
     }
   }
 ];

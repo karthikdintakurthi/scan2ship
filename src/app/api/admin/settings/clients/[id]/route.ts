@@ -365,7 +365,7 @@ export async function PUT(
       console.log(`📝 [API_ADMIN_CLIENT_CONFIG_PUT] Updating ${updateData.configs.length} client configs`);
       try {
         const updatePromises = updateData.configs.map(async (config: any) => {
-          let valueToStore = config.value;
+          const valueToStore = config.value;
           
           // Don't encrypt any keys - store as plain text
           // if (config.isEncrypted && config.value && !config.value.startsWith('••••••••••••••••')) {

@@ -361,8 +361,8 @@ class FileCleanupManager {
     let totalSize = 0;
     let oldestFile: Date | null = null;
     let newestFile: Date | null = null;
-    let quarantineFiles = 0;
-    let backupFiles = 0;
+    const quarantineFiles = 0;
+    const backupFiles = 0;
 
     for (const directory of this.config.tempDirectories) {
       const files = await this.getDirectoryFiles(directory);

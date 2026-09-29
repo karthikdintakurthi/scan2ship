@@ -290,7 +290,7 @@ export async function PUT(request: NextRequest) {
 
     // Update each configuration
     const updatePromises = configs.map(async (config: any) => {
-      let valueToStore = config.value;
+      const valueToStore = config.value;
       
       // Don't encrypt any keys - store as plain text
       // if (config.isEncrypted && config.value && !config.value.startsWith('••••••••••••••••')) {

@@ -5,6 +5,7 @@
 
 import { securityConfig } from './security-config';
 import { jwtSecretManager } from './jwt-secret-manager';
+import jwt from 'jsonwebtoken';
 
 // Validate JWT secret environment variable
 function validateJwtSecret(): string {
@@ -94,7 +95,6 @@ export const enhancedJwtConfig = {
   
   // Generate tokens with operation-specific expiry
   generateToken: (payload: any, operation: 'login' | 'refresh' | 'api' | 'admin' = 'login') => {
-    const jwt = require('jsonwebtoken');
     
     let expiresIn: string;
     switch (operation) {
@@ -119,12 +119,11 @@ export const enhancedJwtConfig = {
       issuer: securityConfig.jwt.issuer,
       audience: securityConfig.jwt.audience,
       algorithm: securityConfig.jwt.algorithm
-    });
+    } as jwt.SignOptions);
   },
   
   // Verify token against all active secrets
   verifyToken: (token: string, options?: any) => {
-    const jwt = require('jsonwebtoken');
     const activeSecrets = jwtSecretManager.getActiveSecrets();
     
     for (const secret of activeSecrets) {
@@ -134,7 +133,7 @@ export const enhancedJwtConfig = {
           audience: securityConfig.jwt.audience,
           algorithms: [securityConfig.jwt.algorithm],
           ...options
-        });
+        }) as jwt.JwtPayload;
       } catch (error) {
         // Continue to next secret
       }
@@ -146,7 +145,6 @@ export const enhancedJwtConfig = {
   // Check if token needs refresh
   shouldRefresh: (token: string): boolean => {
     try {
-      const jwt = require('jsonwebtoken');
       const decoded = jwt.decode(token) as any;
       if (!decoded || !decoded.exp) return true;
       
@@ -163,7 +161,6 @@ export const enhancedJwtConfig = {
   // Get token expiry information
   getTokenInfo: (token: string) => {
     try {
-      const jwt = require('jsonwebtoken');
       const decoded = jwt.decode(token) as any;
       
       if (!decoded) {

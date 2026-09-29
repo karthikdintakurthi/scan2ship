@@ -4,7 +4,7 @@
  */
 
 import { NextRequest } from 'next/server';
-import { POST } from '../auth/register-user/route';
+import { POST } from '@/app/api/auth/register-user/route';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 

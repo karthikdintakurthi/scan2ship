@@ -166,7 +166,7 @@ export function cleanOpenAIResponse(content: string): string {
   if (!content) return '';
   
   // Remove special characters that might cause issues
-  let cleaned = content
+  const cleaned = content
     // Replace problematic characters
     .replace(/&/g, 'and')  // Replace & with 'and'
     .replace(/</g, '&lt;') // Escape < for HTML safety

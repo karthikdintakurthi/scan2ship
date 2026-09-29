@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import bcrypt from 'bcryptjs';
 
 export async function GET(
   request: NextRequest,
@@ -208,7 +209,6 @@ export async function PUT(
     // Hash password if provided
     let hashedPassword = undefined;
     if (password) {
-      const bcrypt = require('bcrypt');
       hashedPassword = await bcrypt.hash(password, 10);
     }
 

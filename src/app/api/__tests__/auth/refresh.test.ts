@@ -4,7 +4,7 @@
  */
 
 import { NextRequest } from 'next/server';
-import { POST } from '../auth/refresh/route';
+import { POST } from '@/app/api/auth/refresh/route';
 import { prisma } from '@/lib/prisma';
 import { enhancedJwtConfig } from '@/lib/jwt-config';
 
