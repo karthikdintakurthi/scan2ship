@@ -170,13 +170,18 @@ describe('POST /api/orders credit handling', () => {
     expect(credits.refundCredits).toHaveBeenCalledWith('client-a', 1, 'Refund: order could not be saved', 'ORDER', TEST_USER_ID);
   });
 
-  it('still refunds, and logs for reconciliation, when the waybill cannot be cancelled', async () => {
+  it.each([
+    ['refuses', () => cancelDelhiveryOrder.mockResolvedValue({ success: false, error: 'already manifested' })],
+    ['throws', () => cancelDelhiveryOrder.mockRejectedValue(new Error('socket hang up'))],
+  ])('keeps the credit and flags the live waybill when Delhivery %s the cancellation', async (_case, arrange) => {
     (prisma.orders.create as jest.Mock).mockRejectedValue(new Error('unique constraint'));
-    cancelDelhiveryOrder.mockResolvedValue({ success: false, error: 'already manifested' });
+    arrange();
 
-    await createOrderRoute(order());
+    const response = await createOrderRoute(order());
 
-    expect(credits.refundCredits).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({ outcome: 'unknown', waybill: 'WB-1', creditRefunded: false, details: expect.stringMatching(/WB-1 may still be live/) });
+    expect(credits.refundCredits).not.toHaveBeenCalled();
     const logged = (console.error as jest.Mock).mock.calls.map(([message]) => String(message)).join(' ');
     expect(logged).toContain('Waybill cancellation failed');
   });

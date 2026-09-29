@@ -336,19 +336,34 @@ export async function createOrder(
   } catch (saveError) {
     console.error('❌ [ORDER_CREATE] Failed to save order:', saveError);
 
+    let liveWaybill: string | null = null;
     if (!order && delhiveryResponse?.success && delhiveryResponse.waybill_number) {
       // Do not leave a live waybill with no order row
-      const cancelResult = await delhiveryService.cancelOrder(
-        delhiveryResponse.waybill_number,
-        processedOrderData.pickup_location,
-        client.id
-      );
+      const cancelResult = await delhiveryService
+        .cancelOrder(delhiveryResponse.waybill_number, processedOrderData.pickup_location, client.id)
+        .catch((cancelError: unknown) => ({ success: false, error: cancelError instanceof Error ? cancelError.message : String(cancelError) }));
       if (!cancelResult.success) {
         console.error('❌ [ORDER_CREATE] Waybill cancellation failed; reconcile manually:', {
           waybill: delhiveryResponse.waybill_number,
           error: cancelResult.error
         });
+        liveWaybill = delhiveryResponse.waybill_number;
       }
+    }
+
+    if (!order && liveWaybill) {
+      // The shipment may still be live with Delhivery: keep the credit and say so,
+      // rather than refunding and reporting an ordinary failure that invites a retry
+      return fail(502, {
+        success: false,
+        outcome: 'unknown',
+        error: 'The order could not be saved and its Delhivery waybill could not be cancelled',
+        details: `Waybill ${liveWaybill} may still be live with Delhivery. Cancel it in Delhivery before creating the order again. The credit has not been refunded yet.`,
+        waybill: liveWaybill,
+        reference: processedOrderData.reference_number,
+        transactionId: charge.transactionId,
+        creditRefunded: false,
+      });
     }
 
     if (!order) {
