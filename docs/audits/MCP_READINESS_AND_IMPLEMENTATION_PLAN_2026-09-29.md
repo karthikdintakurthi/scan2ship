@@ -267,6 +267,9 @@ Each PR is independently shippable and carries route-level tests. Ordered by exp
 8. **Public tracking.** Minimal masked output and IP rate limiting.
 9. **Shopify and Delhivery webhook.** Authenticated Shopify initiation, strict shop-domain validation, shop bound to state, HMAC check; shared-secret header on the Delhivery webhook with tenant-scoped updates.
 
+10. **Partner API keys.** Store only a hash of each key and show the raw key once at creation; stop returning keys from `GET /api/api-keys`; accept only known permission scopes and never `*`; record the issuing user; keep expiry and revocation.
+11. **Catalog proxy permissions.** `/api/catalog` accepts any action with READ permission, including `reduce_inventory` and `restore_inventory`. Require WRITE for inventory changes and reject unknown actions.
+
 ### Phase 1–3 outline
 
 - **Phase 1:** fix ESLint config and broken test imports; CI with lint, a ratcheting TypeScript error baseline, and Jest; Postgres-backed tenant-isolation tests; policy and service layer with Zod schemas; single Prisma client and query indexes; remove the JWT verification fallback after a forced re-login window.
