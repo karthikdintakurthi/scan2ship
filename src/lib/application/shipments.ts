@@ -89,6 +89,14 @@ export async function prepareShipment(principal: McpPrincipal, input: PrepareShi
     throw new McpToolError('invalid_params', `${courier.name} allows at most ${courier.maxWeightGrams} g`);
   }
 
+  const bookedWithCarrier = sameText(courier.code, 'delhivery');
+  if (input.trackingNumber && bookedWithCarrier) {
+    throw new McpToolError(
+      'invalid_params',
+      'Delhivery assigns the waybill when the order is created; do not pass a trackingNumber for Delhivery'
+    );
+  }
+
   const isCod = input.payment.mode === 'cod';
   // Website-shaped order input, exactly what createOrder receives on confirmation
   const orderData: Record<string, unknown> = {
@@ -108,6 +116,8 @@ export async function prepareShipment(principal: McpPrincipal, input: PrepareShi
     cod_amount: isCod ? input.payment.codAmountInr : null,
     ...(input.package.description ? { product_description: input.package.description } : {}),
     ...(input.referenceNumber ? { reference_number: input.referenceNumber } : {}),
+    // Couriers without a carrier booking use the tracking number the user supplies
+    ...(input.trackingNumber ? { tracking_id: input.trackingNumber } : {}),
     ...(input.reseller?.name ? { reseller_name: input.reseller.name } : {}),
     ...(input.reseller?.mobile ? { reseller_mobile: input.reseller.mobile } : {}),
   };
@@ -149,12 +159,14 @@ export async function prepareShipment(principal: McpPrincipal, input: PrepareShi
       payment: isCod ? { mode: 'cod', codAmountInr: input.payment.codAmountInr } : { mode: 'prepaid' },
       courier: { code: courier.code, name: courier.name },
       pickupLocation: pickup.name,
-      bookedWithCarrier: sameText(courier.code, 'delhivery'),
+      referenceNumber: input.referenceNumber ?? null,
+      trackingNumber: bookedWithCarrier ? 'assigned by Delhivery on creation' : input.trackingNumber ?? null,
+      bookedWithCarrier,
     },
     cost: { credits: creditCost, currentBalance: balance, sufficient: balance >= creditCost },
     nextStep:
       'Show this preview to the user. Call create_shipment with this previewId only after the user explicitly confirms. Creating the order uses credits' +
-      (sameText(courier.code, 'delhivery') ? ' and books a Delhivery waybill.' : '.'),
+      (bookedWithCarrier ? ' and books a Delhivery waybill.' : '.'),
   };
 }
 

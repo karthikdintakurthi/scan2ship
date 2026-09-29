@@ -66,6 +66,11 @@ export const prepareShipmentInputSchema = z
     courierCode: z.string().trim().min(1).max(80),
     pickupLocation: z.string().trim().min(1).max(120),
     referenceNumber: z.string().trim().max(60).optional(),
+    trackingNumber: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9-]{4,40}$/, 'trackingNumber must be 4-40 letters, digits, or hyphens')
+      .optional(),
     reseller: z
       .object({ name: z.string().trim().max(120).optional(), mobile: z.string().trim().max(20).optional() })
       .optional(),

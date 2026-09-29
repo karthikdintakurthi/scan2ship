@@ -56,7 +56,16 @@ const TOOL_INPUT: Record<string, z.ZodTypeAny> = {
     }),
     courierCode: z.string().describe('A courier code from list_shipping_options'),
     pickupLocation: z.string().describe('A pickup location name or value from list_shipping_options'),
-    referenceNumber: z.string().max(60).optional(),
+    referenceNumber: z
+      .string()
+      .max(60)
+      .optional()
+      .describe("The seller's own order reference. Not a tracking number; Scan2Ship appends the customer mobile."),
+    trackingNumber: z
+      .string()
+      .max(40)
+      .optional()
+      .describe('Courier tracking/consignment number the user already has, e.g. for India Post or DTDC. Not allowed for Delhivery, which assigns the waybill.'),
     reseller: z.object({ name: z.string().optional(), mobile: z.string().optional() }).optional(),
   }),
   create_shipment: z.object({ previewId: z.string().describe('previewId returned by prepare_shipment') }),

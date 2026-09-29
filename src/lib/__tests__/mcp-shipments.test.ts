@@ -152,6 +152,30 @@ describe('prepare_shipment', () => {
     expect(stored.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(PREVIEW_TTL_MS);
   });
 
+  it('keeps a supplied tracking number separate from the reference number', async () => {
+    const input = { ...INPUT, courierCode: 'india_post', referenceNumber: 'INV-42', trackingNumber: 'EE123456789IN' };
+    const result = await prepareShipment(principalFor(), input);
+
+    expect(operations.get(result.previewId)!.payload).toMatchObject({
+      courier_service: 'india_post',
+      reference_number: 'INV-42',
+      tracking_id: 'EE123456789IN',
+    });
+    expect(result.preview).toMatchObject({ referenceNumber: 'INV-42', trackingNumber: 'EE123456789IN', bookedWithCarrier: false });
+  });
+
+  it('refuses a tracking number for Delhivery, which assigns its own waybill', async () => {
+    await expect(prepareShipment(principalFor(), { ...INPUT, trackingNumber: '1234567890' })).rejects.toMatchObject({
+      code: 'invalid_params',
+      message: expect.stringMatching(/Delhivery assigns the waybill/),
+    });
+    expect(operations.size).toBe(0);
+  });
+
+  it('rejects a malformed tracking number', () => {
+    expect(() => prepareShipmentInputSchema.parse({ ...INPUT, trackingNumber: 'has spaces!' })).toThrow(/trackingNumber/);
+  });
+
   it('reports an insufficient balance in the preview', async () => {
     (prisma.client_credits.findUnique as jest.Mock).mockResolvedValue({ balance: 0 });
     expect((await prepareShipment(principalFor(), INPUT)).cost.sufficient).toBe(false);
