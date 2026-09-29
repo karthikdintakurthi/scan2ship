@@ -26,6 +26,7 @@ const PICKUP_LOCATIONS = [
   { clientId: 'client-b', value: 'Main Warehouse', delhiveryApiKey: 'key-b' },
   { clientId: 'client-a', value: 'Wrapped', delhiveryApiKey: "const clientKeyD = 'key-wrapped';" },
   { clientId: 'client-a', value: 'No Key', delhiveryApiKey: null },
+  { clientId: 'client-a', value: 'Odd Snippet', delhiveryApiKey: "clientKeyD = '" },
 ];
 
 beforeEach(() => {
@@ -70,6 +71,10 @@ describe('getDelhiveryApiKey', () => {
 
   it('extracts keys saved inside a JavaScript snippet', async () => {
     expect(await getDelhiveryApiKey('Wrapped', 'client-a')).toBe('key-wrapped');
+  });
+
+  it('returns the stored value unchanged when a snippet has no quoted key', async () => {
+    expect(await getDelhiveryApiKey('Odd Snippet', 'client-a')).toBe("clientKeyD = '");
   });
 
   it('returns an empty string when the database lookup fails', async () => {

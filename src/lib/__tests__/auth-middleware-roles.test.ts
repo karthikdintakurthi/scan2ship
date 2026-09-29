@@ -94,6 +94,13 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+describe('auth-middleware exports', () => {
+  it('no longer exports authorizeAdmin, which checked the non-existent UserRole.ADMIN', () => {
+    expect(jest.requireActual('@/lib/auth-middleware')).not.toHaveProperty('authorizeAdmin');
+    expect(Object.values(UserRole)).not.toContain('admin');
+  });
+});
+
 describe('hasRequiredRole', () => {
   it('denies an unknown required role instead of comparing against undefined', () => {
     expect(hasRequiredRole(userWithRole('master_admin'), undefined as unknown as UserRole)).toBe(false);

@@ -71,6 +71,7 @@ const ORDERS: OrderRow[] = [
   ...NORTH_IDS.map((id) => order(id)),
   order(101, { pickup_location: 'South', created_by: TEST_USER_ID }),
   order(102, { pickup_location: 'South' }),
+  order(103, { pickup_location: 'South', tracking_status: null }),
   order(900, { clientId: 'client-b', pickup_location: 'North' }),
 ];
 
@@ -222,6 +223,37 @@ describe('POST /api/orders/refresh-statuses', () => {
     expect(errorUpdates().get(1)).toBe('Delhivery timeout');
   });
 
+  it('reports non-Error failures from the tracking request', async () => {
+    actAs('user');
+    bulkTracking.mockRejectedValue('socket hang up');
+    await refreshStatuses(signedRequest({ orderIds: [1] }));
+    expect(errorUpdates().get(1)).toBe('Unknown error');
+  });
+
+  it('falls back to the raw status and reports a missing previous status as "null"', async () => {
+    actAs('user');
+    bulkTracking.mockResolvedValue([
+      { success: true, trackingId: 'AWB-103', data: { tracking_id: 'AWB-103', status: 'Delivered', status_description: '', current_status: '', current_status_description: '' } },
+    ]);
+
+    const response = await refreshStatuses(signedRequest({ orderIds: [103] }));
+    const body = await response.json();
+
+    expect(body.results).toEqual([
+      expect.objectContaining({ orderId: 103, oldStatus: 'null', newStatus: delhiveryTrackingService.mapStatusToInternal('Delivered') }),
+    ]);
+  });
+
+  it('returns 404 when none of the requested orders are accessible', async () => {
+    actAs('user');
+    const response = await refreshStatuses(signedRequest({ orderIds: [900] }));
+
+    expect(response.status).toBe(404);
+    expect(getKey).not.toHaveBeenCalled();
+    expect(bulkTracking).not.toHaveBeenCalled();
+    expect(updateOrderRow).not.toHaveBeenCalled();
+  });
+
   it('applies the child-user rule', async () => {
     actAs('child_user');
     const response = await refreshStatuses(signedRequest({ orderIds: [1, 101, 102] }));
@@ -239,6 +271,15 @@ describe('Delhivery cancellation on order deletion', () => {
     expect(response.status).toBe(200);
     expect(cancelOrder).toHaveBeenCalledWith('AWB-1', 'North', 'client-a');
     expect(prisma.orders.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+  });
+
+  it('DELETE /api/orders/[id] returns 404 for an invalid order ID without querying', async () => {
+    actAs('user');
+    const response = await deleteOrder(signedRequest(), { params: Promise.resolve({ id: 'abc' }) });
+
+    expect(response.status).toBe(404);
+    expect(findOrder).not.toHaveBeenCalled();
+    expect(prisma.orders.delete).not.toHaveBeenCalled();
   });
 
   it("DELETE /api/orders/[id] does not cancel or delete another tenant's order", async () => {

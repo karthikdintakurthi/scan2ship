@@ -21,7 +21,10 @@ export function authUserRow(role: string, clientId = 'client-a') {
 }
 
 /** Minimal request carrying a valid Scan2Ship JWT; enough for authorizeUser and route handlers. */
-export function signedRequest(body: unknown = {}, { authenticated = true } = {}): NextRequest {
+export function signedRequest(
+  body: unknown = {},
+  { authenticated = true, url = 'http://localhost/api/test' }: { authenticated?: boolean; url?: string } = {}
+): NextRequest {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (authenticated) {
     const token = jwt.sign({ userId: TEST_USER_ID }, process.env.JWT_SECRET!, {
@@ -32,7 +35,12 @@ export function signedRequest(body: unknown = {}, { authenticated = true } = {})
     headers.authorization = `Bearer ${token}`;
   }
   return {
-    headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
+    url,
+    nextUrl: new URL(url),
+    headers: {
+      get: (name: string) => headers[name.toLowerCase()] ?? null,
+      forEach: (fn: (value: string, key: string) => void) => Object.entries(headers).forEach(([k, v]) => fn(v, k)),
+    },
     cookies: { get: () => undefined },
     json: async () => body,
   } as unknown as NextRequest;

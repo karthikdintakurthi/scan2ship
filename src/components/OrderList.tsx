@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import ExcelJS from 'exceljs'
 import TrackingModal from './TrackingModal'
 import ImageModal from './ImageModal'
+import { buildDelhiveryUpdateRequest, DELHIVERY_UPDATE_ORDER_URL } from '@/lib/delhivery-update-request'
 
 
 interface Order {
@@ -808,35 +809,10 @@ export default function OrderList() {
     try {
       console.log('🔄 [DELHIVERY_UPDATE] Updating Delhivery order:', order.delhivery_waybill_number)
       
-      // The server resolves the waybill and carrier key from the stored order
-      // Note: shipment dimensions are not sent to Delhivery update API
-      const delhiveryPayload: any = {
-        orderId: order.id,
-        pt: order.is_cod ? 'COD' : 'Pre-paid',
-        cod: order.is_cod ? (order.cod_amount || 0) : 0,
-        weight: order.weight || 100, // Weight in grams
-        
-        // Customer details for address updates
-        name: order.name,
-        phone: order.mobile,
-        address: order.address,
-        city: order.city,
-        state: order.state,
-        pincode: order.pincode,
-        country: order.country
-      }
-
-      console.log('📦 [DELHIVERY_UPDATE] Delhivery update payload:', delhiveryPayload)
-
-      const token = localStorage.getItem('authToken')
-      const delhiveryResponse = await fetch('/api/delhivery/update-order', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(delhiveryPayload),
-      })
+      const delhiveryResponse = await fetch(
+        DELHIVERY_UPDATE_ORDER_URL,
+        buildDelhiveryUpdateRequest(order, localStorage.getItem('authToken'))
+      )
 
       if (delhiveryResponse.ok) {
         const delhiveryResult = await delhiveryResponse.json()
