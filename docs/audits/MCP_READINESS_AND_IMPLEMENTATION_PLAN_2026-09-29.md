@@ -52,6 +52,7 @@ Priority describes remediation order. Critical findings are release blockers for
 | Credits can be granted from an unverified claim | [verify-payment](/Users/karthiknaidudintakurthi/Documents/GitHub/scan2ship/src/app/api/credits/verify-payment/route.ts:54) accepts caller amount/reference from any active user down to `CHILD_USER`. Duplicate detection is only a substring match on the ledger description. It then [adds credits](/Users/karthiknaidudintakurthi/Documents/GitHub/scan2ship/src/app/api/credits/verify-payment/route.ts:115) without payment-provider verification. | Require independently verified settlement or an authorized manual reconciliation workflow. Enforce a unique provider payment ID and atomic posting. |
 | Public phone lookup returns customer data across tenants | [tracking](/Users/karthiknaidudintakurthi/Documents/GitHub/scan2ship/src/app/api/tracking/route.ts:4) needs only a phone number and returns addresses, order values, and tenant-grouped shipments. | Tenant-authenticated lookup for MCP; if public tracking is retained, use an appropriately scoped secret link or verified customer flow with minimal output. |
 | Unauthenticated shipment edits use any tenant's carrier key | [delhivery/update-order](/Users/karthiknaidudintakurthi/Documents/GitHub/scan2ship/src/app/api/delhivery/update-order/route.ts:6) has no authentication. It looks up a pickup location by `value` alone ([line 40](/Users/karthiknaidudintakurthi/Documents/GitHub/scan2ship/src/app/api/delhivery/update-order/route.ts:40)), with no tenant filter, and uses that location's `delhiveryApiKey` to send caller-supplied waybill, address, phone, payment type, and COD changes to Delhivery. | Remove the route or put it behind tenant authorization; resolve the waybill to a tenant-owned order and use that order's pickup credential. Review Delhivery edit history for unexpected changes. |
+| Platform-admin routes accept ordinary tenant users | Fourteen route files pass `requiredRole: UserRole.ADMIN` to `authorizeUser`, but the enum has no `ADMIN` member. The value is `undefined`, so the [destructuring default](/Users/karthiknaidudintakurthi/Documents/GitHub/scan2ship/src/lib/auth-middleware.ts:331) substitutes `UserRole.USER`. Any `user`-level account in any tenant can therefore add credits to any tenant ([admin credits](/Users/karthiknaidudintakurthi/Documents/GitHub/scan2ship/src/app/api/admin/credits/[clientId]/route.ts:72)), create users with any role in any tenant ([admin users](/Users/karthiknaidudintakurthi/Documents/GitHub/scan2ship/src/app/api/admin/users/route.ts:83)), and reach system configuration, JWT secret management, and platform analytics. `authorizeAdmin` has the same defect. Found by source reading; not reproduced against a running app. | Replace `UserRole.ADMIN` with an explicit platform-admin role; make role checks reject unknown required roles instead of defaulting; review credit and user changes made through these routes. |
 
 ### High: operations and MCP boundaries
 
@@ -125,7 +126,7 @@ These are proposed files. Existing routes should call the extracted services dir
 
 Customer flow: connect the server URL in an assistant → sign in to Scan2Ship → select an authorized tenant → see the assistant name and requested permissions → approve → manage or revoke the connection in Settings.
 
-Use an established OAuth authorization server/provider supporting authorization code with PKCE, exact redirect validation, short-lived access tokens, refresh rotation/reuse detection, and revocation. Decide the provider during the first implementation spike; no existing deployment/provider is assumed. The MCP resource server must publish protected-resource metadata and enforce tokens issued for its canonical audience. Current MCP guidance prefers Client ID Metadata Documents; support pre-registration and legacy dynamic registration only as required by tested clients. [MCP authorization specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
+Build the OAuth authorization server into Scan2Ship, backed by the existing `users` table, using a maintained OAuth library rather than hand-written protocol code. It must support authorization code with PKCE, exact redirect validation, short-lived access tokens, refresh rotation/reuse detection, and revocation. The library is chosen during the Phase 2 spike. The MCP resource server must publish protected-resource metadata and enforce tokens issued for its canonical audience. Current MCP guidance prefers Client ID Metadata Documents; support pre-registration and legacy dynamic registration only as required by tested clients. [MCP authorization specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
 
 Implementation policy:
 
@@ -211,11 +212,11 @@ Estimates are engineering effort for one experienced full-time engineer with tim
 |---|---|---:|---|
 | 0. Contain and stabilize | Close critical auth/data/payment gaps, including `delhivery/update-order`; remove or lock down the public repair, test, status-update, and cron routes; sign the Delhivery webhook; fix Shopify OAuth initiation; redact secrets; restore test/lint tooling and assess type backlog | 10–17 days | Critical paths protected; no route in `src/app/api` mutates data without authentication, a signature, or a cron secret; tenant/role regression tests execute; clear baseline and dependency review |
 | 1. Shared services | Principal/policy layer, scoped read services, output schemas, database-client consolidation, initial index review | 5–8 days | Cross-tenant and subgroup tests pass for every pilot capability; existing UI paths retain intended behavior |
-| 2. Customer MCP reads | SDK/Vercel spike, OAuth provider integration, consent/revocation UI, seven tools, quotas and audit | 6–10 days | Two selected customer assistant clients connect, read, expire/refresh, and revoke correctly |
+| 2. Customer MCP reads | SDK/Vercel spike, self-hosted OAuth authorization server, consent/revocation UI, seven tools, quotas and audit | 10–16 days | Two selected customer assistant clients connect, read, expire/refresh, and revoke correctly |
 | 3. Read pilot | Small tenant allowlist, staging/load/security checks, support docs and dashboards | 3–5 days | No unresolved critical/high issue on the pilot path; tenant isolation proven; rollback drill complete |
 | 4. Shipment writes | Preview/approval, atomic credits, durable jobs, provider reconciliation, pickup workflow, operation status | 10–18 days | Concurrency, duplicate, crash, timeout, revocation, and compensation tests pass |
 
-Indicative total: **24–40 engineering days for a read pilot; 34–58 for controlled writes**. Re-estimate after Phase 0. Full general availability also requires resolving the remaining type/test failures, restoring build gates, and a deployment/dependency security review. Do not let unrelated existing failures hide new errors: use a temporary tracked baseline while repairing them, with strict checks for all new services.
+Indicative total: **28–46 engineering days for a read pilot; 38–64 for controlled writes**. Building the authorization server in-house, rather than using a managed provider, adds about 4–6 days to Phase 2 and keeps its security review in scope. Re-estimate after Phase 0. Full general availability also requires resolving the remaining type/test failures, restoring build gates, and a deployment/dependency security review. Do not let unrelated existing failures hide new errors: use a temporary tracked baseline while repairing them, with strict checks for all new services.
 
 ### Required acceptance tests
 
@@ -237,3 +238,37 @@ Create the policy/service foundation and demonstrate one complete flow in stagin
 **Customer connects → approves `orders:read` for their tenant → searches their own orders → cannot access another tenant's order → revokes access → the next call is denied.**
 
 Ship that with regression tests, redacted audit records, and a documented client compatibility result before expanding the tool catalog. This proves the most important product and security boundary with a small, reviewable implementation.
+
+## 9. Decisions and pull request sequence
+
+### Decisions (2026-09-29)
+
+| Topic | Decision |
+|---|---|
+| Credit recharge | `verify-payment` creates a pending request that a platform admin approves in the existing admin credits UI. A payment gateway with verified webhooks replaces manual approval later. |
+| Public tracking | Keep phone lookup, return only masked minimal fields, and rate-limit by IP. |
+| OAuth for MCP | Self-hosted authorization server in Scan2Ship, using a maintained OAuth library. |
+
+### Existing callers that constrain the fixes
+
+These routes must be repaired, not deleted, because the UI calls them: `register-user` (admin add-user page, through `AuthContext`), `delhivery/update-order` and `orders/[id]/fulfill` (`OrderList`), `credits/verify-payment` (`RechargeModal`), `/api/tracking` (public `/tracking` page), and pickup-location reads that include `delhiveryApiKey` (settings and admin client pages). `OrderList` currently calls `delhivery/update-order` without an `Authorization` header.
+
+### Phase 0 pull requests
+
+Each PR is independently shippable and carries route-level tests. Ordered by exploitability and cost.
+
+1. **Admin role check.** Replace `UserRole.ADMIN` with `SUPER_ADMIN` in the 14 affected files, with tenant rules where the route is tenant-level. Make `hasRequiredRole` deny unknown roles and `authorizeUser` reject an unknown `requiredRole`.
+2. **Delete unused public routes.** `admin/fix-database`, `admin/update-order-status`, `cron/test-tracking`, `test-catalog`, `catalog-simple`, `debug-env`, `test-auth` with the `debug-auth` page, `cache/clear`, and `test-clear-cache`.
+3. **Scoped order access.** A shared `findAccessibleOrder(user, id)` applying tenant and child-user sub-group/creator rules, used by order detail GET/PUT/DELETE, `fulfill`, `delhivery/update-order`, and `tracking/update-single`. Allowlist PUT fields; remove header and payload dumps. Resolve carrier keys server-side from the order's pickup location.
+4. **Carrier credential scoping.** `getDelhiveryApiKey` requires a string tenant ID and fails closed; fix the cancellation `parseInt`; `refresh-statuses` filters by tenant, matches by waybill, uses each order's pickup key, and fixes batching.
+5. **Registration.** `register-user` requires `CLIENT_ADMIN` or higher, takes the tenant from the session (platform admins may choose), and cannot grant a role above the caller's.
+6. **Credential exposure.** Authorize all cross-app mapping handlers and return key-free DTOs; pickup reads return `hasApiKey`; settings forms keep an existing key when left blank; remove raw-key logging. Rotate Delhivery and Catalog keys after release.
+7. **Credits.** Pending recharge requests with a unique UTR and admin approval; conditional credit decrement; order creation stops ignoring debit failures.
+8. **Public tracking.** Minimal masked output and IP rate limiting.
+9. **Shopify and Delhivery webhook.** Authenticated Shopify initiation, strict shop-domain validation, shop bound to state, HMAC check; shared-secret header on the Delhivery webhook with tenant-scoped updates.
+
+### Phase 1–3 outline
+
+- **Phase 1:** fix ESLint config and broken test imports; CI with lint, a ratcheting TypeScript error baseline, and Jest; Postgres-backed tenant-isolation tests; policy and service layer with Zod schemas; single Prisma client and query indexes; remove the JWT verification fallback after a forced re-login window.
+- **Phase 2:** SDK and OAuth library spike on a Vercel preview with two pilot clients; `mcp_grants`, protected-resource metadata, token-to-principal validation, and the connections settings page; the seven read tools with quotas and audit; tenant allowlist and kill switch; Section 8 milestone.
+- **Phase 3:** controlled writes as described in Section 5.
