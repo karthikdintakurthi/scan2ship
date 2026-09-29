@@ -276,17 +276,17 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
 /**
  * Check if user has required role
  */
-export function hasRequiredRole(user: AuthenticatedUser, requiredRole: UserRole): boolean {
-  const roleHierarchy = {
-    [UserRole.CHILD_USER]: 1,
-    [UserRole.USER]: 2,
-    [UserRole.CLIENT_ADMIN]: 3,
-    [UserRole.SUPER_ADMIN]: 4,
-    [UserRole.MASTER_ADMIN]: 5
-  };
+export const ROLE_LEVELS: Readonly<Record<UserRole, number>> = {
+  [UserRole.CHILD_USER]: 1,
+  [UserRole.USER]: 2,
+  [UserRole.CLIENT_ADMIN]: 3,
+  [UserRole.SUPER_ADMIN]: 4,
+  [UserRole.MASTER_ADMIN]: 5
+};
 
-  const userRoleLevel = roleHierarchy[user.role];
-  const requiredRoleLevel = roleHierarchy[requiredRole];
+export function hasRequiredRole(user: AuthenticatedUser, requiredRole: UserRole): boolean {
+  const userRoleLevel = ROLE_LEVELS[user.role];
+  const requiredRoleLevel = ROLE_LEVELS[requiredRole];
 
   console.log(`🔒 [ROLE_CHECK] User role: ${user.role}, level: ${userRoleLevel}`);
   console.log(`🔒 [ROLE_CHECK] Required role: ${requiredRole}, level: ${requiredRoleLevel}`);

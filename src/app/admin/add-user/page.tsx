@@ -184,9 +184,9 @@ export default function AddUserPage() {
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
+                  <option value="child_user">Child user</option>
                   <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                  <option value="viewer">Viewer</option>
+                  <option value="client_admin">Client admin</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
                   Select the user's role within the client organization

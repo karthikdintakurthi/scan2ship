@@ -1,24 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { resolveUserProvisioning } from '@/lib/application/user-provisioning';
 
 export async function POST(request: NextRequest) {
   try {
-             const {
-           name,
-           email,
-           password,
-           clientId,
-           role = 'user'
-         } = await request.json();
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'auth', cors: true, securityHeaders: true }
+    );
 
-    // Validate required fields
-    if (!name || !email || !password || !clientId) {
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.CLIENT_ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
+    const creator = authResult.user!;
+
+    const body = await request.json();
+    const { name, email, password } = body ?? {};
+
+    if (!name || !email || !password) {
       return NextResponse.json(
-        { error: 'Name, email, password, and client ID are required' },
+        { error: 'Name, email, and password are required' },
         { status: 400 }
       );
     }
+
+    const decision = resolveUserProvisioning(creator, { clientId: body.clientId, role: body.role });
+    if (!decision.ok) {
+      return NextResponse.json({ error: decision.error }, { status: decision.status });
+    }
+    const { clientId, role } = decision;
 
     // Check if client exists
     const client = await prisma.clients.findUnique({
@@ -55,22 +82,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-             // Create user
-         const user = await prisma.users.create({
-           data: {
-             id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-             email,
-             name,
-             password: hashedPassword,
-             role,
-             isActive: true,
-             clientId,
-             updatedAt: new Date()
-           }
-         });
+    const user = await prisma.users.create({
+      data: {
+        id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        email,
+        name,
+        password: hashedPassword,
+        role,
+        isActive: true,
+        clientId,
+        createdBy: creator.id,
+        updatedAt: new Date()
+      }
+    });
 
     // Create default pickup locations for the client (only if they don't exist)
     const defaultPickupLocations = [

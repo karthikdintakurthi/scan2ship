@@ -64,7 +64,7 @@ const REQUEST_BODY = {
   name: 'Attacker',
   email: 'attacker@example.test',
   password: 'Passw0rd!Passw0rd!',
-  role: 'master_admin',
+  role: 'user',
   clientId: 'client-b',
 };
 

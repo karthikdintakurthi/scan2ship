@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { resolveUserProvisioning } from '@/lib/application/user-provisioning';
 
 const prisma = new PrismaClient();
 
@@ -131,6 +132,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const decision = resolveUserProvisioning(auth.user, { clientId: userData.clientId, role: userData.role });
+    if (!decision.ok) {
+      return NextResponse.json({ error: decision.error }, { status: decision.status });
+    }
+
     // Check if user with this email and clientId already exists (compound unique constraint)
     console.log('🔍 [API_ADMIN_USERS_POST] Checking for existing user...');
     const existingUser = await prisma.users.findFirst({
@@ -170,8 +176,9 @@ export async function POST(request: NextRequest) {
         name: userData.name,
         email: userData.email,
         password: hashedPassword,
-        role: userData.role,
-        clientId: userData.clientId,
+        role: decision.role,
+        clientId: decision.clientId,
+        createdBy: auth.user.id,
         isActive: userData.isActive !== undefined ? userData.isActive : true,
         createdAt: new Date(),
         updatedAt: new Date()

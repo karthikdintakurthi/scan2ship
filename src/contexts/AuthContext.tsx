@@ -290,6 +290,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await fetch('/api/auth/register-user', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${getStoredToken()}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(userData),
