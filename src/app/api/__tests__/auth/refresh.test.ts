@@ -1,545 +1,150 @@
 /**
- * Authentication API Tests - Refresh Token
- * Comprehensive tests for token refresh functionality
+ * POST /api/auth/refresh: rejects missing/invalid tokens and inactive
+ * accounts, and issues a fresh login/refresh token pair without leaking the
+ * password hash. Tokens are real JWTs signed with the test JWT_SECRET.
  */
+jest.unmock('jsonwebtoken');
 
-import { NextRequest } from 'next/server';
-import { POST } from '@/app/api/auth/refresh/route';
-import { prisma } from '@/lib/prisma';
-import { enhancedJwtConfig } from '@/lib/jwt-config';
-
-// Mock dependencies
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
-    sessions: {
-      findFirst: jest.fn(),
-      update: jest.fn(),
-    },
-    audit_logs: {
-      create: jest.fn(),
-    },
+jest.mock('next/server', () => require('@/test-utils/auth-request').nextServerMock);
+jest.mock('@/lib/prisma', () => ({ prisma: require('@/test-utils/prisma-mock').createPrismaMock() }));
+jest.mock('@/lib/jwt-secret-manager', () => ({
+  jwtSecretManager: {
+    getPrimarySecret: () => process.env.JWT_SECRET,
+    getActiveSecrets: () => [process.env.JWT_SECRET],
   },
 }));
 
-jest.mock('@/lib/jwt-config', () => ({
-  enhancedJwtConfig: {
-    verifyToken: jest.fn(),
-    generateToken: jest.fn(),
-  },
-}));
+import type { NextRequest } from 'next/server';
+import { prisma as realPrisma } from '@/lib/prisma';
+import type { createPrismaMock } from '@/test-utils/prisma-mock';
+import { POST as refresh } from '@/app/api/auth/refresh/route';
 
-describe('POST /api/auth/refresh', () => {
-  let mockRequest: NextRequest;
-  const mockSession = {
-    id: 'session-1',
-    userId: 'user-1',
-    clientId: 'client-1',
-    sessionToken: 'old-token',
-    refreshToken: 'refresh-token',
-    ipAddress: '192.168.1.1',
-    userAgent: 'Mozilla/5.0',
-    location: 'US',
-    role: 'user',
-    permissions: '["read"]',
-    createdAt: new Date(),
-    lastActivity: new Date(),
-    expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000),
-    isActive: true,
-  };
+const jwt = jest.requireActual('jsonwebtoken');
+const prisma = realPrisma as unknown as ReturnType<typeof createPrismaMock>;
+const SECRET = process.env.JWT_SECRET!;
+const VERIFY = { issuer: 'scan2ship-saas', audience: 'scan2ship-users', algorithms: ['HS256'] };
 
-  const mockDecodedToken = {
-    userId: 'user-1',
-    clientId: 'client-1',
-    sessionId: 'session-1',
-    role: 'user',
-    permissions: ['read'],
-    type: 'refresh',
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
-  };
+const USER = {
+  id: 'user-1',
+  email: 'user@client-a.test',
+  name: 'Test User',
+  password: '$2a$12$stored-hash',
+  role: 'user',
+  isActive: true,
+  clientId: 'client-a',
+  clients: { id: 'client-a', name: 'Client A', isActive: true },
+};
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    
-    // Mock request
-    mockRequest = {
-      json: jest.fn(),
-      headers: new Map(),
-    } as any;
+function token(
+  payload: Record<string, unknown> = { userId: USER.id },
+  { secret = SECRET, issuer = 'scan2ship-saas', audience = 'scan2ship-users', expiresIn = '24h' as string | number } = {}
+) {
+  return jwt.sign(payload, secret, { issuer, audience, algorithm: 'HS256', expiresIn });
+}
+
+function refreshRequest(body: unknown) {
+  return { url: 'http://localhost/api/auth/refresh', json: async () => body } as unknown as NextRequest;
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+  (prisma.users.findUnique as jest.Mock).mockResolvedValue(USER);
+  (prisma.sessions.findFirst as jest.Mock).mockResolvedValue(null);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('token validation', () => {
+  it('requires a refresh token', async () => {
+    const response = await refresh(refreshRequest({}));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Refresh token is required' });
+    expect(prisma.users.findUnique).not.toHaveBeenCalled();
   });
 
-  describe('Successful Token Refresh', () => {
-    it('should refresh token with valid refresh token', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue(mockDecodedToken);
-      (prisma.sessions.findFirst as jest.Mock).mockResolvedValue(mockSession);
-      (enhancedJwtConfig.generateToken as jest.Mock).mockReturnValue('new-session-token');
-      (prisma.sessions.update as jest.Mock).mockResolvedValue({
-        ...mockSession,
-        sessionToken: 'new-session-token',
-        lastActivity: new Date(),
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
+  it.each([
+    ['a malformed token', () => 'not-a-jwt'],
+    ['a token signed with another secret', () => token(undefined, { secret: 'another-secret-that-is-at-least-32-chars' })],
+    ['a token from another issuer', () => token(undefined, { issuer: 'someone-else' })],
+    ['a token for another audience', () => token(undefined, { audience: 'someone-else' })],
+    ['an expired token', () => token(undefined, { expiresIn: -10 })],
+    ['an unsigned token', () => jwt.sign({ userId: USER.id }, '', { algorithm: 'none', issuer: 'scan2ship-saas', audience: 'scan2ship-users' })],
+  ])('rejects %s with 401', async (_case, makeToken) => {
+    const response = await refresh(refreshRequest({ refreshToken: makeToken() }));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Invalid refresh token' });
+    expect(prisma.users.findUnique).not.toHaveBeenCalled();
+  });
+});
 
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(responseData.success).toBe(true);
-      expect(responseData.data).toHaveProperty('sessionToken');
-      expect(responseData.data.sessionToken).toBe('new-session-token');
-      expect(responseData.data).toHaveProperty('expiresAt');
-      
-      expect(enhancedJwtConfig.verifyToken).toHaveBeenCalledWith('valid-refresh-token');
-      expect(prisma.sessions.findFirst).toHaveBeenCalledWith({
-        where: { 
-          refreshToken: 'valid-refresh-token',
-          isActive: true,
-        },
-        include: { users: true, clients: true },
-      });
-    });
-
-    it('should update session last activity', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue(mockDecodedToken);
-      (prisma.sessions.findFirst as jest.Mock).mockResolvedValue(mockSession);
-      (enhancedJwtConfig.generateToken as jest.Mock).mockReturnValue('new-session-token');
-      (prisma.sessions.update as jest.Mock).mockResolvedValue({
-        ...mockSession,
-        sessionToken: 'new-session-token',
-        lastActivity: new Date(),
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      await POST(mockRequest);
-
-      // Assert
-      expect(prisma.sessions.update).toHaveBeenCalledWith({
-        where: { id: 'session-1' },
-        data: {
-          sessionToken: 'new-session-token',
-          lastActivity: expect.any(Date),
-        },
-      });
-    });
-
-    it('should log successful token refresh', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue(mockDecodedToken);
-      (prisma.sessions.findFirst as jest.Mock).mockResolvedValue(mockSession);
-      (enhancedJwtConfig.generateToken as jest.Mock).mockReturnValue('new-session-token');
-      (prisma.sessions.update as jest.Mock).mockResolvedValue({
-        ...mockSession,
-        sessionToken: 'new-session-token',
-        lastActivity: new Date(),
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      await POST(mockRequest);
-
-      // Assert
-      expect(prisma.audit_logs.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventType: 'TOKEN_REFRESH',
-          severity: 'INFO',
-          userId: 'user-1',
-          clientId: 'client-1',
-          sessionId: 'session-1',
-          action: 'TOKEN_REFRESHED',
-          details: expect.stringContaining('Token refreshed successfully'),
-        }),
-      });
-    });
+describe('account checks', () => {
+  it('looks up the user named in the token', async () => {
+    await refresh(refreshRequest({ refreshToken: token() }));
+    expect(prisma.users.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: USER.id } }));
   });
 
-  describe('Failed Token Refresh', () => {
-    it('should reject missing refresh token', async () => {
-      // Arrange
-      const refreshData = {};
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Refresh token is required');
-    });
-
-    it('should reject invalid refresh token', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'invalid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(401);
-      expect(responseData.error).toBe('Invalid refresh token');
-    });
-
-    it('should reject expired refresh token', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'expired-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockImplementation(() => {
-        throw new Error('Token expired');
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(401);
-      expect(responseData.error).toBe('Invalid refresh token');
-    });
-
-    it('should reject non-existent session', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue(mockDecodedToken);
-      (prisma.sessions.findFirst as jest.Mock).mockResolvedValue(null);
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(401);
-      expect(responseData.error).toBe('Session not found');
-    });
-
-    it('should reject inactive session', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue(mockDecodedToken);
-      (prisma.sessions.findFirst as jest.Mock).mockResolvedValue({
-        ...mockSession,
-        isActive: false,
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(401);
-      expect(responseData.error).toBe('Session not found');
-    });
-
-    it('should reject expired session', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue(mockDecodedToken);
-      (prisma.sessions.findFirst as jest.Mock).mockResolvedValue({
-        ...mockSession,
-        expiresAt: new Date(Date.now() - 1000), // Expired
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(401);
-      expect(responseData.error).toBe('Session expired');
-    });
+  it.each([
+    ['the user no longer exists', null],
+    ['the user is inactive', { ...USER, isActive: false }],
+    ["the user's client is inactive", { ...USER, clients: { ...USER.clients, isActive: false } }],
+  ])('rejects the refresh when %s', async (_case, row) => {
+    (prisma.users.findUnique as jest.Mock).mockResolvedValue(row);
+    const response = await refresh(refreshRequest({ refreshToken: token() }));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'User not found or inactive' });
+    expect(prisma.writeCalls()).toEqual([]);
   });
 
-  describe('Token Generation', () => {
-    it('should generate new session token with correct payload', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue(mockDecodedToken);
-      (prisma.sessions.findFirst as jest.Mock).mockResolvedValue(mockSession);
-      (enhancedJwtConfig.generateToken as jest.Mock).mockReturnValue('new-session-token');
-      (prisma.sessions.update as jest.Mock).mockResolvedValue({
-        ...mockSession,
-        sessionToken: 'new-session-token',
-        lastActivity: new Date(),
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
+  it('returns 500 when the database fails', async () => {
+    (prisma.users.findUnique as jest.Mock).mockRejectedValue(new Error('connection refused'));
+    const response = await refresh(refreshRequest({ refreshToken: token() }));
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'Internal server error' });
+  });
+});
 
-      // Act
-      await POST(mockRequest);
+describe('successful refresh', () => {
+  it('issues a new 8h login token and 24h refresh token for the current role and tenant', async () => {
+    // Claims come from the database row, not from the presented token.
+    (prisma.users.findUnique as jest.Mock).mockResolvedValue({ ...USER, role: 'child_user' });
+    const response = await refresh(refreshRequest({ refreshToken: token({ userId: USER.id, role: 'super_admin' }) }));
+    const { session } = await response.json();
 
-      // Assert
-      expect(enhancedJwtConfig.generateToken).toHaveBeenCalledWith(
-        {
-          userId: 'user-1',
-          clientId: 'client-1',
-          sessionId: 'session-1',
-          role: 'user',
-          permissions: ['read'],
-          type: 'session',
-        },
-        'login'
-      );
-    });
-
-    it('should handle token generation failure', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue(mockDecodedToken);
-      (prisma.sessions.findFirst as jest.Mock).mockResolvedValue(mockSession);
-      (enhancedJwtConfig.generateToken as jest.Mock).mockImplementation(() => {
-        throw new Error('Token generation failed');
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(500);
-      expect(responseData.error).toBe('Internal server error');
-    });
+    expect(response.status).toBe(200);
+    const login = jwt.verify(session.token, SECRET, VERIFY);
+    const next = jwt.verify(session.refreshToken, SECRET, VERIFY);
+    expect(login).toMatchObject({ userId: USER.id, clientId: 'client-a', email: USER.email, role: 'child_user' });
+    expect(next).toMatchObject({ userId: USER.id, clientId: 'client-a', role: 'child_user' });
+    expect(login.exp - login.iat).toBe(8 * 60 * 60);
+    expect(next.exp - next.iat).toBe(24 * 60 * 60);
+    expect(session).toMatchObject({ userId: USER.id, clientId: 'client-a', tokenInfo: { valid: true, isExpired: false } });
   });
 
-  describe('Database Errors', () => {
-    it('should handle session update failure', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue(mockDecodedToken);
-      (prisma.sessions.findFirst as jest.Mock).mockResolvedValue(mockSession);
-      (enhancedJwtConfig.generateToken as jest.Mock).mockReturnValue('new-session-token');
-      (prisma.sessions.update as jest.Mock).mockRejectedValue(new Error('Database error'));
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(500);
-      expect(responseData.error).toBe('Internal server error');
-    });
-
-    it('should handle session lookup failure', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue(mockDecodedToken);
-      (prisma.sessions.findFirst as jest.Mock).mockRejectedValue(new Error('Database error'));
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(500);
-      expect(responseData.error).toBe('Internal server error');
-    });
+  it('never returns the password hash', async () => {
+    const body = await (await refresh(refreshRequest({ refreshToken: token() }))).json();
+    expect(body.user).not.toHaveProperty('password');
+    expect(JSON.stringify(body)).not.toContain(USER.password);
+    expect(body.user).toMatchObject({ id: USER.id, email: USER.email, role: USER.role });
+    expect(body.client).toEqual(USER.clients);
   });
 
-  describe('Security Features', () => {
-    it('should validate token type', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue({
-        ...mockDecodedToken,
-        type: 'session', // Wrong type
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(401);
-      expect(responseData.error).toBe('Invalid token type');
-    });
-
-    it('should validate token permissions', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'valid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockReturnValue({
-        ...mockDecodedToken,
-        permissions: null, // Invalid permissions
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(401);
-      expect(responseData.error).toBe('Invalid token permissions');
-    });
-
-    it('should log failed refresh attempts', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'invalid-refresh-token',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      await POST(mockRequest);
-
-      // Assert
-      expect(prisma.audit_logs.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventType: 'TOKEN_REFRESH_FAILURE',
-          severity: 'WARNING',
-          action: 'INVALID_REFRESH_TOKEN',
-          details: expect.stringContaining('Invalid refresh token'),
-        }),
-      });
-    });
+  it("looks for the session within the user's own tenant", async () => {
+    await refresh(refreshRequest({ refreshToken: token() }));
+    expect(prisma.sessions.findFirst).toHaveBeenCalledWith({ where: { userId: USER.id, clientId: 'client-a' } });
+    expect(prisma.sessions.update).not.toHaveBeenCalled();
   });
 
-  describe('Edge Cases', () => {
-    it('should handle malformed JSON', async () => {
-      // Arrange
-      mockRequest.json.mockRejectedValue(new Error('Invalid JSON'));
+  it('stores the new login token on the existing session', async () => {
+    (prisma.sessions.findFirst as jest.Mock).mockResolvedValue({ id: 'session-1', userId: USER.id, clientId: 'client-a' });
+    const { session } = await (await refresh(refreshRequest({ refreshToken: token() }))).json();
 
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Invalid request body');
-    });
-
-    it('should handle missing request body', async () => {
-      // Arrange
-      mockRequest.json.mockResolvedValue(null);
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Request body is required');
-    });
-
-    it('should handle empty refresh token', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: '',
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Refresh token is required');
-    });
-
-    it('should handle very long refresh token', async () => {
-      // Arrange
-      const refreshData = {
-        refreshToken: 'A'.repeat(10000), // Very long token
-      };
-      
-      mockRequest.json.mockResolvedValue(refreshData);
-      
-      (enhancedJwtConfig.verifyToken as jest.Mock).mockImplementation(() => {
-        throw new Error('Token too long');
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(401);
-      expect(responseData.error).toBe('Invalid refresh token');
+    expect(session.id).toBe('session-1');
+    expect(prisma.sessions.update).toHaveBeenCalledWith({
+      where: { id: 'session-1' },
+      data: { sessionToken: session.token, expiresAt: expect.any(Date) },
     });
   });
 });

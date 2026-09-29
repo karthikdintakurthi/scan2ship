@@ -1,745 +1,233 @@
 /**
- * Admin API Tests - Users Management
- * Comprehensive tests for admin user management functionality
+ * /api/admin/users: platform-level user listing and creation. Both handlers
+ * require SUPER_ADMIN or higher; password hashes must never be returned.
  */
+jest.unmock('jsonwebtoken');
 
-import { NextRequest } from 'next/server';
-import { GET, POST, PUT, DELETE } from '@/app/api/admin/users/route';
-import { prisma } from '@/lib/prisma';
-import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
-
-// Mock dependencies
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
-    users: {
-      findMany: jest.fn(),
-      findFirst: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
-    },
-    clients: {
-      findFirst: jest.fn(),
-    },
-    audit_logs: {
-      create: jest.fn(),
-    },
-  },
-}));
-
-jest.mock('@/lib/auth-middleware', () => ({
-  authorizeUser: jest.fn(),
-  UserRole: {
-    ADMIN: 'admin',
-    MASTER_ADMIN: 'master_admin',
-  },
-  PermissionLevel: {
-    READ: 'READ',
-    WRITE: 'WRITE',
-    DELETE: 'DELETE',
-  },
-}));
-
+jest.mock('next/server', () => require('@/test-utils/auth-request').nextServerMock);
+jest.mock('@/lib/prisma', () => ({ prisma: require('@/test-utils/prisma-mock').createPrismaMock() }));
+// The route constructs its own PrismaClient; route it to the same mock.
+jest.mock('@prisma/client', () => ({ PrismaClient: jest.fn(() => require('@/lib/prisma').prisma) }));
 jest.mock('@/lib/security-middleware', () => ({
-  applySecurityMiddleware: jest.fn(() => null),
-  securityHeaders: jest.fn((response) => response),
+  applySecurityMiddleware: jest.fn().mockResolvedValue(null),
+  securityHeaders: jest.fn(),
 }));
 
-jest.mock('@/lib/password-validator', () => ({
-  validatePassword: jest.fn(),
-}));
+import bcrypt from 'bcryptjs';
+import { prisma as realPrisma } from '@/lib/prisma';
+import { applySecurityMiddleware } from '@/lib/security-middleware';
+import { authUserRow, signedRequest, TEST_USER_ID } from '@/test-utils/auth-request';
+import type { createPrismaMock } from '@/test-utils/prisma-mock';
+import { matchesWhere } from '@/test-utils/prisma-where';
+import { GET as listUsers, POST as createUser } from '@/app/api/admin/users/route';
 
-jest.mock('bcryptjs', () => ({
-  hash: jest.fn(),
-  genSalt: jest.fn(),
-}));
+const prisma = realPrisma as unknown as ReturnType<typeof createPrismaMock>;
 
-describe('Admin Users API', () => {
-  let mockRequest: NextRequest;
-  const mockAdminUser = {
-    id: 'admin-1',
-    email: 'admin@example.com',
-    name: 'Admin User',
-    role: 'admin',
-    clientId: 'client-1',
-    isActive: true,
-  };
+const USERS = [
+  { id: 'admin-a', clientId: 'client-a', email: 'admin@a.test', password: '$2a$12$hash-admin-a', role: 'client_admin' },
+  { id: 'user-a', clientId: 'client-a', email: 'user@a.test', password: '$2a$12$hash-user-a', role: 'user' },
+  { id: 'user-b', clientId: 'client-b', email: 'user@b.test', password: '$2a$12$hash-user-b', role: 'user' },
+];
+const HASH = '$2a$12$new-user-hash';
+const NEW_USER = { name: 'New Admin', email: 'new@b.test', password: 'plain-text-password', role: 'client_admin', clientId: 'client-b' };
 
-  const mockUser = {
-    id: 'user-1',
-    email: 'user@example.com',
-    name: 'Test User',
-    role: 'user',
-    clientId: 'client-1',
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    clients: {
-      id: 'client-1',
-      name: 'Test Client',
-    },
-  };
+function actAs(role: string, clientId = 'platform') {
+  (prisma.users.findUnique as jest.Mock).mockResolvedValue(authUserRow(role, clientId));
+}
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    
-    // Mock request
-    mockRequest = {
-      json: jest.fn(),
-      headers: new Map(),
-      nextUrl: new URL('http://localhost:3000/api/admin/users'),
-    } as any;
+const get = (query = '', authenticated = true) =>
+  listUsers(signedRequest({}, { authenticated, url: `http://localhost/api/admin/users${query}` }));
+const post = (body: unknown, authenticated = true) =>
+  createUser(signedRequest(body, { authenticated, url: 'http://localhost/api/admin/users' }));
 
-    // Mock successful authorization
-    (authorizeUser as jest.Mock).mockResolvedValue({
-      response: null,
-      user: mockAdminUser,
-    });
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+  (applySecurityMiddleware as jest.Mock).mockResolvedValue(null);
+  (bcrypt.hash as jest.Mock).mockResolvedValue(HASH);
+
+  (prisma.users.findMany as jest.Mock).mockImplementation(async ({ where, omit, skip = 0, take }) =>
+    USERS.filter((row) => matchesWhere(row, where))
+      .slice(skip, take === undefined ? undefined : skip + take)
+      .map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !omit?.[key])))
+  );
+  (prisma.users.count as jest.Mock).mockImplementation(async ({ where }) => USERS.filter((row) => matchesWhere(row, where)).length);
+  (prisma.users.findFirst as jest.Mock).mockResolvedValue(null);
+  (prisma.clients.findUnique as jest.Mock).mockImplementation(async ({ where }) =>
+    ['client-a', 'client-b'].includes(where.id) ? { id: where.id, companyName: `Company ${where.id}`, name: where.id } : null
+  );
+  (prisma.users.create as jest.Mock).mockImplementation(async ({ data }) => ({
+    ...data,
+    clients: { id: data.clientId, companyName: `Company ${data.clientId}`, name: data.clientId },
+  }));
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('GET /api/admin/users', () => {
+  it('returns the security middleware response without authenticating', async () => {
+    const limited = { status: 429, json: async () => ({ error: 'Too many requests' }) };
+    (applySecurityMiddleware as jest.Mock).mockResolvedValueOnce(limited);
+    expect(await get()).toBe(limited);
+    expect(prisma.users.findUnique).not.toHaveBeenCalled();
   });
 
-  describe('GET /api/admin/users', () => {
-    it('should get all users successfully', async () => {
-      // Arrange
-      const mockUsers = [mockUser];
-      (prisma.users.findMany as jest.Mock).mockResolvedValue(mockUsers);
-      (prisma.users.count as jest.Mock).mockResolvedValue(1);
-
-      // Act
-      const response = await GET(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(responseData.success).toBe(true);
-      expect(responseData.data.users).toHaveLength(1);
-      expect(responseData.data.users[0].email).toBe('user@example.com');
-      expect(responseData.data.pagination.total).toBe(1);
-      
-      expect(prisma.users.findMany).toHaveBeenCalledWith({
-        include: { clients: true },
-        orderBy: { createdAt: 'desc' },
-        skip: 0,
-        take: 10,
-      });
-    });
-
-    it('should handle pagination parameters', async () => {
-      // Arrange
-      mockRequest.nextUrl.searchParams.set('page', '2');
-      mockRequest.nextUrl.searchParams.set('limit', '5');
-      
-      (prisma.users.findMany as jest.Mock).mockResolvedValue([]);
-      (prisma.users.count as jest.Mock).mockResolvedValue(0);
-
-      // Act
-      const response = await GET(mockRequest);
-
-      // Assert
-      expect(prisma.users.findMany).toHaveBeenCalledWith({
-        include: { clients: true },
-        orderBy: { createdAt: 'desc' },
-        skip: 5, // (page - 1) * limit
-        take: 5,
-      });
-    });
-
-    it('should filter users by client', async () => {
-      // Arrange
-      mockRequest.nextUrl.searchParams.set('clientId', 'client-1');
-      
-      (prisma.users.findMany as jest.Mock).mockResolvedValue([mockUser]);
-      (prisma.users.count as jest.Mock).mockResolvedValue(1);
-
-      // Act
-      const response = await GET(mockRequest);
-
-      // Assert
-      expect(prisma.users.findMany).toHaveBeenCalledWith({
-        include: { clients: true },
-        orderBy: { createdAt: 'desc' },
-        skip: 0,
-        take: 10,
-        where: { clientId: 'client-1' },
-      });
-    });
-
-    it('should filter users by role', async () => {
-      // Arrange
-      mockRequest.nextUrl.searchParams.set('role', 'user');
-      
-      (prisma.users.findMany as jest.Mock).mockResolvedValue([mockUser]);
-      (prisma.users.count as jest.Mock).mockResolvedValue(1);
-
-      // Act
-      const response = await GET(mockRequest);
-
-      // Assert
-      expect(prisma.users.findMany).toHaveBeenCalledWith({
-        include: { clients: true },
-        orderBy: { createdAt: 'desc' },
-        skip: 0,
-        take: 10,
-        where: { role: 'user' },
-      });
-    });
-
-    it('should filter users by status', async () => {
-      // Arrange
-      mockRequest.nextUrl.searchParams.set('isActive', 'true');
-      
-      (prisma.users.findMany as jest.Mock).mockResolvedValue([mockUser]);
-      (prisma.users.count as jest.Mock).mockResolvedValue(1);
-
-      // Act
-      const response = await GET(mockRequest);
-
-      // Assert
-      expect(prisma.users.findMany).toHaveBeenCalledWith({
-        include: { clients: true },
-        orderBy: { createdAt: 'desc' },
-        skip: 0,
-        take: 10,
-        where: { isActive: true },
-      });
-    });
-
-    it('should reject unauthorized access', async () => {
-      // Arrange
-      (authorizeUser as jest.Mock).mockResolvedValue({
-        response: {
-          status: 403,
-          json: () => ({ error: 'Insufficient permissions' }),
-        },
-        user: null,
-      });
-
-      // Act
-      const response = await GET(mockRequest);
-
-      // Assert
-      expect(response.status).toBe(403);
-    });
+  it('rejects unauthenticated requests', async () => {
+    const response = await get('', false);
+    expect(response.status).toBe(401);
+    expect(prisma.users.findMany).not.toHaveBeenCalled();
   });
 
-  describe('POST /api/admin/users', () => {
-    it('should create user successfully', async () => {
-      // Arrange
-      const userData = {
-        email: 'newuser@example.com',
-        password: 'ValidPassword123!',
-        name: 'New User',
-        role: 'user',
-        clientId: 'client-1',
-      };
-      
-      mockRequest.json.mockResolvedValue(userData);
-      
-      (prisma.clients.findFirst as jest.Mock).mockResolvedValue({
-        id: 'client-1',
-        name: 'Test Client',
-        isActive: true,
-      });
-      (prisma.users.findFirst as jest.Mock).mockResolvedValue(null);
-      
-      const bcrypt = require('bcryptjs');
-      (bcrypt.genSalt as jest.Mock).mockResolvedValue('salt123');
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
-      
-      (prisma.users.create as jest.Mock).mockResolvedValue({
-        ...mockUser,
-        email: 'newuser@example.com',
-        name: 'New User',
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      const { validatePassword } = require('@/lib/password-validator');
-      validatePassword.mockReturnValue({ isValid: true, errors: [] });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(201);
-      expect(responseData.success).toBe(true);
-      expect(responseData.data.user.email).toBe('newuser@example.com');
-      expect(responseData.data.user.name).toBe('New User');
-      
-      expect(prisma.users.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          email: 'newuser@example.com',
-          name: 'New User',
-          password: 'hashedPassword',
-          role: 'user',
-          clientId: 'client-1',
-          isActive: true,
-        }),
-        include: { clients: true },
-      });
-    });
-
-    it('should reject duplicate email', async () => {
-      // Arrange
-      const userData = {
-        email: 'existing@example.com',
-        password: 'ValidPassword123!',
-        name: 'New User',
-        role: 'user',
-        clientId: 'client-1',
-      };
-      
-      mockRequest.json.mockResolvedValue(userData);
-      
-      (prisma.users.findFirst as jest.Mock).mockResolvedValue(mockUser);
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(409);
-      expect(responseData.error).toBe('User with this email already exists');
-    });
-
-    it('should reject invalid client ID', async () => {
-      // Arrange
-      const userData = {
-        email: 'newuser@example.com',
-        password: 'ValidPassword123!',
-        name: 'New User',
-        role: 'user',
-        clientId: 'invalid-client',
-      };
-      
-      mockRequest.json.mockResolvedValue(userData);
-      
-      (prisma.clients.findFirst as jest.Mock).mockResolvedValue(null);
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Invalid client ID');
-    });
-
-    it('should reject weak password', async () => {
-      // Arrange
-      const userData = {
-        email: 'newuser@example.com',
-        password: 'weak',
-        name: 'New User',
-        role: 'user',
-        clientId: 'client-1',
-      };
-      
-      mockRequest.json.mockResolvedValue(userData);
-      
-      const { validatePassword } = require('@/lib/password-validator');
-      validatePassword.mockReturnValue({ 
-        isValid: false, 
-        errors: ['Password must be at least 16 characters long'] 
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Password must be at least 16 characters long');
-    });
+  it.each(['child_user', 'user', 'client_admin'])('rejects %s callers with 403', async (role) => {
+    actAs(role, 'client-a');
+    const response = await get();
+    expect(response.status).toBe(403);
+    expect(prisma.users.findMany).not.toHaveBeenCalled();
   });
 
-  describe('PUT /api/admin/users', () => {
-    it('should update user successfully', async () => {
-      // Arrange
-      const updateData = {
-        id: 'user-1',
-        name: 'Updated User',
-        role: 'admin',
-        isActive: true,
-      };
-      
-      mockRequest.json.mockResolvedValue(updateData);
-      
-      (prisma.users.findFirst as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.users.update as jest.Mock).mockResolvedValue({
-        ...mockUser,
-        name: 'Updated User',
-        role: 'admin',
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
+  it.each(['super_admin', 'master_admin'])('lists users across tenants for %s', async (role) => {
+    actAs(role);
+    const response = await get();
+    const body = await response.json();
 
-      // Act
-      const response = await PUT(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(responseData.success).toBe(true);
-      expect(responseData.data.user.name).toBe('Updated User');
-      expect(responseData.data.user.role).toBe('admin');
-      
-      expect(prisma.users.update).toHaveBeenCalledWith({
-        where: { id: 'user-1' },
-        data: expect.objectContaining({
-          name: 'Updated User',
-          role: 'admin',
-          isActive: true,
-        }),
-        include: { clients: true },
-      });
-    });
-
-    it('should reject non-existent user', async () => {
-      // Arrange
-      const updateData = {
-        id: 'non-existent',
-        name: 'Updated User',
-      };
-      
-      mockRequest.json.mockResolvedValue(updateData);
-      
-      (prisma.users.findFirst as jest.Mock).mockResolvedValue(null);
-
-      // Act
-      const response = await PUT(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(404);
-      expect(responseData.error).toBe('User not found');
-    });
-
-    it('should reject invalid role', async () => {
-      // Arrange
-      const updateData = {
-        id: 'user-1',
-        role: 'invalid-role',
-      };
-      
-      mockRequest.json.mockResolvedValue(updateData);
-
-      // Act
-      const response = await PUT(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Invalid role');
-    });
+    expect(response.status).toBe(200);
+    expect(body.users.map((u: { id: string }) => u.id)).toEqual(['admin-a', 'user-a', 'user-b']);
+    expect(body.pagination).toEqual({ page: 1, limit: 10, total: 3, pages: 1 });
   });
 
-  describe('DELETE /api/admin/users', () => {
-    it('should delete user successfully', async () => {
-      // Arrange
-      const deleteData = {
-        id: 'user-1',
-      };
-      
-      mockRequest.json.mockResolvedValue(deleteData);
-      
-      (prisma.users.findFirst as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.users.delete as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
+  it('never returns password hashes', async () => {
+    actAs('super_admin');
+    const body = await (await get()).json();
 
-      // Act
-      const response = await DELETE(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(responseData.success).toBe(true);
-      expect(responseData.message).toBe('User deleted successfully');
-      
-      expect(prisma.users.delete).toHaveBeenCalledWith({
-        where: { id: 'user-1' },
-      });
-    });
-
-    it('should reject deleting non-existent user', async () => {
-      // Arrange
-      const deleteData = {
-        id: 'non-existent',
-      };
-      
-      mockRequest.json.mockResolvedValue(deleteData);
-      
-      (prisma.users.findFirst as jest.Mock).mockResolvedValue(null);
-
-      // Act
-      const response = await DELETE(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(404);
-      expect(responseData.error).toBe('User not found');
-    });
-
-    it('should reject deleting own account', async () => {
-      // Arrange
-      const deleteData = {
-        id: 'admin-1', // Same as mockAdminUser.id
-      };
-      
-      mockRequest.json.mockResolvedValue(deleteData);
-
-      // Act
-      const response = await DELETE(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Cannot delete your own account');
-    });
+    expect(prisma.users.findMany).toHaveBeenCalledWith(expect.objectContaining({ omit: { password: true } }));
+    for (const user of body.users) expect(user).not.toHaveProperty('password');
+    expect(JSON.stringify(body)).not.toContain('$2a$12$');
   });
 
-  describe('Authorization', () => {
-    it('should require admin role for GET', async () => {
-      // Arrange
-      (authorizeUser as jest.Mock).mockResolvedValue({
-        response: {
-          status: 403,
-          json: () => ({ error: 'Insufficient permissions' }),
-        },
-        user: null,
-      });
+  it('filters by clientId and paginates', async () => {
+    actAs('super_admin');
+    const body = await (await get('?clientId=client-a&page=2&limit=1')).json();
 
-      // Act
-      const response = await GET(mockRequest);
-
-      // Assert
-      expect(authorizeUser).toHaveBeenCalledWith(mockRequest, {
-        requiredRole: UserRole.SUPER_ADMIN,
-        requiredPermissions: [PermissionLevel.READ],
-        requireActiveUser: true,
-        requireActiveClient: true,
-      });
-      expect(response.status).toBe(403);
-    });
-
-    it('should require write permission for POST', async () => {
-      // Arrange
-      (authorizeUser as jest.Mock).mockResolvedValue({
-        response: {
-          status: 403,
-          json: () => ({ error: 'Insufficient permissions' }),
-        },
-        user: null,
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-
-      // Assert
-      expect(authorizeUser).toHaveBeenCalledWith(mockRequest, {
-        requiredRole: UserRole.SUPER_ADMIN,
-        requiredPermissions: [PermissionLevel.WRITE],
-        requireActiveUser: true,
-        requireActiveClient: true,
-      });
-      expect(response.status).toBe(403);
-    });
-
-    it('should require write permission for PUT', async () => {
-      // Arrange
-      (authorizeUser as jest.Mock).mockResolvedValue({
-        response: {
-          status: 403,
-          json: () => ({ error: 'Insufficient permissions' }),
-        },
-        user: null,
-      });
-
-      // Act
-      const response = await PUT(mockRequest);
-
-      // Assert
-      expect(authorizeUser).toHaveBeenCalledWith(mockRequest, {
-        requiredRole: UserRole.SUPER_ADMIN,
-        requiredPermissions: [PermissionLevel.WRITE],
-        requireActiveUser: true,
-        requireActiveClient: true,
-      });
-      expect(response.status).toBe(403);
-    });
-
-    it('should require delete permission for DELETE', async () => {
-      // Arrange
-      (authorizeUser as jest.Mock).mockResolvedValue({
-        response: {
-          status: 403,
-          json: () => ({ error: 'Insufficient permissions' }),
-        },
-        user: null,
-      });
-
-      // Act
-      const response = await DELETE(mockRequest);
-
-      // Assert
-      expect(authorizeUser).toHaveBeenCalledWith(mockRequest, {
-        requiredRole: UserRole.SUPER_ADMIN,
-        requiredPermissions: [PermissionLevel.DELETE],
-        requireActiveUser: true,
-        requireActiveClient: true,
-      });
-      expect(response.status).toBe(403);
-    });
+    expect(prisma.users.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { clientId: 'client-a' }, skip: 1, take: 1, orderBy: { createdAt: 'desc' } })
+    );
+    expect(prisma.users.count).toHaveBeenCalledWith({ where: { clientId: 'client-a' } });
+    expect(body.users.map((u: { id: string }) => u.id)).toEqual(['user-a']);
+    expect(body.pagination).toEqual({ page: 2, limit: 1, total: 2, pages: 2 });
   });
 
-  describe('Audit Logging', () => {
-    it('should log user creation', async () => {
-      // Arrange
-      const userData = {
-        email: 'newuser@example.com',
-        password: 'ValidPassword123!',
-        name: 'New User',
-        role: 'user',
-        clientId: 'client-1',
-      };
-      
-      mockRequest.json.mockResolvedValue(userData);
-      
-      (prisma.clients.findFirst as jest.Mock).mockResolvedValue({
-        id: 'client-1',
-        name: 'Test Client',
-        isActive: true,
-      });
-      (prisma.users.findFirst as jest.Mock).mockResolvedValue(null);
-      
-      const bcrypt = require('bcryptjs');
-      (bcrypt.genSalt as jest.Mock).mockResolvedValue('salt123');
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
-      
-      (prisma.users.create as jest.Mock).mockResolvedValue({
-        ...mockUser,
-        email: 'newuser@example.com',
-        name: 'New User',
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
+  it('returns 500 when the query fails', async () => {
+    actAs('super_admin');
+    (prisma.users.findMany as jest.Mock).mockRejectedValue(new Error('db down'));
+    const response = await get();
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'Failed to fetch users' });
+  });
+});
 
-      const { validatePassword } = require('@/lib/password-validator');
-      validatePassword.mockReturnValue({ isValid: true, errors: [] });
-
-      // Act
-      await POST(mockRequest);
-
-      // Assert
-      expect(prisma.audit_logs.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventType: 'USER_CREATED',
-          severity: 'INFO',
-          userId: 'admin-1',
-          clientId: 'client-1',
-          action: 'CREATE_USER',
-          details: expect.stringContaining('User created successfully'),
-        }),
-      });
-    });
-
-    it('should log user update', async () => {
-      // Arrange
-      const updateData = {
-        id: 'user-1',
-        name: 'Updated User',
-      };
-      
-      mockRequest.json.mockResolvedValue(updateData);
-      
-      (prisma.users.findFirst as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.users.update as jest.Mock).mockResolvedValue({
-        ...mockUser,
-        name: 'Updated User',
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      await PUT(mockRequest);
-
-      // Assert
-      expect(prisma.audit_logs.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventType: 'USER_UPDATED',
-          severity: 'INFO',
-          userId: 'admin-1',
-          clientId: 'client-1',
-          action: 'UPDATE_USER',
-          details: expect.stringContaining('User updated successfully'),
-        }),
-      });
-    });
-
-    it('should log user deletion', async () => {
-      // Arrange
-      const deleteData = {
-        id: 'user-1',
-      };
-      
-      mockRequest.json.mockResolvedValue(deleteData);
-      
-      (prisma.users.findFirst as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.users.delete as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      await DELETE(mockRequest);
-
-      // Assert
-      expect(prisma.audit_logs.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventType: 'USER_DELETED',
-          severity: 'WARNING',
-          userId: 'admin-1',
-          clientId: 'client-1',
-          action: 'DELETE_USER',
-          details: expect.stringContaining('User deleted successfully'),
-        }),
-      });
-    });
+describe('POST /api/admin/users', () => {
+  it('rejects unauthenticated requests', async () => {
+    const response = await post(NEW_USER, false);
+    expect(response.status).toBe(401);
+    expect(prisma.writeCalls()).toEqual([]);
   });
 
-  describe('Error Handling', () => {
-    it('should handle database errors gracefully', async () => {
-      // Arrange
-      (prisma.users.findMany as jest.Mock).mockRejectedValue(new Error('Database error'));
+  it.each(['child_user', 'user', 'client_admin'])('rejects %s callers with 403, even for their own tenant', async (role) => {
+    actAs(role, 'client-b');
+    const response = await post(NEW_USER);
+    expect(response.status).toBe(403);
+    expect(prisma.writeCalls()).toEqual([]);
+  });
 
-      // Act
-      const response = await GET(mockRequest);
-      const responseData = await response.json();
+  it.each(['name', 'email', 'password', 'role', 'clientId'])('rejects a request missing %s', async (field) => {
+    actAs('super_admin');
+    const response = await post({ ...NEW_USER, [field]: '' });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: `Missing required field: ${field}` });
+    expect(prisma.writeCalls()).toEqual([]);
+  });
 
-      // Assert
-      expect(response.status).toBe(500);
-      expect(responseData.error).toBe('Internal server error');
+  it('does not let a super admin grant master_admin', async () => {
+    actAs('super_admin');
+    const response = await post({ ...NEW_USER, role: 'master_admin' });
+    expect(response.status).toBe(403);
+    expect(prisma.writeCalls()).toEqual([]);
+  });
+
+  it('rejects unknown roles', async () => {
+    actAs('master_admin');
+    const response = await post({ ...NEW_USER, role: 'admin' });
+    expect(response.status).toBe(400);
+    expect(prisma.writeCalls()).toEqual([]);
+  });
+
+  it('rejects a duplicate email within the target tenant', async () => {
+    actAs('super_admin');
+    (prisma.users.findFirst as jest.Mock).mockResolvedValue(USERS[2]);
+    const response = await post({ ...NEW_USER, email: 'user@b.test' });
+
+    expect(response.status).toBe(409);
+    expect(prisma.users.findFirst).toHaveBeenCalledWith({ where: { email: 'user@b.test', clientId: 'client-b' } });
+    expect(prisma.writeCalls()).toEqual([]);
+  });
+
+  it('returns 404 for an unknown client', async () => {
+    actAs('super_admin');
+    const response = await post({ ...NEW_USER, clientId: 'client-zzz' });
+    expect(response.status).toBe(404);
+    expect(prisma.writeCalls()).toEqual([]);
+  });
+
+  it('creates the user with a bcrypt hash and records the creator', async () => {
+    actAs('super_admin');
+    const response = await post(NEW_USER);
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(bcrypt.hash).toHaveBeenCalledWith(NEW_USER.password, 12);
+    expect((prisma.users.create as jest.Mock).mock.calls[0][0].data).toMatchObject({
+      name: NEW_USER.name,
+      email: NEW_USER.email,
+      password: HASH,
+      role: 'client_admin',
+      clientId: 'client-b',
+      createdBy: TEST_USER_ID,
+      isActive: true,
     });
+    expect(body.message).toBe('User created successfully');
+    expect(body.user).toMatchObject({ email: NEW_USER.email, role: 'client_admin', clientId: 'client-b' });
+  });
 
-    it('should handle malformed JSON', async () => {
-      // Arrange
-      mockRequest.json.mockRejectedValue(new Error('Invalid JSON'));
+  it('never returns the password hash or the plain-text password', async () => {
+    actAs('super_admin');
+    const body = await (await post(NEW_USER)).json();
 
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
+    expect(body.user).not.toHaveProperty('password');
+    expect(JSON.stringify(body)).not.toContain(HASH);
+    expect(JSON.stringify(body)).not.toContain(NEW_USER.password);
+  });
 
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Invalid request body');
-    });
+  it('honours an explicit isActive flag', async () => {
+    actAs('super_admin');
+    await post({ ...NEW_USER, isActive: false });
+    expect((prisma.users.create as jest.Mock).mock.calls[0][0].data.isActive).toBe(false);
+  });
 
-    it('should handle missing request body', async () => {
-      // Arrange
-      mockRequest.json.mockResolvedValue(null);
+  it('lets a master admin create a super admin', async () => {
+    actAs('master_admin');
+    const response = await post({ ...NEW_USER, role: 'super_admin' });
+    expect(response.status).toBe(201);
+    expect((prisma.users.create as jest.Mock).mock.calls[0][0].data.role).toBe('super_admin');
+  });
 
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Request body is required');
-    });
+  it('returns 500 when creating the user fails', async () => {
+    actAs('super_admin');
+    (prisma.users.create as jest.Mock).mockRejectedValue(new Error('db down'));
+    const response = await post(NEW_USER);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'Failed to create user' });
   });
 });

@@ -1,826 +1,550 @@
 /**
- * Orders API Tests
- * Comprehensive tests for order management functionality
+ * /api/orders collection route: POST (create), GET (list), DELETE (bulk).
+ * Focus: authentication, tenant isolation, the child-user sub-group rule,
+ * server-owned fields, input validation, and the credit/Delhivery ordering
+ * on create. Prisma, Delhivery, credits, analytics and webhooks are mocked.
  */
+jest.unmock('jsonwebtoken');
 
-import { NextRequest } from 'next/server';
-import { GET, POST, DELETE } from '../orders/route';
-import { prisma } from '@/lib/prisma';
-import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
-
-// Mock NextResponse
-jest.mock('next/server', () => ({
-  ...jest.requireActual('next/server'),
-  NextResponse: {
-    json: jest.fn((data, init = {}) => ({
-      json: jest.fn().mockResolvedValue(data),
-      status: init.status || 200,
-      headers: new Map(Object.entries(init.headers || {})),
-    })),
-    redirect: jest.fn((url, status = 302) => ({
-      status,
-      headers: new Map([['location', url]]),
-    })),
-    next: jest.fn(() => ({
-      status: 200,
-    })),
-  },
-}));
-
-// Mock dependencies
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
-    orders: {
-      findMany: jest.fn(),
-      findFirst: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
-    },
-    clients: {
-      findFirst: jest.fn(),
-    },
-    audit_logs: {
-      create: jest.fn(),
-    },
-  },
-}));
-
-jest.mock('@/lib/auth-middleware', () => ({
-  authorizeUser: jest.fn(),
-  UserRole: {
-    USER: 'user',
-    ADMIN: 'admin',
-  },
-  PermissionLevel: {
-    READ: 'READ',
-    WRITE: 'WRITE',
-    DELETE: 'DELETE',
-  },
-}));
-
+jest.mock('next/server', () => require('@/test-utils/auth-request').nextServerMock);
+jest.mock('@/lib/prisma', () => ({ prisma: require('@/test-utils/prisma-mock').createPrismaMock() }));
+jest.mock('@prisma/client', () => ({ PrismaClient: jest.fn(() => require('@/lib/prisma').prisma) }));
 jest.mock('@/lib/security-middleware', () => ({
-  applySecurityMiddleware: jest.fn(() => null),
-  securityHeaders: jest.fn((response) => response),
-  InputValidator: {
-    validateString: jest.fn(),
-    validateEmail: jest.fn(),
-    validateNumber: jest.fn(),
+  applySecurityMiddleware: jest.fn().mockResolvedValue(null),
+  securityHeaders: jest.fn(),
+}));
+jest.mock('@/lib/delhivery', () => {
+  const instance = { createOrder: jest.fn(), cancelOrder: jest.fn() };
+  return { DelhiveryService: jest.fn(() => instance), __instance: instance };
+});
+jest.mock('@/lib/analytics-service', () => ({
+  __esModule: true,
+  default: { trackOrderCreation: jest.fn(), trackEvent: jest.fn() },
+}));
+jest.mock('@/lib/webhook-service', () => ({ WebhookService: { triggerWebhooks: jest.fn() } }));
+jest.mock('@/lib/cross-app-auth', () => ({ getCatalogApiKey: jest.fn() }));
+jest.mock('@/lib/credit-service', () => ({
+  CreditService: {
+    getCreditCost: () => 1,
+    deductCredits: jest.fn(),
+    refundCredits: jest.fn(),
+    attachOrderToTransaction: jest.fn(),
+  },
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {
+    constructor(public readonly required: number) {
+      super('Insufficient credits');
+      this.name = 'InsufficientCreditsError';
+    }
   },
 }));
 
-describe('Orders API', () => {
-  let mockRequest: NextRequest;
-  const mockUser = {
-    id: 'user-1',
-    email: 'user@example.com',
-    name: 'Test User',
-    role: 'user',
-    clientId: 'client-1',
-    isActive: true,
-  };
+import { prisma as realPrisma } from '@/lib/prisma';
+import { CreditService, InsufficientCreditsError } from '@/lib/credit-service';
+import { WebhookService } from '@/lib/webhook-service';
+import { getCatalogApiKey } from '@/lib/cross-app-auth';
+import { authUserRow, signedRequest, TEST_USER_ID } from '@/test-utils/auth-request';
+import type { createPrismaMock } from '@/test-utils/prisma-mock';
+import { matchesWhere } from '@/test-utils/prisma-where';
+import { POST as createOrder, GET as listOrders, DELETE as deleteOrders } from '@/app/api/orders/route';
 
-  const mockOrder = {
-    id: 'order-1',
-    clientId: 'client-1',
-    orderNumber: 'ORD-001',
-    status: 'pending',
-    customerName: 'John Doe',
-    customerEmail: 'john@example.com',
-    customerPhone: '+1234567890',
-    pickupAddress: '123 Main St, New York, NY 10001',
-    deliveryAddress: '456 Oak Ave, Boston, MA 02101',
-    weight: 1.5,
-    dimensions: '10x10x10',
-    value: 100.00,
-    notes: 'Handle with care',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    clients: {
-      id: 'client-1',
-      name: 'Test Client',
-    },
-  };
+const prisma = realPrisma as unknown as ReturnType<typeof createPrismaMock>;
+const delhivery = jest.requireMock('@/lib/delhivery').__instance as { createOrder: jest.Mock; cancelOrder: jest.Mock };
+const fetchMock = global.fetch as jest.Mock;
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    
-    // Mock request
-    mockRequest = {
-      json: jest.fn(),
-      headers: new Map(),
-      nextUrl: new URL('http://localhost:3000/api/orders'),
-    } as any;
+type OrderRow = Record<string, unknown> & { id: number; clientId: string };
 
-    // Mock successful authorization
-    (authorizeUser as jest.Mock).mockResolvedValue({
-      response: null,
-      user: mockUser,
+const ORDERS: OrderRow[] = [
+  { id: 1, clientId: 'client-a', created_by: TEST_USER_ID, sub_group: null, courier_service: 'delhivery', tracking_id: 'AWB-1', pickup_location: 'a-wh', products: null },
+  { id: 2, clientId: 'client-a', created_by: 'colleague', sub_group: 'north', courier_service: 'dtdc', tracking_id: null, pickup_location: 'a-wh', products: '[{"sku":"SKU-1","quantity":2}]' },
+  { id: 3, clientId: 'client-a', created_by: 'colleague', sub_group: 'south', courier_service: 'dtdc', tracking_id: 'DT-3', pickup_location: 'a-wh', products: null },
+  { id: 9, clientId: 'client-b', created_by: 'other-tenant-user', sub_group: null, courier_service: 'delhivery', tracking_id: 'AWB-9', pickup_location: 'b-wh', products: null },
+];
+
+const ORDER_URL = 'http://localhost/api/orders';
+
+const VALID_ORDER = {
+  name: 'Customer',
+  mobile: '9876543210',
+  address: '1 Main Road',
+  city: 'Hyderabad',
+  state: 'Telangana',
+  country: 'India',
+  pincode: '500001',
+  courier_service: 'dtdc',
+  pickup_location: 'a-wh',
+  package_value: '1500.50',
+  weight: '250',
+  total_items: '2',
+};
+
+function actAs(role: string, { clientId = 'client-a', subGroup }: { clientId?: string; subGroup?: string } = {}) {
+  (prisma.users.findUnique as jest.Mock).mockResolvedValue(authUserRow(role, clientId));
+  (prisma.user_sub_groups.findFirst as jest.Mock).mockResolvedValue(subGroup ? { subGroups: { name: subGroup } } : null);
+}
+
+const post = (body: unknown, authenticated = true) => createOrder(signedRequest(body, { authenticated, url: ORDER_URL }));
+const get = (query = '', authenticated = true) => listOrders(signedRequest({}, { authenticated, url: `${ORDER_URL}${query}` }));
+const del = (body: unknown, authenticated = true) => deleteOrders(signedRequest(body, { authenticated, url: ORDER_URL }));
+
+const lastWhere = (mock: jest.Mock) => mock.mock.calls[mock.mock.calls.length - 1][0].where;
+const createdOrder = () => (prisma.orders.create as jest.Mock).mock.calls[0][0].data;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+  jest.spyOn(console, 'warn').mockImplementation(() => {});
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+
+  (prisma.orders.findMany as jest.Mock).mockImplementation(async ({ where, skip = 0, take }) =>
+    ORDERS.filter((row) => matchesWhere(row, where)).slice(skip, take === undefined ? undefined : skip + take)
+  );
+  (prisma.orders.count as jest.Mock).mockImplementation(async ({ where }) => ORDERS.filter((row) => matchesWhere(row, where)).length);
+  (prisma.orders.create as jest.Mock).mockImplementation(async ({ data }) => ({ id: 101, ...data }));
+  (prisma.orders.findUnique as jest.Mock).mockImplementation(async ({ where }) => ({ id: where.id, reference_number: 'REF' }));
+  (prisma.orders.delete as jest.Mock).mockImplementation(async ({ where }) => ORDERS.find((row) => row.id === where.id));
+  (prisma.client_order_configs.findUnique as jest.Mock).mockResolvedValue(null);
+  (prisma.user_custom_from_address.findUnique as jest.Mock).mockResolvedValue(null);
+
+  (CreditService.deductCredits as jest.Mock).mockResolvedValue({ transactionId: 'txn-1' });
+  (CreditService.refundCredits as jest.Mock).mockResolvedValue(undefined);
+  (CreditService.attachOrderToTransaction as jest.Mock).mockResolvedValue(undefined);
+  (WebhookService.triggerWebhooks as jest.Mock).mockResolvedValue(undefined);
+  (getCatalogApiKey as jest.Mock).mockResolvedValue(null);
+  delhivery.createOrder.mockResolvedValue({ success: true, waybill_number: 'AWB-NEW', order_id: 'DLV-1' });
+  delhivery.cancelOrder.mockResolvedValue({ success: true, message: 'cancelled' });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('POST /api/orders', () => {
+  describe('authentication and validation', () => {
+    it('rejects unauthenticated callers without charging or writing', async () => {
+      const response = await post(VALID_ORDER, false);
+      expect(response.status).toBe(401);
+      expect(CreditService.deductCredits).not.toHaveBeenCalled();
+      expect(prisma.writeCalls()).toEqual([]);
     });
 
-    // Mock successful validation
-    const { InputValidator } = require('@/lib/security-middleware');
-    InputValidator.validateString.mockReturnValue({ valid: true });
-    InputValidator.validateEmail.mockReturnValue({ valid: true });
-    InputValidator.validateNumber.mockReturnValue({ valid: true });
+    it.each(Object.keys(VALID_ORDER))('rejects an order missing %s before charging', async (field) => {
+      actAs('user');
+      const response = await post({ ...VALID_ORDER, [field]: '' });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: `Missing required field: ${field}` });
+      expect(CreditService.deductCredits).not.toHaveBeenCalled();
+      expect(prisma.writeCalls()).toEqual([]);
+    });
+
+    it.each(['12345', '5876543210', '98765432101', '+1 9876543210'])('rejects the mobile number %p', async (mobile) => {
+      actAs('user');
+      const response = await post({ ...VALID_ORDER, mobile });
+      expect(response.status).toBe(400);
+      expect(CreditService.deductCredits).not.toHaveBeenCalled();
+    });
+
+    it.each(['9876543210', '+91 98765 43210', '919876543210', '+91-0-9876543210'])('accepts the mobile number %p', async (mobile) => {
+      actAs('user');
+      expect((await post({ ...VALID_ORDER, mobile })).status).toBe(200);
+    });
+
+    it('rejects an invalid reseller mobile number', async () => {
+      actAs('user');
+      const response = await post({ ...VALID_ORDER, reseller_mobile: '123' });
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toMatch(/^Reseller mobile number/);
+      expect(CreditService.deductCredits).not.toHaveBeenCalled();
+    });
   });
 
-  describe('GET /api/orders', () => {
-    it('should get orders successfully', async () => {
-      // Arrange
-      const mockOrders = [mockOrder];
-      (prisma.orders.findMany as jest.Mock).mockResolvedValue(mockOrders);
-      (prisma.orders.count as jest.Mock).mockResolvedValue(1);
+  describe('creating a non-Delhivery order', () => {
+    it("stores the order in the caller's tenant and ignores server-owned fields from the body", async () => {
+      actAs('user');
+      const response = await post({
+        ...VALID_ORDER,
+        clientId: 'client-b',
+        created_by: 'someone-else',
+        sub_group: 'north',
+        delhivery_api_status: 'success',
+        id: 999,
+      });
 
-      // Act
-      const response = await GET(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
       expect(response.status).toBe(200);
-      expect(responseData.success).toBe(true);
-      expect(responseData.data.orders).toHaveLength(1);
-      expect(responseData.data.orders[0].orderNumber).toBe('ORD-001');
-      expect(responseData.data.pagination.total).toBe(1);
-      
-      expect(prisma.orders.findMany).toHaveBeenCalledWith({
-        where: { clientId: 'client-1' },
-        include: { clients: true },
-        orderBy: { createdAt: 'desc' },
-        skip: 0,
-        take: 10,
+      expect(createdOrder()).toMatchObject({ clientId: 'client-a', created_by: TEST_USER_ID, sub_group: null });
+      expect(createdOrder()).not.toHaveProperty('delhivery_api_status');
+      expect(createdOrder()).not.toHaveProperty('id');
+    });
+
+    it("records a child user's sub-group", async () => {
+      actAs('child_user', { subGroup: 'north' });
+      await post(VALID_ORDER);
+      expect(createdOrder()).toMatchObject({ created_by: TEST_USER_ID, sub_group: 'north' });
+    });
+
+    it('converts numeric fields and serialises products', async () => {
+      actAs('user');
+      const products = [{ sku: 'SKU-1', quantity: 2 }];
+      await post({ ...VALID_ORDER, cod_amount: '99.5', products });
+
+      expect(createdOrder()).toMatchObject({
+        package_value: 1500.5,
+        weight: 250,
+        total_items: 2,
+        cod_amount: 99.5,
+        products: JSON.stringify(products),
       });
     });
 
-    it('should handle pagination parameters', async () => {
-      // Arrange
-      mockRequest.nextUrl.searchParams.set('page', '2');
-      mockRequest.nextUrl.searchParams.set('limit', '5');
-      
-      (prisma.orders.findMany as jest.Mock).mockResolvedValue([]);
-      (prisma.orders.count as jest.Mock).mockResolvedValue(0);
+    it('builds the reference number from a custom value or generates one', async () => {
+      actAs('user');
+      await post({ ...VALID_ORDER, reference_number: ' INV42 ' });
+      expect(createdOrder().reference_number).toBe('INV42-9876543210');
 
-      // Act
-      const response = await GET(mockRequest);
+      (prisma.orders.create as jest.Mock).mockClear();
+      await post(VALID_ORDER);
+      expect(createdOrder().reference_number).toMatch(/^[A-Z0-9]{6}-9876543210$/);
 
-      // Assert
-      expect(prisma.orders.findMany).toHaveBeenCalledWith({
-        where: { clientId: 'client-1' },
-        include: { clients: true },
-        orderBy: { createdAt: 'desc' },
-        skip: 5, // (page - 1) * limit
-        take: 5,
-      });
+      (prisma.orders.create as jest.Mock).mockClear();
+      (prisma.client_order_configs.findUnique as jest.Mock).mockResolvedValue({ enableReferencePrefix: false });
+      await post(VALID_ORDER);
+      expect(createdOrder().reference_number).toBe('9876543210');
+      expect(prisma.client_order_configs.findUnique).toHaveBeenCalledWith({ where: { clientId: 'client-a' } });
     });
 
-    it('should filter orders by status', async () => {
-      // Arrange
-      mockRequest.nextUrl.searchParams.set('status', 'pending');
-      
-      (prisma.orders.findMany as jest.Mock).mockResolvedValue([mockOrder]);
-      (prisma.orders.count as jest.Mock).mockResolvedValue(1);
+    it('keeps a caller-supplied tracking id and marks untracked orders pending', async () => {
+      actAs('user');
+      await post({ ...VALID_ORDER, tracking_id: 'DT-777' });
+      expect(createdOrder()).toMatchObject({ tracking_id: 'DT-777', tracking_status: null });
 
-      // Act
-      const response = await GET(mockRequest);
-
-      // Assert
-      expect(prisma.orders.findMany).toHaveBeenCalledWith({
-        where: { 
-          clientId: 'client-1',
-          status: 'pending',
-        },
-        include: { clients: true },
-        orderBy: { createdAt: 'desc' },
-        skip: 0,
-        take: 10,
-      });
+      (prisma.orders.create as jest.Mock).mockClear();
+      await post(VALID_ORDER);
+      expect(createdOrder()).toMatchObject({ tracking_id: null, tracking_status: 'pending' });
+      expect(delhivery.createOrder).not.toHaveBeenCalled();
     });
 
-    it('should filter orders by date range', async () => {
-      // Arrange
-      const startDate = '2024-01-01';
-      const endDate = '2024-01-31';
-      mockRequest.nextUrl.searchParams.set('startDate', startDate);
-      mockRequest.nextUrl.searchParams.set('endDate', endDate);
-      
-      (prisma.orders.findMany as jest.Mock).mockResolvedValue([mockOrder]);
-      (prisma.orders.count as jest.Mock).mockResolvedValue(1);
+    it('charges one order credit, links it to the order and returns the order summary', async () => {
+      actAs('user');
+      const response = await post(VALID_ORDER);
+      const body = await response.json();
 
-      // Act
-      const response = await GET(mockRequest);
-
-      // Assert
-      expect(prisma.orders.findMany).toHaveBeenCalledWith({
-        where: { 
-          clientId: 'client-1',
-          createdAt: {
-            gte: new Date(startDate),
-            lte: new Date(endDate + 'T23:59:59.999Z'),
-          },
-        },
-        include: { clients: true },
-        orderBy: { createdAt: 'desc' },
-        skip: 0,
-        take: 10,
-      });
+      expect(CreditService.deductCredits).toHaveBeenCalledWith('client-a', 1, 'Order creation', 'ORDER', TEST_USER_ID);
+      expect(CreditService.attachOrderToTransaction).toHaveBeenCalledWith('txn-1', 101);
+      expect(CreditService.refundCredits).not.toHaveBeenCalled();
+      expect(body).toMatchObject({ success: true, order: { id: 101, orderNumber: 'ORDER-101' } });
     });
 
-    it('should search orders by customer name', async () => {
-      // Arrange
-      mockRequest.nextUrl.searchParams.set('search', 'John');
-      
-      (prisma.orders.findMany as jest.Mock).mockResolvedValue([mockOrder]);
-      (prisma.orders.count as jest.Mock).mockResolvedValue(1);
-
-      // Act
-      const response = await GET(mockRequest);
-
-      // Assert
-      expect(prisma.orders.findMany).toHaveBeenCalledWith({
-        where: { 
-          clientId: 'client-1',
-          customerName: {
-            contains: 'John',
-            mode: 'insensitive',
-          },
-        },
-        include: { clients: true },
-        orderBy: { createdAt: 'desc' },
-        skip: 0,
-        take: 10,
-      });
-    });
-  });
-
-  describe('POST /api/orders', () => {
-    it('should create order successfully', async () => {
-      // Arrange
-      const orderData = {
-        customerName: 'Jane Doe',
-        customerEmail: 'jane@example.com',
-        customerPhone: '+1234567890',
-        pickupAddress: '123 Main St, New York, NY 10001',
-        deliveryAddress: '456 Oak Ave, Boston, MA 02101',
-        weight: 2.0,
-        dimensions: '12x12x12',
-        value: 150.00,
-        notes: 'Fragile items',
-      };
-      
-      mockRequest.json.mockResolvedValue(orderData);
-      
-      (prisma.orders.create as jest.Mock).mockResolvedValue({
-        ...mockOrder,
-        ...orderData,
-        orderNumber: 'ORD-002',
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(201);
-      expect(responseData.success).toBe(true);
-      expect(responseData.data.order.customerName).toBe('Jane Doe');
-      expect(responseData.data.order.orderNumber).toBe('ORD-002');
-      
-      expect(prisma.orders.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          clientId: 'client-1',
-          customerName: 'Jane Doe',
-          customerEmail: 'jane@example.com',
-          customerPhone: '+1234567890',
-          pickupAddress: '123 Main St, New York, NY 10001',
-          deliveryAddress: '456 Oak Ave, Boston, MA 02101',
-          weight: 2.0,
-          dimensions: '12x12x12',
-          value: 150.00,
-          notes: 'Fragile items',
-          status: 'pending',
-        }),
-        include: { clients: true },
-      });
+    it("fires order.created webhooks for the caller's tenant", async () => {
+      actAs('user');
+      await post(VALID_ORDER);
+      expect(WebhookService.triggerWebhooks).toHaveBeenCalledWith('order.created', expect.any(Object), 'client-a', 101);
     });
 
-    it('should validate required fields', async () => {
-      // Arrange
-      const orderData = {
-        customerName: 'Jane Doe',
-        // Missing required fields
-      };
-      
-      mockRequest.json.mockResolvedValue(orderData);
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Customer email is required');
+    it("applies the user's custom from-address when the courier matches", async () => {
+      actAs('user');
+      (prisma.user_custom_from_address.findUnique as jest.Mock).mockResolvedValue({
+        overwriteFromAddress: true,
+        courierServiceCode: 'DTDC',
+        customAddress: 'Custom Warehouse, Pune',
+      });
+      await post(VALID_ORDER);
+      expect(prisma.user_custom_from_address.findUnique).toHaveBeenCalledWith({ where: { userId: TEST_USER_ID } });
+      expect(createdOrder().seller_address).toBe('Custom Warehouse, Pune');
     });
 
-    it('should validate email format', async () => {
-      // Arrange
-      const orderData = {
-        customerName: 'Jane Doe',
-        customerEmail: 'invalid-email',
-        customerPhone: '+1234567890',
-        pickupAddress: '123 Main St, New York, NY 10001',
-        deliveryAddress: '456 Oak Ave, Boston, MA 02101',
-        weight: 2.0,
-        value: 150.00,
-      };
-      
-      mockRequest.json.mockResolvedValue(orderData);
-      
-      const { InputValidator } = require('@/lib/security-middleware');
-      InputValidator.validateEmail.mockReturnValue({ 
-        valid: false, 
-        error: 'Invalid email format' 
-      });
+    it('returns 402 without creating anything when credits run out', async () => {
+      actAs('user');
+      (CreditService.deductCredits as jest.Mock).mockRejectedValue(new InsufficientCreditsError(1));
+      const response = await post(VALID_ORDER);
 
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Invalid email format');
+      expect(response.status).toBe(402);
+      expect((await response.json()).error).toBe('Insufficient credits');
+      expect(prisma.orders.create).not.toHaveBeenCalled();
     });
 
-    it('should validate phone number format', async () => {
-      // Arrange
-      const orderData = {
-        customerName: 'Jane Doe',
-        customerEmail: 'jane@example.com',
-        customerPhone: 'invalid-phone',
-        pickupAddress: '123 Main St, New York, NY 10001',
-        deliveryAddress: '456 Oak Ave, Boston, MA 02101',
-        weight: 2.0,
-        value: 150.00,
-      };
-      
-      mockRequest.json.mockResolvedValue(orderData);
-      
-      const { InputValidator } = require('@/lib/security-middleware');
-      InputValidator.validateString.mockReturnValue({ 
-        valid: false, 
-        error: 'Invalid phone number format' 
-      });
+    it('refunds the credit when the order cannot be saved', async () => {
+      actAs('user');
+      (prisma.orders.create as jest.Mock).mockRejectedValue(new Error('db down'));
+      const response = await post(VALID_ORDER);
 
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Invalid phone number format');
-    });
-
-    it('should validate weight is positive', async () => {
-      // Arrange
-      const orderData = {
-        customerName: 'Jane Doe',
-        customerEmail: 'jane@example.com',
-        customerPhone: '+1234567890',
-        pickupAddress: '123 Main St, New York, NY 10001',
-        deliveryAddress: '456 Oak Ave, Boston, MA 02101',
-        weight: -1.0, // Invalid weight
-        value: 150.00,
-      };
-      
-      mockRequest.json.mockResolvedValue(orderData);
-      
-      const { InputValidator } = require('@/lib/security-middleware');
-      InputValidator.validateNumber.mockReturnValue({ 
-        valid: false, 
-        error: 'Weight must be positive' 
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Weight must be positive');
-    });
-
-    it('should validate value is positive', async () => {
-      // Arrange
-      const orderData = {
-        customerName: 'Jane Doe',
-        customerEmail: 'jane@example.com',
-        customerPhone: '+1234567890',
-        pickupAddress: '123 Main St, New York, NY 10001',
-        deliveryAddress: '456 Oak Ave, Boston, MA 02101',
-        weight: 2.0,
-        value: -100.00, // Invalid value
-      };
-      
-      mockRequest.json.mockResolvedValue(orderData);
-      
-      const { InputValidator } = require('@/lib/security-middleware');
-      InputValidator.validateNumber.mockReturnValue({ 
-        valid: false, 
-        error: 'Value must be positive' 
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Value must be positive');
-    });
-  });
-
-  // PUT tests commented out - orders route does not export PUT function
-  describe.skip('PUT /api/orders', () => {
-    it('should update order successfully', async () => {
-      // Arrange
-      const updateData = {
-        id: 'order-1',
-        status: 'in_transit',
-        trackingNumber: 'TRACK123456',
-        notes: 'Updated notes',
-      };
-      
-      mockRequest.json.mockResolvedValue(updateData);
-      
-      (prisma.orders.findFirst as jest.Mock).mockResolvedValue(mockOrder);
-      (prisma.orders.update as jest.Mock).mockResolvedValue({
-        ...mockOrder,
-        status: 'in_transit',
-        trackingNumber: 'TRACK123456',
-        notes: 'Updated notes',
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      const response = await PUT(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(responseData.success).toBe(true);
-      expect(responseData.data.order.status).toBe('in_transit');
-      expect(responseData.data.order.trackingNumber).toBe('TRACK123456');
-      
-      expect(prisma.orders.update).toHaveBeenCalledWith({
-        where: { id: 'order-1' },
-        data: expect.objectContaining({
-          status: 'in_transit',
-          trackingNumber: 'TRACK123456',
-          notes: 'Updated notes',
-        }),
-        include: { clients: true },
-      });
-    });
-
-    it('should reject non-existent order', async () => {
-      // Arrange
-      const updateData = {
-        id: 'non-existent',
-        status: 'in_transit',
-      };
-      
-      mockRequest.json.mockResolvedValue(updateData);
-      
-      (prisma.orders.findFirst as jest.Mock).mockResolvedValue(null);
-
-      // Act
-      const response = await PUT(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(404);
-      expect(responseData.error).toBe('Order not found');
-    });
-
-    it('should reject updating order from different client', async () => {
-      // Arrange
-      const updateData = {
-        id: 'order-1',
-        status: 'in_transit',
-      };
-      
-      mockRequest.json.mockResolvedValue(updateData);
-      
-      (prisma.orders.findFirst as jest.Mock).mockResolvedValue({
-        ...mockOrder,
-        clientId: 'different-client',
-      });
-
-      // Act
-      const response = await PUT(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(403);
-      expect(responseData.error).toBe('Access denied');
-    });
-
-    it('should validate order status', async () => {
-      // Arrange
-      const updateData = {
-        id: 'order-1',
-        status: 'invalid-status',
-      };
-      
-      mockRequest.json.mockResolvedValue(updateData);
-
-      // Act
-      const response = await PUT(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Invalid order status');
-    });
-  });
-
-  describe('DELETE /api/orders', () => {
-    it('should delete order successfully', async () => {
-      // Arrange
-      const deleteData = {
-        id: 'order-1',
-      };
-      
-      mockRequest.json.mockResolvedValue(deleteData);
-      
-      (prisma.orders.findFirst as jest.Mock).mockResolvedValue(mockOrder);
-      (prisma.orders.delete as jest.Mock).mockResolvedValue(mockOrder);
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      const response = await DELETE(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(responseData.success).toBe(true);
-      expect(responseData.message).toBe('Order deleted successfully');
-      
-      expect(prisma.orders.delete).toHaveBeenCalledWith({
-        where: { id: 'order-1' },
-      });
-    });
-
-    it('should reject deleting non-existent order', async () => {
-      // Arrange
-      const deleteData = {
-        id: 'non-existent',
-      };
-      
-      mockRequest.json.mockResolvedValue(deleteData);
-      
-      (prisma.orders.findFirst as jest.Mock).mockResolvedValue(null);
-
-      // Act
-      const response = await DELETE(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(404);
-      expect(responseData.error).toBe('Order not found');
-    });
-
-    it('should reject deleting order from different client', async () => {
-      // Arrange
-      const deleteData = {
-        id: 'order-1',
-      };
-      
-      mockRequest.json.mockResolvedValue(deleteData);
-      
-      (prisma.orders.findFirst as jest.Mock).mockResolvedValue({
-        ...mockOrder,
-        clientId: 'different-client',
-      });
-
-      // Act
-      const response = await DELETE(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(403);
-      expect(responseData.error).toBe('Access denied');
-    });
-
-    it('should reject deleting order with active status', async () => {
-      // Arrange
-      const deleteData = {
-        id: 'order-1',
-      };
-      
-      mockRequest.json.mockResolvedValue(deleteData);
-      
-      (prisma.orders.findFirst as jest.Mock).mockResolvedValue({
-        ...mockOrder,
-        status: 'in_transit',
-      });
-
-      // Act
-      const response = await DELETE(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Cannot delete order with active status');
-    });
-  });
-
-  describe('Authorization', () => {
-    it('should require user role for GET', async () => {
-      // Arrange
-      (authorizeUser as jest.Mock).mockResolvedValue({
-        response: {
-          status: 403,
-          json: () => ({ error: 'Insufficient permissions' }),
-        },
-        user: null,
-      });
-
-      // Act
-      const response = await GET(mockRequest);
-
-      // Assert
-      expect(authorizeUser).toHaveBeenCalledWith(mockRequest, {
-        requiredRole: UserRole.USER,
-        requiredPermissions: [PermissionLevel.READ],
-        requireActiveUser: true,
-        requireActiveClient: true,
-      });
-      expect(response.status).toBe(403);
-    });
-
-    it('should require write permission for POST', async () => {
-      // Arrange
-      (authorizeUser as jest.Mock).mockResolvedValue({
-        response: {
-          status: 403,
-          json: () => ({ error: 'Insufficient permissions' }),
-        },
-        user: null,
-      });
-
-      // Act
-      const response = await POST(mockRequest);
-
-      // Assert
-      expect(authorizeUser).toHaveBeenCalledWith(mockRequest, {
-        requiredRole: UserRole.USER,
-        requiredPermissions: [PermissionLevel.WRITE],
-        requireActiveUser: true,
-        requireActiveClient: true,
-      });
-      expect(response.status).toBe(403);
-    });
-  });
-
-  describe('Audit Logging', () => {
-    it('should log order creation', async () => {
-      // Arrange
-      const orderData = {
-        customerName: 'Jane Doe',
-        customerEmail: 'jane@example.com',
-        customerPhone: '+1234567890',
-        pickupAddress: '123 Main St, New York, NY 10001',
-        deliveryAddress: '456 Oak Ave, Boston, MA 02101',
-        weight: 2.0,
-        value: 150.00,
-      };
-      
-      mockRequest.json.mockResolvedValue(orderData);
-      
-      (prisma.orders.create as jest.Mock).mockResolvedValue({
-        ...mockOrder,
-        ...orderData,
-        orderNumber: 'ORD-002',
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      await POST(mockRequest);
-
-      // Assert
-      expect(prisma.audit_logs.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventType: 'ORDER_CREATED',
-          severity: 'INFO',
-          userId: 'user-1',
-          clientId: 'client-1',
-          action: 'CREATE_ORDER',
-          details: expect.stringContaining('Order created successfully'),
-        }),
-      });
-    });
-
-    it.skip('should log order update', async () => {
-      // Arrange
-      const updateData = {
-        id: 'order-1',
-        status: 'in_transit',
-      };
-      
-      mockRequest.json.mockResolvedValue(updateData);
-      
-      (prisma.orders.findFirst as jest.Mock).mockResolvedValue(mockOrder);
-      (prisma.orders.update as jest.Mock).mockResolvedValue({
-        ...mockOrder,
-        status: 'in_transit',
-      });
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      await PUT(mockRequest);
-
-      // Assert
-      expect(prisma.audit_logs.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventType: 'ORDER_UPDATED',
-          severity: 'INFO',
-          userId: 'user-1',
-          clientId: 'client-1',
-          action: 'UPDATE_ORDER',
-          details: expect.stringContaining('Order updated successfully'),
-        }),
-      });
-    });
-
-    it('should log order deletion', async () => {
-      // Arrange
-      const deleteData = {
-        id: 'order-1',
-      };
-      
-      mockRequest.json.mockResolvedValue(deleteData);
-      
-      (prisma.orders.findFirst as jest.Mock).mockResolvedValue(mockOrder);
-      (prisma.orders.delete as jest.Mock).mockResolvedValue(mockOrder);
-      (prisma.audit_logs.create as jest.Mock).mockResolvedValue({});
-
-      // Act
-      await DELETE(mockRequest);
-
-      // Assert
-      expect(prisma.audit_logs.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventType: 'ORDER_DELETED',
-          severity: 'WARNING',
-          userId: 'user-1',
-          clientId: 'client-1',
-          action: 'DELETE_ORDER',
-          details: expect.stringContaining('Order deleted successfully'),
-        }),
-      });
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should handle database errors gracefully', async () => {
-      // Arrange
-      (prisma.orders.findMany as jest.Mock).mockRejectedValue(new Error('Database error'));
-
-      // Act
-      const response = await GET(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
       expect(response.status).toBe(500);
-      expect(responseData.error).toBe('Internal server error');
+      expect(CreditService.refundCredits).toHaveBeenCalledWith('client-a', 1, expect.stringMatching(/^Refund:/), 'ORDER', TEST_USER_ID);
+      expect(delhivery.cancelOrder).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('creating a Delhivery order', () => {
+    const DELHIVERY_ORDER = { ...VALID_ORDER, courier_service: 'Delhivery' };
+
+    it('charges first, books with Delhivery, then stores the waybill on the new order', async () => {
+      actAs('user');
+      const response = await post({ ...DELHIVERY_ORDER, tracking_id: 'CALLER-AWB' });
+
+      expect(response.status).toBe(200);
+      const deductOrder = (CreditService.deductCredits as jest.Mock).mock.invocationCallOrder[0];
+      const bookOrder = delhivery.createOrder.mock.invocationCallOrder[0];
+      const saveOrder = (prisma.orders.create as jest.Mock).mock.invocationCallOrder[0];
+      expect(deductOrder).toBeLessThan(bookOrder);
+      expect(bookOrder).toBeLessThan(saveOrder);
+
+      expect(delhivery.createOrder.mock.calls[0][0]).toMatchObject({ clientId: 'client-a', tracking_id: null });
+      expect(createdOrder().tracking_id).toBeNull();
+      expect(prisma.orders.update).toHaveBeenCalledWith({
+        where: { id: 101 },
+        data: expect.objectContaining({
+          delhivery_waybill_number: 'AWB-NEW',
+          delhivery_order_id: 'DLV-1',
+          delhivery_api_status: 'success',
+          tracking_id: 'AWB-NEW',
+          tracking_status: 'manifested',
+        }),
+      });
     });
 
-    it('should handle malformed JSON', async () => {
-      // Arrange
-      mockRequest.json.mockRejectedValue(new Error('Invalid JSON'));
+    it.each([
+      ['reports a failure', () => delhivery.createOrder.mockResolvedValue({ success: false, error: 'Pincode not serviceable' })],
+      ['throws', () => delhivery.createOrder.mockRejectedValue(new Error('timeout'))],
+    ])('refunds and creates no order when Delhivery %s', async (_case, arrange) => {
+      actAs('user');
+      arrange();
+      const response = await post(DELHIVERY_ORDER);
 
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
       expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Invalid request body');
+      expect((await response.json()).error).toBe('Delhivery API failed');
+      expect(CreditService.refundCredits).toHaveBeenCalledTimes(1);
+      expect(prisma.orders.create).not.toHaveBeenCalled();
     });
 
-    it('should handle missing request body', async () => {
-      // Arrange
-      mockRequest.json.mockResolvedValue(null);
+    it('cancels the booked waybill and refunds when the order cannot be saved', async () => {
+      actAs('user');
+      (prisma.orders.create as jest.Mock).mockRejectedValue(new Error('db down'));
+      const response = await post(DELHIVERY_ORDER);
 
-      // Act
-      const response = await POST(mockRequest);
-      const responseData = await response.json();
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(responseData.error).toBe('Request body is required');
+      expect(response.status).toBe(500);
+      expect(delhivery.cancelOrder).toHaveBeenCalledWith('AWB-NEW', 'a-wh', 'client-a');
+      expect(CreditService.refundCredits).toHaveBeenCalledTimes(1);
     });
+
+    it('keeps the charge when the order exists but storing carrier details fails', async () => {
+      actAs('user');
+      (prisma.orders.update as jest.Mock).mockRejectedValue(new Error('db hiccup'));
+      const response = await post(DELHIVERY_ORDER);
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toMatchObject({ orderId: 101, waybill: 'AWB-NEW' });
+      expect(CreditService.refundCredits).not.toHaveBeenCalled();
+      expect(delhivery.cancelOrder).not.toHaveBeenCalled();
+      expect(CreditService.attachOrderToTransaction).toHaveBeenCalledWith('txn-1', 101);
+    });
+
+    it('skips the Delhivery booking when skip_tracking is set', async () => {
+      actAs('user');
+      const response = await post({ ...DELHIVERY_ORDER, skip_tracking: true });
+      expect(response.status).toBe(200);
+      expect(delhivery.createOrder).not.toHaveBeenCalled();
+      expect(createdOrder()).toMatchObject({ tracking_id: null, tracking_status: 'pending' });
+    });
+  });
+});
+
+describe('GET /api/orders', () => {
+  const ids = async (response: { json: () => Promise<any> }) => (await response.json()).orders.map((o: OrderRow) => o.id);
+
+  it('rejects unauthenticated callers', async () => {
+    const response = await get('', false);
+    expect(response.status).toBe(401);
+    expect(prisma.orders.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each(['user', 'client_admin', 'super_admin'])("limits %s callers to their own tenant's orders", async (role) => {
+    actAs(role);
+    const response = await get();
+    expect(response.status).toBe(200);
+    expect(await ids(response)).toEqual([1, 2, 3]);
+    expect(lastWhere(prisma.orders.findMany as jest.Mock)).toEqual({ clientId: 'client-a' });
+    expect(lastWhere(prisma.orders.count as jest.Mock)).toEqual({ clientId: 'client-a' });
+  });
+
+  it('shows the other tenant only its own orders', async () => {
+    actAs('user', { clientId: 'client-b' });
+    expect(await ids(await get())).toEqual([9]);
+  });
+
+  it('limits child users to their sub-group or their own orders', async () => {
+    actAs('child_user', { subGroup: 'north' });
+    expect(await ids(await get())).toEqual([1, 2]);
+  });
+
+  it('limits child users without a sub-group to their own orders', async () => {
+    actAs('child_user');
+    expect(await ids(await get())).toEqual([1]);
+  });
+
+  it('falls back to own orders when the sub-group lookup fails', async () => {
+    actAs('child_user');
+    (prisma.user_sub_groups.findFirst as jest.Mock).mockRejectedValue(new Error('db hiccup'));
+    expect(await ids(await get())).toEqual([1]);
+  });
+
+  it('builds a case-insensitive search within the tenant', async () => {
+    actAs('user');
+    await get('?search=AWB');
+    expect(lastWhere(prisma.orders.findMany as jest.Mock)).toEqual({
+      clientId: 'client-a',
+      OR: ['name', 'mobile', 'tracking_id', 'reference_number'].map((field) => ({ [field]: { contains: 'AWB', mode: 'insensitive' } })),
+    });
+  });
+
+  it("keeps a child user's restriction when searching", async () => {
+    actAs('child_user', { subGroup: 'north' });
+    await get('?search=AWB');
+    const where = lastWhere(prisma.orders.findMany as jest.Mock);
+
+    expect(where.clientId).toBe('client-a');
+    expect(where.OR).toBeUndefined();
+    expect(where.AND).toEqual([
+      { OR: [{ sub_group: 'north' }, { created_by: TEST_USER_ID }] },
+      { OR: expect.arrayContaining([{ name: { contains: 'AWB', mode: 'insensitive' } }]) },
+    ]);
+  });
+
+  it("keeps a child user's restriction when filtering for pending orders", async () => {
+    actAs('child_user', { subGroup: 'north' });
+    await get('?trackingStatus=pending');
+    const where = lastWhere(prisma.orders.findMany as jest.Mock);
+
+    expect(where.AND[0]).toEqual({ OR: [{ sub_group: 'north' }, { created_by: TEST_USER_ID }] });
+    expect(where.AND[1].OR).toEqual(expect.arrayContaining([{ tracking_status: 'pending' }, { tracking_id: null }]));
+  });
+
+  it('cannot widen access through the subGroup filter', async () => {
+    actAs('child_user', { subGroup: 'north' });
+    expect(await ids(await get('?subGroup=south'))).toEqual([]);
+  });
+
+  it('applies pickup location, courier, status and date filters', async () => {
+    actAs('user');
+    await get('?pickupLocation=a-wh&courierService=dtdc&trackingStatus=delivered&fromDate=2024-01-01&toDate=2024-01-31');
+    expect(lastWhere(prisma.orders.findMany as jest.Mock)).toEqual({
+      clientId: 'client-a',
+      pickup_location: 'a-wh',
+      courier_service: 'dtdc',
+      tracking_status: 'delivered',
+      created_at: { gte: new Date('2024-01-01'), lte: new Date('2024-01-31T23:59:59.999Z') },
+    });
+  });
+
+  it('paginates and parses stored products', async () => {
+    actAs('user');
+    const response = await get('?page=2&limit=1');
+    const body = await response.json();
+
+    expect((prisma.orders.findMany as jest.Mock).mock.calls[0][0]).toMatchObject({ skip: 1, take: 1, orderBy: { created_at: 'desc' } });
+    expect(body.orders).toEqual([expect.objectContaining({ id: 2, products: [{ sku: 'SKU-1', quantity: 2 }] })]);
+    expect(body.pagination).toEqual({ currentPage: 2, totalPages: 3, totalCount: 3, hasNextPage: true, hasPrevPage: true });
+  });
+
+  it('returns 500 when the query fails', async () => {
+    actAs('user');
+    (prisma.orders.findMany as jest.Mock).mockRejectedValue(new Error('db down'));
+    const response = await get();
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'Failed to fetch orders' });
+  });
+});
+
+describe('DELETE /api/orders', () => {
+  const deletedIds = () => (prisma.orders.delete as jest.Mock).mock.calls.map(([args]) => args.where.id);
+
+  it('rejects unauthenticated callers', async () => {
+    const response = await del({ orderIds: [1] }, false);
+    expect(response.status).toBe(401);
+    expect(prisma.writeCalls()).toEqual([]);
+  });
+
+  it.each([[{}], [{ orderIds: [] }], [{ orderIds: '1' }]])('requires a non-empty orderIds array (%p)', async (body) => {
+    actAs('user');
+    const response = await del(body);
+    expect(response.status).toBe(400);
+    expect(prisma.orders.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each([[[1, 'abc']], [[0]], [[-3]]])('rejects invalid order ids %p', async (orderIds) => {
+    actAs('user');
+    const response = await del({ orderIds });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'All order IDs must be valid positive integers' });
+    expect(prisma.writeCalls()).toEqual([]);
+  });
+
+  it("refuses to delete another tenant's order, even alongside the caller's own", async () => {
+    actAs('client_admin');
+    const response = await del({ orderIds: [1, 9] });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Some orders not found or do not belong to your client' });
+    expect(lastWhere(prisma.orders.findMany as jest.Mock)).toMatchObject({ clientId: 'client-a' });
+    expect(prisma.writeCalls()).toEqual([]);
+    expect(delhivery.cancelOrder).not.toHaveBeenCalled();
+  });
+
+  it('limits child users to orders in their sub-group or their own', async () => {
+    actAs('child_user', { subGroup: 'north' });
+    const denied = await del({ orderIds: [3] });
+    expect(denied.status).toBe(404);
+    expect(await denied.json()).toEqual({ error: 'Some orders not found or you do not have permission to delete them' });
+    expect(prisma.writeCalls()).toEqual([]);
+
+    const allowed = await del({ orderIds: [1, 2] });
+    expect(allowed.status).toBe(200);
+    expect(deletedIds()).toEqual([1, 2]);
+  });
+
+  it("deletes the caller's orders and cancels their Delhivery waybills with the order tenant", async () => {
+    actAs('user');
+    const response = await del({ orderIds: [1, 3] });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(deletedIds()).toEqual([1, 3]);
+    expect(delhivery.cancelOrder).toHaveBeenCalledTimes(1);
+    expect(delhivery.cancelOrder).toHaveBeenCalledWith('AWB-1', 'a-wh', 'client-a');
+    expect(body).toMatchObject({
+      success: true,
+      deletedCount: 2,
+      delhiveryCancellations: [{ orderId: 1, waybill: 'AWB-1', success: true }],
+    });
+  });
+
+  it('still deletes when a Delhivery cancellation fails, and reports it', async () => {
+    actAs('user');
+    delhivery.cancelOrder.mockRejectedValue(new Error('carrier down'));
+    const body = await (await del({ orderIds: [1] })).json();
+
+    expect(deletedIds()).toEqual([1]);
+    expect(body.delhiveryCancellations).toEqual([{ orderId: 1, waybill: 'AWB-1', success: false, message: 'Error cancelling Delhivery order' }]);
+  });
+
+  it("restores catalog inventory with the tenant's catalog credentials", async () => {
+    actAs('user');
+    (prisma.clients.findUnique as jest.Mock).mockResolvedValue({ id: 'client-a', slug: 'acme', name: 'Acme' });
+    (getCatalogApiKey as jest.Mock).mockResolvedValue({ catalogApiKey: 'cat-key', catalogClientId: 'cat-client' });
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: { summary: { totalRestored: 2 } } }) });
+
+    const body = await (await del({ orderIds: [2] })).json();
+
+    expect(getCatalogApiKey).toHaveBeenCalledWith('client-a');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/public\/inventory\/restore\?client=acme$/);
+    expect(init.headers).toMatchObject({ 'X-API-Key': 'cat-key', 'X-Client-ID': 'cat-client' });
+    expect(JSON.parse(init.body)).toMatchObject({ orderId: 'scan2ship_order_2', items: [{ sku: 'SKU-1', quantity: 2 }] });
+    expect(body.inventoryRestorations).toEqual([{ orderId: 2, success: true, restoredItems: 2 }]);
+  });
+
+  it('returns 500 when the delete transaction fails', async () => {
+    actAs('user');
+    (prisma.orders.delete as jest.Mock).mockRejectedValue(new Error('db down'));
+    const response = await del({ orderIds: [1] });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'Failed to delete orders' });
   });
 });

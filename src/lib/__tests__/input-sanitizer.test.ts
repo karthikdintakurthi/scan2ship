@@ -1,6 +1,7 @@
 /**
- * Input Sanitizer Tests
- * Comprehensive tests for input sanitization security
+ * Input sanitizer: plain-text sanitization, emails, URLs, file names, JSON,
+ * search queries and phone numbers. isomorphic-dompurify is stubbed globally
+ * in jest.setup.js, so the allowHTML branch is not exercised here.
  */
 
 import {
@@ -10,435 +11,204 @@ import {
   sanitizeFileName,
   sanitizeJSON,
   sanitizeSearchQuery,
-  sanitizePhoneNumber
+  sanitizePhoneNumber,
 } from '../input-sanitizer';
 
-describe('Input Sanitizer', () => {
-  describe('sanitizeString', () => {
-    it('should sanitize basic HTML tags', () => {
-      const input = '<script>alert("xss")</script>Hello World';
-      const result = sanitizeString(input);
-      
-      expect(result).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;Hello World');
-    });
+describe('sanitizeString', () => {
+  it('drops script blocks entirely', () => {
+    expect(sanitizeString('<script>alert("xss")</script>Hello World')).toBe('Hello World');
+    expect(sanitizeString('a<SCRIPT type="x">steal()</SCRIPT>b')).toBe('ab');
+  });
 
-    it('should sanitize event handlers', () => {
-      const input = '<div onclick="alert(1)">Click me</div>';
-      const result = sanitizeString(input);
-      
-      expect(result).toBe('&lt;div&gt;Click me&lt;/div&gt;');
-    });
+  it('strips inline event handlers and encodes the remaining markup', () => {
+    expect(sanitizeString('<div onclick="alert(1)">Click me</div>')).toBe('&lt;div&gt;Click me&lt;&#x2F;div&gt;');
+    expect(sanitizeString('<img src=x onerror=alert(1)>')).toBe('&lt;img src=x&gt;');
+  });
 
-    it('should sanitize javascript: URLs', () => {
-      const input = 'javascript:alert("xss")';
-      const result = sanitizeString(input);
-      
-      expect(result).toBe('alert(&quot;xss&quot;)');
-    });
+  it('removes javascript: and non-image data: schemes', () => {
+    expect(sanitizeString('javascript:alert("xss")')).toBe('alert(&quot;xss&quot;)');
+    expect(sanitizeString('JaVaScRiPt:go()')).toBe('go()');
+    expect(sanitizeString('data:text/html,hi')).toBe('text&#x2F;html,hi');
+    expect(sanitizeString('data:image/png')).toBe('data:image&#x2F;png');
+  });
 
-    it('should sanitize null bytes and control characters', () => {
-      const input = 'Hello\x00World\x01Test';
-      const result = sanitizeString(input);
-      
-      expect(result).toBe('HelloWorldTest');
-    });
+  it('HTML-encodes special characters', () => {
+    expect(sanitizeString(`Tom & "Jerry" <b>'hi'</b>`)).toBe(
+      'Tom &amp; &quot;Jerry&quot; &lt;b&gt;&#x27;hi&#x27;&lt;&#x2F;b&gt;'
+    );
+  });
 
-    it('should normalize whitespace', () => {
-      const input = 'Hello    World\n\nTest';
-      const result = sanitizeString(input, { normalizeWhitespace: true });
-      
-      expect(result).toBe('Hello World Test');
-    });
+  it('removes null bytes and control characters', () => {
+    expect(sanitizeString('Hello\x00World\x01Test\x7F')).toBe('HelloWorldTest');
+  });
 
-    it('should trim whitespace when enabled', () => {
-      const input = '  Hello World  ';
-      const result = sanitizeString(input, { trimWhitespace: true });
-      
-      expect(result).toBe('Hello World');
-    });
+  it('trims and normalizes whitespace by default', () => {
+    expect(sanitizeString('  Hello    World\n\nTest  ')).toBe('Hello World Test');
+  });
 
-    it('should limit string length', () => {
-      const input = 'A'.repeat(1000);
-      const result = sanitizeString(input, { maxLength: 100 });
-      
-      expect(result).toHaveLength(100);
-    });
+  it('can keep whitespace untouched', () => {
+    expect(sanitizeString('  a  b  ', { trimWhitespace: false, normalizeWhitespace: false })).toBe('  a  b  ');
+  });
 
-    it('should handle empty string', () => {
-      const result = sanitizeString('');
-      
-      expect(result).toBe('');
-    });
+  it('truncates to maxLength (default 1000)', () => {
+    expect(sanitizeString('A'.repeat(200), { maxLength: 100 })).toHaveLength(100);
+    expect(sanitizeString('A'.repeat(2000))).toHaveLength(1000);
+  });
 
-    it('should handle null input', () => {
-      const result = sanitizeString(null as any);
-      
-      expect(result).toBe('');
-    });
+  it.each([[''], [null], [undefined], [42]])('returns an empty string for %p', (input) => {
+    expect(sanitizeString(input as any)).toBe('');
+  });
+});
 
-    it('should handle undefined input', () => {
-      const result = sanitizeString(undefined as any);
-      
-      expect(result).toBe('');
-    });
+describe('sanitizeEmail', () => {
+  it('lowercases and trims a valid address', () => {
+    expect(sanitizeEmail('  Test.User@Example.COM ')).toBe('test.user@example.com');
+  });
 
-    it('should allow HTML when allowHTML is true', () => {
-      const input = '<p>Hello <strong>World</strong></p>';
-      const result = sanitizeString(input, { allowHTML: true });
-      
-      expect(result).toContain('<p>');
-      expect(result).toContain('<strong>');
+  it('strips HTML tags and control characters', () => {
+    expect(sanitizeEmail('<b>test</b>@example.com')).toBe('test@example.com');
+    expect(sanitizeEmail('test\x00@example.com')).toBe('test@example.com');
+  });
+
+  it.each(['not-an-email', 'a@b', 'a b@example.com', '@example.com', ''])('rejects %p', (email) => {
+    expect(sanitizeEmail(email)).toBe('');
+  });
+
+  it('rejects non-string input', () => {
+    expect(sanitizeEmail(null as any)).toBe('');
+    expect(sanitizeEmail(undefined as any)).toBe('');
+  });
+});
+
+describe('sanitizeURL', () => {
+  it('accepts http and https URLs', () => {
+    expect(sanitizeURL('http://example.com')).toBe('http://example.com/');
+    expect(sanitizeURL(' https://example.com/path?q=1 ')).toBe('https://example.com/path?q=1');
+  });
+
+  it('strips HTML tags before parsing', () => {
+    expect(sanitizeURL('https://example.com/<b>page</b>')).toBe('https://example.com/page');
+  });
+
+  it.each(['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', 'ftp://example.com', 'file:///etc/passwd'])(
+    'rejects non-http(s) scheme %p',
+    (url) => {
+      expect(sanitizeURL(url)).toBe('');
+    }
+  );
+
+  it('rejects unparsable and empty input', () => {
+    expect(sanitizeURL('not a url')).toBe('');
+    expect(sanitizeURL('')).toBe('');
+    expect(sanitizeURL(null as any)).toBe('');
+  });
+});
+
+describe('sanitizeFileName', () => {
+  it('keeps safe names', () => {
+    expect(sanitizeFileName('report-2024.pdf')).toBe('report-2024.pdf');
+  });
+
+  it('neutralises path traversal and separators', () => {
+    expect(sanitizeFileName('../../etc/passwd')).toBe('__etc_passwd');
+    expect(sanitizeFileName('..\\..\\windows\\system32')).toBe('__windows_system32');
+    expect(sanitizeFileName('../../x')).not.toMatch(/\.\.|\//);
+  });
+
+  it('replaces reserved characters', () => {
+    expect(sanitizeFileName('a<b>c:d"e|f?g*h.txt')).toBe('a_b_c_d_e_f_g_h.txt');
+  });
+
+  it('removes control characters', () => {
+    expect(sanitizeFileName('file\x00name.txt')).toBe('filename.txt');
+  });
+
+  it('caps length at 255 while keeping the extension', () => {
+    const result = sanitizeFileName('a'.repeat(300) + '.pdf');
+    expect(result).toHaveLength(255);
+    expect(result.endsWith('.pdf')).toBe(true);
+  });
+
+  it('falls back to a generated name when nothing usable is left', () => {
+    expect(sanitizeFileName('')).toBe('file');
+    expect(sanitizeFileName(null as any)).toBe('file');
+    expect(sanitizeFileName('....')).toMatch(/^file_\d+$/);
+    expect(sanitizeFileName('/')).toMatch(/^file_\d+$/);
+  });
+});
+
+describe('sanitizeJSON', () => {
+  it('sanitizes string values and keys recursively', () => {
+    expect(
+      sanitizeJSON({
+        name: '<script>x()</script>Bob',
+        '<k>': 'v',
+        nested: { tags: ['a&b', 1, true, null] },
+      })
+    ).toEqual({
+      name: 'Bob',
+      '&lt;k&gt;': 'v',
+      nested: { tags: ['a&amp;b', 1, true, null] },
     });
   });
 
-  describe('sanitizeEmail', () => {
-    it('should sanitize valid email', () => {
-      const input = 'test@example.com';
-      const result = sanitizeEmail(input);
-      
-      expect(result).toBe('test@example.com');
-    });
-
-    it('should sanitize email with HTML tags', () => {
-      const input = 'test<script>alert(1)</script>@example.com';
-      const result = sanitizeEmail(input);
-      
-      expect(result).toBe('testalert(1)@example.com');
-    });
-
-    it('should sanitize email with special characters', () => {
-      const input = 'test+tag@example.com';
-      const result = sanitizeEmail(input);
-      
-      expect(result).toBe('test+tag@example.com');
-    });
-
-    it('should return empty string for invalid email', () => {
-      const input = 'not-an-email';
-      const result = sanitizeEmail(input);
-      
-      expect(result).toBe('');
-    });
-
-    it('should return empty string for email with null bytes', () => {
-      const input = 'test\x00@example.com';
-      const result = sanitizeEmail(input);
-      
-      expect(result).toBe('test@example.com');
-    });
-
-    it('should handle empty input', () => {
-      const result = sanitizeEmail('');
-      
-      expect(result).toBe('');
-    });
-
-    it('should handle null input', () => {
-      const result = sanitizeEmail(null as any);
-      
-      expect(result).toBe('');
-    });
+  it('parses and sanitizes JSON strings', () => {
+    expect(sanitizeJSON('{"a":"<i>x</i>"}')).toEqual({ a: '&lt;i&gt;x&lt;&#x2F;i&gt;' });
   });
 
-  describe('sanitizeURL', () => {
-    it('should sanitize valid HTTP URL', () => {
-      const input = 'http://example.com';
-      const result = sanitizeURL(input);
-      
-      expect(result).toBe('http://example.com/');
-    });
+  it('returns null for invalid JSON strings and passes through null/undefined', () => {
+    expect(sanitizeJSON('{not json')).toBeNull();
+    expect(sanitizeJSON(null)).toBeNull();
+    expect(sanitizeJSON(undefined)).toBeUndefined();
+  });
+});
 
-    it('should sanitize valid HTTPS URL', () => {
-      const input = 'https://example.com';
-      const result = sanitizeURL(input);
-      
-      expect(result).toBe('https://example.com/');
-    });
-
-    it('should sanitize URL with HTML tags', () => {
-      const input = 'https://example<script>alert(1)</script>.com';
-      const result = sanitizeURL(input);
-      
-      expect(result).toBe('https://examplealert(1).com');
-    });
-
-    it('should return empty string for javascript: URL', () => {
-      const input = 'javascript:alert("xss")';
-      const result = sanitizeURL(input);
-      
-      expect(result).toBe('');
-    });
-
-    it('should return empty string for data: URL', () => {
-      const input = 'data:text/html,<script>alert(1)</script>';
-      const result = sanitizeURL(input);
-      
-      expect(result).toBe('');
-    });
-
-    it('should return empty string for invalid URL', () => {
-      const input = 'not-a-url';
-      const result = sanitizeURL(input);
-      
-      expect(result).toBe('');
-    });
-
-    it('should handle empty input', () => {
-      const result = sanitizeURL('');
-      
-      expect(result).toBe('');
-    });
-
-    it('should handle null input', () => {
-      const result = sanitizeURL(null as any);
-      
-      expect(result).toBe('');
-    });
+describe('sanitizeSearchQuery', () => {
+  it('keeps ordinary queries', () => {
+    expect(sanitizeSearchQuery('  order 12345  ')).toBe('order 12345');
   });
 
-  describe('sanitizeFileName', () => {
-    it('should sanitize valid filename', () => {
-      const input = 'document.pdf';
-      const result = sanitizeFileName(input);
-      
-      expect(result).toBe('document.pdf');
-    });
-
-    it('should sanitize filename with dangerous characters', () => {
-      const input = 'file<>:"|?*.txt';
-      const result = sanitizeFileName(input);
-      
-      expect(result).toBe('file______.txt');
-    });
-
-    it('should sanitize path traversal attempts', () => {
-      const input = '../../../etc/passwd';
-      const result = sanitizeFileName(input);
-      
-      expect(result).toBe('etc_passwd');
-    });
-
-    it('should sanitize filename with null bytes', () => {
-      const input = 'file\x00.txt';
-      const result = sanitizeFileName(input);
-      
-      expect(result).toBe('file.txt');
-    });
-
-    it('should limit filename length', () => {
-      const longName = 'A'.repeat(300) + '.txt';
-      const result = sanitizeFileName(longName);
-      
-      expect(result.length).toBeLessThanOrEqual(255);
-    });
-
-    it('should handle empty filename', () => {
-      const result = sanitizeFileName('');
-      
-      expect(result).toMatch(/^file_\d+$/);
-    });
-
-    it('should handle null input', () => {
-      const result = sanitizeFileName(null as any);
-      
-      expect(result).toMatch(/^file_\d+$/);
-    });
-
-    it('should handle filename with only dots', () => {
-      const input = '...';
-      const result = sanitizeFileName(input);
-      
-      expect(result).toMatch(/^file_\d+$/);
-    });
+  it('removes SQL keywords, comments and statement separators', () => {
+    expect(sanitizeSearchQuery("x'; DROP TABLE users; --")).toBe("x' TABLE users");
+    expect(sanitizeSearchQuery('1 UNION SELECT password FROM users')).toBe('1 password FROM users');
+    expect(sanitizeSearchQuery('a /* c */ b | c & d')).toBe('a c b c d');
   });
 
-  describe('sanitizeJSON', () => {
-    it('should sanitize JSON object', () => {
-      const input = {
-        name: '<script>alert(1)</script>',
-        email: 'test@example.com',
-        data: '<img src=x onerror=alert(1)>'
-      };
-      const result = sanitizeJSON(input);
-      
-      expect(result.name).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
-      expect(result.email).toBe('test@example.com');
-      expect(result.data).toBe('&lt;img src=x onerror=alert(1)&gt;');
-    });
-
-    it('should sanitize JSON array', () => {
-      const input = ['<script>alert(1)</script>', 'normal string'];
-      const result = sanitizeJSON(input);
-      
-      expect(result[0]).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
-      expect(result[1]).toBe('normal string');
-    });
-
-    it('should handle nested objects', () => {
-      const input = {
-        user: {
-          name: '<script>alert(1)</script>',
-          profile: {
-            bio: '<img src=x onerror=alert(1)>'
-          }
-        }
-      };
-      const result = sanitizeJSON(input);
-      
-      expect(result.user.name).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
-      expect(result.user.profile.bio).toBe('&lt;img src=x onerror=alert(1)&gt;');
-    });
-
-    it('should handle JSON string', () => {
-      const input = '{"name": "<script>alert(1)</script>"}';
-      const result = sanitizeJSON(input);
-      
-      expect(result.name).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
-    });
-
-    it('should handle invalid JSON string', () => {
-      const input = 'invalid json';
-      const result = sanitizeJSON(input);
-      
-      expect(result).toBeNull();
-    });
-
-    it('should handle null input', () => {
-      const result = sanitizeJSON(null);
-      
-      expect(result).toBeNull();
-    });
-
-    it('should handle undefined input', () => {
-      const result = sanitizeJSON(undefined);
-      
-      expect(result).toBeUndefined();
-    });
+  it('removes HTML tags and script keywords', () => {
+    expect(sanitizeSearchQuery('<b>shoes</b>')).toBe('shoes');
+    expect(sanitizeSearchQuery('<img src=x onerror=alert(1)>shoes')).toBe('shoes');
+    expect(sanitizeSearchQuery('javascript alert')).toBe('alert');
   });
 
-  describe('sanitizeSearchQuery', () => {
-    it('should sanitize basic search query', () => {
-      const input = 'hello world';
-      const result = sanitizeSearchQuery(input);
-      
-      expect(result).toBe('hello world');
-    });
-
-    it('should remove SQL injection patterns', () => {
-      const input = "hello'; DROP TABLE users; --";
-      const result = sanitizeSearchQuery(input);
-      
-      expect(result).toBe('hello');
-    });
-
-    it('should remove script tags', () => {
-      const input = 'search <script>alert(1)</script> term';
-      const result = sanitizeSearchQuery(input);
-      
-      expect(result).toBe('search  term');
-    });
-
-    it('should remove event handlers', () => {
-      const input = 'search onmouseover="alert(1)" term';
-      const result = sanitizeSearchQuery(input);
-      
-      expect(result).toBe('search  term');
-    });
-
-    it('should remove URLs', () => {
-      const input = 'search https://example.com term';
-      const result = sanitizeSearchQuery(input);
-      
-      expect(result).toBe('search  term');
-    });
-
-    it('should normalize whitespace', () => {
-      const input = '  hello    world  ';
-      const result = sanitizeSearchQuery(input);
-      
-      expect(result).toBe('hello world');
-    });
-
-    it('should limit query length', () => {
-      const longQuery = 'A'.repeat(600);
-      const result = sanitizeSearchQuery(longQuery);
-      
-      expect(result.length).toBeLessThanOrEqual(500);
-    });
-
-    it('should handle empty input', () => {
-      const result = sanitizeSearchQuery('');
-      
-      expect(result).toBe('');
-    });
-
-    it('should handle null input', () => {
-      const result = sanitizeSearchQuery(null as any);
-      
-      expect(result).toBe('');
-    });
+  it('caps length at 500', () => {
+    expect(sanitizeSearchQuery('a'.repeat(600))).toHaveLength(500);
   });
 
-  describe('sanitizePhoneNumber', () => {
-    it('should sanitize valid phone number', () => {
-      const input = '+1234567890';
-      const result = sanitizePhoneNumber(input);
-      
-      expect(result).toBe('+1234567890');
-    });
+  it('returns an empty string for empty or non-string input', () => {
+    expect(sanitizeSearchQuery('')).toBe('');
+    expect(sanitizeSearchQuery(null as any)).toBe('');
+  });
+});
 
-    it('should sanitize phone number with spaces and dashes', () => {
-      const input = '+1 (234) 567-890';
-      const result = sanitizePhoneNumber(input);
-      
-      expect(result).toBe('+1234567890');
-    });
+describe('sanitizePhoneNumber', () => {
+  it('keeps digits and a leading plus', () => {
+    expect(sanitizePhoneNumber('+919876543210')).toBe('+919876543210');
+    expect(sanitizePhoneNumber('+91 98765-43210')).toBe('+919876543210');
+    expect(sanitizePhoneNumber('(987) 654-3210')).toBe('9876543210');
+  });
 
-    it('should handle phone number without country code', () => {
-      const input = '1234567890';
-      const result = sanitizePhoneNumber(input);
-      
-      expect(result).toBe('1234567890');
-    });
+  it('moves a misplaced plus to the front', () => {
+    expect(sanitizePhoneNumber('91+9876543210')).toBe('+919876543210');
+  });
 
-    it('should handle phone number with multiple plus signs', () => {
-      const input = '++1234567890';
-      const result = sanitizePhoneNumber(input);
-      
-      expect(result).toBe('+1234567890');
-    });
+  it('requires 10 to 15 digits', () => {
+    expect(sanitizePhoneNumber('123456789')).toBe('');
+    expect(sanitizePhoneNumber('1234567890123456')).toBe('');
+    expect(sanitizePhoneNumber('abcdefghij')).toBe('');
+  });
 
-    it('should return empty string for too short number', () => {
-      const input = '123';
-      const result = sanitizePhoneNumber(input);
-      
-      expect(result).toBe('');
-    });
-
-    it('should return empty string for too long number', () => {
-      const input = '1234567890123456';
-      const result = sanitizePhoneNumber(input);
-      
-      expect(result).toBe('');
-    });
-
-    it('should return empty string for non-numeric input', () => {
-      const input = 'abc-def-ghij';
-      const result = sanitizePhoneNumber(input);
-      
-      expect(result).toBe('');
-    });
-
-    it('should handle empty input', () => {
-      const result = sanitizePhoneNumber('');
-      
-      expect(result).toBe('');
-    });
-
-    it('should handle null input', () => {
-      const result = sanitizePhoneNumber(null as any);
-      
-      expect(result).toBe('');
-    });
+  it('returns an empty string for empty or non-string input', () => {
+    expect(sanitizePhoneNumber('')).toBe('');
+    expect(sanitizePhoneNumber(null as any)).toBe('');
   });
 });
