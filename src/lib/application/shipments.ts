@@ -326,30 +326,43 @@ export async function createShipment(principal: McpPrincipal, previewId: string)
 
   // The order exists but its carrier details were not saved: it is charged, so
   // it must be reconciled rather than retried.
-  const orderId = typeof outcome.body.orderId === 'number' ? outcome.body.orderId : null;
-  // Delhivery may have booked it (timeout, 5xx): not a failure, and not safe to retry
-  const outcomeUnknown = outcome.body.outcome === 'unknown';
-  const reason = [outcome.body.error, outcome.body.details].filter(Boolean).join(': ');
+  const body = outcome.body;
+  const orderId = typeof body.orderId === 'number' ? body.orderId : null;
+  // Delhivery may have booked it (timeout, 5xx, uncancelled waybill): not a failure, and not safe to retry
+  const outcomeUnknown = body.outcome === 'unknown';
+  const reason = [body.error, body.details].filter(Boolean).join(': ');
+  const text = (value: unknown) => (typeof value === 'string' && value ? value : null);
+  // Kept on the operation so a later get_shipment_operation still has what is
+  // needed to reconcile, and the truth about the credit
+  const result = {
+    ...(text(body.reference) ? { referenceNumber: text(body.reference) } : {}),
+    ...(text(body.waybill) ? { waybill: text(body.waybill) } : {}),
+    ...(text(body.transactionId) ? { creditTransactionId: text(body.transactionId) } : {}),
+    ...(outcomeUnknown ? { creditsCharged: operation.creditCost, creditsRefunded: false } : {}),
+    ...(typeof body.creditRefunded === 'boolean'
+      ? {
+          creditsRefunded: body.creditRefunded,
+          ...(body.creditRefunded
+            ? {}
+            : { creditNote: 'The credit could not be refunded automatically. The user should contact Scan2Ship support to have it returned.' }),
+        }
+      : {}),
+  };
   const updated = await prisma.shipment_operations.update({
     where: { id: operation.id },
     data: {
       status: orderId || outcomeUnknown ? 'reconciliation_required' : 'failed',
       orderId,
       error: reason || 'Order could not be created',
+      ...(Object.keys(result).length > 0 ? { result } : {}),
     },
   });
   return {
     ...operationView(updated),
     ...(outcome.status === 402 ? { hint: 'Not enough credits. The user can recharge in Scan2Ship, then prepare the shipment again.' } : {}),
-    // Only a charge that was actually refunded is reported as refunded
-    ...(typeof outcome.body.creditRefunded === 'boolean'
-      ? {
-          creditsRefunded: outcome.body.creditRefunded,
-          ...(outcome.body.creditRefunded
-            ? {}
-            : { creditNote: 'The credit could not be refunded automatically. The user should contact Scan2Ship support to have it returned.' }),
-        }
-      : {}),
+    // Top-level copies of the credit fields, as returned before they were also stored
+    ...('creditsRefunded' in result ? { creditsRefunded: result.creditsRefunded } : {}),
+    ...('creditNote' in result ? { creditNote: result.creditNote } : {}),
   };
 }
 

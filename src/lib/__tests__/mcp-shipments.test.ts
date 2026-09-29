@@ -291,8 +291,36 @@ describe('create_shipment', () => {
   it('marks an unknown Delhivery outcome for reconciliation, not failure', async () => {
     createOrderMock.mockResolvedValue({ ok: false, status: 502, body: { outcome: 'unknown', error: 'Delhivery did not confirm the booking', details: 'Check Delhivery' } });
     const result = await createShipment(principalFor(), await preview());
-    expect(result).toMatchObject({ status: 'reconciliation_required', orderId: null, note: expect.stringMatching(/do not create a duplicate/) });
-    expect(result).not.toHaveProperty('creditsRefunded');
+    expect(result).toMatchObject({ status: 'reconciliation_required', orderId: null, note: expect.stringMatching(/do not create a duplicate/), creditsRefunded: false });
+  });
+
+  it('keeps reconciliation details and the credit outcome for later status checks', async () => {
+    createOrderMock.mockResolvedValue({
+      ok: false,
+      status: 502,
+      body: { outcome: 'unknown', error: 'The order could not be saved and its Delhivery waybill could not be cancelled', waybill: 'WB-9', reference: 'REF-X-9876543210', transactionId: 'txn-1', creditRefunded: false },
+    });
+    const id = await preview();
+    await createShipment(principalFor(), id);
+
+    expect(await getShipmentOperation(principalFor(), id)).toMatchObject({
+      status: 'reconciliation_required',
+      result: { waybill: 'WB-9', referenceNumber: 'REF-X-9876543210', creditTransactionId: 'txn-1', creditsCharged: 1, creditsRefunded: false, creditNote: expect.any(String) },
+    });
+  });
+
+  it('keeps a refund outcome for later status checks', async () => {
+    createOrderMock.mockResolvedValue({ ok: false, status: 400, body: { error: 'Delhivery API failed', creditRefunded: true } });
+    const id = await preview();
+    await createShipment(principalFor(), id);
+    expect(await getShipmentOperation(principalFor(), id)).toMatchObject({ status: 'failed', result: { creditsRefunded: true } });
+  });
+
+  it('keeps the waybill of a saved order whose carrier details were lost', async () => {
+    createOrderMock.mockResolvedValue({ ok: false, status: 500, body: { error: 'Order was created but its carrier details could not be saved', orderId: 88, waybill: 'WB-7' } });
+    const id = await preview();
+    await createShipment(principalFor(), id);
+    expect(await getShipmentOperation(principalFor(), id)).toMatchObject({ orderId: 88, result: { waybill: 'WB-7' } });
   });
 
   it('marks an unexpected failure for reconciliation instead of retrying', async () => {
