@@ -30,9 +30,6 @@ const LIST_SELECT = {
   city: true,
   state: true,
   pincode: true,
-  // Read only to mask them inside reference numbers; not returned by list results
-  mobile: true,
-  reseller_mobile: true,
 } satisfies Prisma.ordersSelect;
 
 const DETAIL_SELECT = {
@@ -106,20 +103,20 @@ function maskPhone(mobile: string | null): string | null {
  * some are only the mobile), so without customers:read the mobile digits are
  * masked the same way as the mobile field. The rest of the reference stays.
  */
-export function maskReference(reference: string | null, phones: Array<string | null>): string | null {
+/**
+ * Masks phone numbers inside a reference (e.g. REF-...-9876543210). Masks any run
+ * of 10+ digits, not just the order's current numbers: a reference keeps the
+ * mobile it was created with, which may since have been edited.
+ */
+export function maskReference(reference: string | null): string | null {
   if (!reference) return reference;
-  let masked = reference;
-  for (const phone of phones) {
-    const digits = (phone ?? '').replace(/\D/g, '').slice(-10);
-    if (digits.length === 10) masked = masked.split(digits).join(maskPhone(digits)!);
-  }
-  return masked;
+  return reference.replace(/\d{10,}/g, (digits) => '*'.repeat(digits.length - 4) + digits.slice(-4));
 }
 
 function toListItem(row: ListRow, includePii: boolean): OrderListItem {
   return {
     id: row.id,
-    referenceNumber: includePii ? row.reference_number : maskReference(row.reference_number, [row.mobile, row.reseller_mobile]),
+    referenceNumber: includePii ? row.reference_number : maskReference(row.reference_number),
     trackingId: row.tracking_id,
     trackingStatus: row.tracking_status,
     courierService: row.courier_service,

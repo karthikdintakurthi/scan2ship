@@ -194,10 +194,19 @@ describe('MCP read services', () => {
       expect((await getOrder(actor(UserRole.USER), 1, ['orders:read', 'customers:read'])).referenceNumber).toBe('REF-AB12CD-9876543210');
     });
 
-    it('masks reseller mobiles too, and leaves references without a mobile alone', () => {
-      expect(maskReference('INV-42-9123456789', ['9876543210', '+91 91234 56789'])).toBe('INV-42-******6789');
-      expect(maskReference('INV-42', ['9876543210'])).toBe('INV-42');
-      expect(maskReference(null, ['9876543210'])).toBeNull();
+    it('masks a mobile the order no longer has, after the customer number was edited', async () => {
+      (prisma.orders.findFirst as jest.Mock).mockResolvedValue({ ...ORDERS[0], mobile: '9000000001', reference_number: 'REF-AB12CD-9876543210' });
+      const detail = await getOrder(actor(UserRole.USER), 1, ['orders:read']);
+      expect(detail.referenceNumber).toBe('REF-AB12CD-******3210');
+      expect(JSON.stringify(detail)).not.toContain('9876543210');
+    });
+
+    it('masks any long digit run, with or without a country code, and leaves short ones alone', () => {
+      expect(maskReference('INV-42-9123456789')).toBe('INV-42-******6789');
+      expect(maskReference('REF-919876543210')).toBe('REF-********3210');
+      expect(maskReference('INV-42-123456789')).toBe('INV-42-123456789');
+      expect(maskReference('INV-42')).toBe('INV-42');
+      expect(maskReference(null)).toBeNull();
     });
   });
 
