@@ -15,7 +15,7 @@ jest.mock('@/lib/persistent-rate-limiter', () => ({
 import { prisma as realPrisma } from '@/lib/prisma';
 import { ROLE_PERMISSIONS, UserRole, type AuthenticatedUser } from '@/lib/auth-middleware';
 import { getCreditBalanceReadOnly } from '@/lib/application/credits';
-import { getOrder, searchOrders } from '@/lib/application/orders';
+import { getOrder, maskReference, searchOrders } from '@/lib/application/orders';
 import { quoteShipping } from '@/lib/application/shipping';
 import { executeMcpTool } from '@/lib/mcp/tools';
 import type { McpPrincipal } from '@/lib/mcp/principal';
@@ -162,6 +162,42 @@ describe('MCP read services', () => {
   it('executeMcpTool denies a tool when the grant lacks the scope', async () => {
     await expect(executeMcpTool(principalFor(actor(UserRole.USER), ['orders:read']), 'get_credit_balance', {})).rejects.toMatchObject({
       code: 'insufficient_scope',
+    });
+  });
+
+  describe('reference numbers carry the customer mobile', () => {
+    // Generated references end in the customer mobile; some are only the mobile
+    const withMobileRef = (reference: string) => {
+      (prisma.orders.findMany as jest.Mock).mockResolvedValue([{ ...ORDERS[0], reference_number: reference }]);
+      (prisma.orders.findFirst as jest.Mock).mockResolvedValue({ ...ORDERS[0], reference_number: reference });
+    };
+
+    it('masks the mobile inside references without customers:read, keeping the rest', async () => {
+      withMobileRef('REF-AB12CD-9876543210');
+      const list = await executeMcpTool(principalFor(actor(UserRole.USER), ['orders:read']), 'search_orders', { limit: 20 });
+      const detail = await getOrder(actor(UserRole.USER), 1, ['orders:read']);
+
+      expect((list.structured as { orders: Array<{ referenceNumber: string }> }).orders[0].referenceNumber).toBe('REF-AB12CD-******3210');
+      expect(detail.referenceNumber).toBe('REF-AB12CD-******3210');
+      expect(JSON.stringify(list.structured)).not.toContain('9876543210');
+    });
+
+    it('masks a reference that is only the mobile', async () => {
+      withMobileRef('9876543210');
+      expect((await getOrder(actor(UserRole.USER), 1, ['orders:read'])).referenceNumber).toBe('******3210');
+    });
+
+    it('shows the full reference with customers:read', async () => {
+      withMobileRef('REF-AB12CD-9876543210');
+      const list = await executeMcpTool(principalFor(actor(UserRole.USER), ['orders:read', 'customers:read']), 'search_orders', { limit: 20 });
+      expect((list.structured as { orders: Array<{ referenceNumber: string }> }).orders[0].referenceNumber).toBe('REF-AB12CD-9876543210');
+      expect((await getOrder(actor(UserRole.USER), 1, ['orders:read', 'customers:read'])).referenceNumber).toBe('REF-AB12CD-9876543210');
+    });
+
+    it('masks reseller mobiles too, and leaves references without a mobile alone', () => {
+      expect(maskReference('INV-42-9123456789', ['9876543210', '+91 91234 56789'])).toBe('INV-42-******6789');
+      expect(maskReference('INV-42', ['9876543210'])).toBe('INV-42');
+      expect(maskReference(null, ['9876543210'])).toBeNull();
     });
   });
 

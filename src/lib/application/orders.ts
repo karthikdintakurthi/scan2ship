@@ -30,6 +30,9 @@ const LIST_SELECT = {
   city: true,
   state: true,
   pincode: true,
+  // Read only to mask them inside reference numbers; not returned by list results
+  mobile: true,
+  reseller_mobile: true,
 } satisfies Prisma.ordersSelect;
 
 const DETAIL_SELECT = {
@@ -98,10 +101,25 @@ function maskPhone(mobile: string | null): string | null {
   return `${'*'.repeat(digits.length - 4)}${digits.slice(-4)}`;
 }
 
-function toListItem(row: ListRow): OrderListItem {
+/**
+ * Reference numbers embed the customer's mobile (generated ones end in it, and
+ * some are only the mobile), so without customers:read the mobile digits are
+ * masked the same way as the mobile field. The rest of the reference stays.
+ */
+export function maskReference(reference: string | null, phones: Array<string | null>): string | null {
+  if (!reference) return reference;
+  let masked = reference;
+  for (const phone of phones) {
+    const digits = (phone ?? '').replace(/\D/g, '').slice(-10);
+    if (digits.length === 10) masked = masked.split(digits).join(maskPhone(digits)!);
+  }
+  return masked;
+}
+
+function toListItem(row: ListRow, includePii: boolean): OrderListItem {
   return {
     id: row.id,
-    referenceNumber: row.reference_number,
+    referenceNumber: includePii ? row.reference_number : maskReference(row.reference_number, [row.mobile, row.reseller_mobile]),
     trackingId: row.tracking_id,
     trackingStatus: row.tracking_status,
     courierService: row.courier_service,
@@ -119,7 +137,7 @@ function toListItem(row: ListRow): OrderListItem {
 
 function toDetail(row: DetailRow, includePii: boolean): OrderDetail {
   return {
-    ...toListItem(row),
+    ...toListItem(row, includePii),
     country: row.country,
     totalItems: row.total_items,
     productDescription: row.product_description,
@@ -133,7 +151,8 @@ function toDetail(row: DetailRow, includePii: boolean): OrderDetail {
 
 export async function searchOrders(
   user: AuthenticatedUser,
-  input: SearchOrdersInput
+  input: SearchOrdersInput,
+  scopes: readonly McpScope[] | readonly string[] = []
 ): Promise<{ orders: OrderListItem[]; nextCursor: string | null; hasMore: boolean }> {
   const access = await orderAccessWhere(user);
   const filters: Prisma.ordersWhereInput[] = [access];
@@ -191,7 +210,7 @@ export async function searchOrders(
   const page = hasMore ? rows.slice(0, limit) : rows;
   const last = page[page.length - 1];
   return {
-    orders: page.map(toListItem),
+    orders: page.map((row) => toListItem(row, hasScope(scopes, 'customers:read'))),
     nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
     hasMore,
   };

@@ -201,7 +201,7 @@ export async function executeMcpTool(
         break;
       case 'search_orders': {
         const input = searchOrdersInputSchema.parse(rawArgs ?? {});
-        structured = await searchOrders(principal.user, input);
+        structured = await searchOrders(principal.user, input, principal.scopes);
         break;
       }
       case 'get_order': {
