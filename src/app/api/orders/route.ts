@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { DelhiveryService } from '@/lib/delhivery';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
-import { getCatalogApiKey } from '@/lib/cross-app-auth';
 import { parseOrderId } from '@/lib/application/policy';
 import { createOrder } from '@/lib/application/order-creation';
 
@@ -377,7 +376,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if all orders belong to the authenticated client (security check)
-    // Also fetch courier service, tracking details, and products for Delhivery cancellation and inventory restoration
+    // Also fetch courier service and tracking details for Delhivery cancellation
     const user = authResult.user!;
     
     // Build where clause with client isolation and role-based filtering
@@ -425,8 +424,7 @@ export async function DELETE(request: NextRequest) {
         courier_service: true,
         tracking_id: true,
         pickup_location: true,
-        clientId: true,
-        products: true // Include products for inventory restoration
+        clientId: true
       }
     });
 
@@ -476,114 +474,6 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    console.log(`🔍 [API_ORDERS_DELETE] About to start inventory restoration logic`);
-    // Restore inventory for orders with products from catalog app
-    console.log(`🔄 [API_ORDERS_DELETE] Starting inventory restoration for ${existingOrders.length} orders`);
-    const inventoryRestoreResults = [];
-    
-    // Fetch complete client data for inventory operations
-    let fullClient: typeof client = client;
-    try {
-      fullClient = (await prisma.clients.findUnique({
-        where: { id: client.id },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          companyName: true,
-          isActive: true,
-          subscriptionStatus: true,
-          subscriptionExpiresAt: true
-        }
-      })) ?? client;
-      console.log('🔍 [API_ORDERS_DELETE] Full client data:', fullClient);
-    } catch (error) {
-      console.error('Error fetching full client data:', error);
-      // Fallback to original client data
-      fullClient = client;
-    }
-    
-    for (const order of existingOrders) {
-      if (order.products) {
-        try {
-          const products = typeof order.products === 'string' ? JSON.parse(order.products) : order.products;
-          if (Array.isArray(products) && products.length > 0) {
-            console.log(`🔄 [API_ORDERS_DELETE] Restoring inventory for order ${order.id} with ${products.length} products`);
-            
-            // Get catalog auth for this client
-            const catalogAuth = await getCatalogApiKey(fullClient.id);
-            if (catalogAuth) {
-              // Prepare inventory restoration data
-              const inventoryItems = products.map((item: any) => ({
-                sku: item.product?.sku || item.sku,
-                quantity: item.quantity || 1
-              })).filter(item => item.sku); // Only include items with valid SKUs
-
-              if (inventoryItems.length > 0) {
-                // Call catalog app to restore inventory
-                const catalogUrl = process.env.CATALOG_APP_URL || 'http://localhost:3000';
-                let clientSlug = fullClient.slug;
-                if (!clientSlug) {
-                  // Generate slug from company name or name
-                  const baseName = fullClient.companyName || fullClient.name || 'default-client';
-                  clientSlug = baseName.toLowerCase()
-                    .replace(/\s+/g, '-')
-                    .replace(/[^a-z0-9-]/g, '')
-                    .replace(/-+/g, '-')
-                    .replace(/^-|-$/g, '');
-                }
-                
-                console.log('🔍 [API_ORDERS_DELETE] Generated client slug:', clientSlug);
-                
-                if (clientSlug) {
-                  const restoreResponse = await fetch(`${catalogUrl}/api/public/inventory/restore?client=${clientSlug}`, {
-                    method: 'POST',
-                    headers: {
-                      'X-API-Key': catalogAuth.catalogApiKey,
-                      'X-Client-ID': catalogAuth.catalogClientId,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      orderId: `scan2ship_order_${order.id}`,
-                      items: inventoryItems,
-                      reason: 'order_deletion',
-                      webhookId: null
-                    }),
-                  });
-
-                  if (restoreResponse.ok) {
-                    const restoreData = await restoreResponse.json();
-                    console.log(`✅ [API_ORDERS_DELETE] Successfully restored inventory for order ${order.id}:`, restoreData.data.summary);
-                    inventoryRestoreResults.push({
-                      orderId: order.id,
-                      success: true,
-                      restoredItems: restoreData.data.summary.totalRestored
-                    });
-                  } else {
-                    const errorData = await restoreResponse.json();
-                    console.error(`❌ [API_ORDERS_DELETE] Failed to restore inventory for order ${order.id}:`, errorData);
-                    inventoryRestoreResults.push({
-                      orderId: order.id,
-                      success: false,
-                      error: errorData.error
-                    });
-                  }
-                } else {
-                  console.warn(`⚠️ [API_ORDERS_DELETE] No client slug available for inventory restoration for order ${order.id}`);
-                }
-              } else {
-                console.log(`ℹ️ [API_ORDERS_DELETE] No valid SKUs found for inventory restoration in order ${order.id}`);
-              }
-            } else {
-              console.log(`ℹ️ [API_ORDERS_DELETE] No catalog auth found for client ${client.id}, skipping inventory restoration for order ${order.id}`);
-            }
-          }
-        } catch (parseError) {
-          console.error(`❌ [API_ORDERS_DELETE] Error parsing products for order ${order.id}:`, parseError);
-        }
-      }
-    }
-
     // Delete all orders in a transaction
     const deleteResult = await prisma.$transaction(async (tx) => {
       const deletedOrders = [];
@@ -610,8 +500,7 @@ export async function DELETE(request: NextRequest) {
         mobile: order.mobile,
         tracking_id: order.tracking_id
       })),
-      delhiveryCancellations: delhiveryCancelResults,
-      inventoryRestorations: inventoryRestoreResults
+      delhiveryCancellations: delhiveryCancelResults
     });
 
   } catch (error) {

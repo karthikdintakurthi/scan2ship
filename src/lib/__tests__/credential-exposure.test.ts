@@ -13,12 +13,10 @@ jest.mock('@/lib/security-middleware', () => ({
 
 import fs from 'node:fs';
 import { prisma as realPrisma } from '@/lib/prisma';
-import { resolveSubmittedApiKey, toCrossAppMappingDto, toPickupLocationDto } from '@/lib/application/credential-dto';
+import { resolveSubmittedApiKey, toPickupLocationDto } from '@/lib/application/credential-dto';
 import { authUserRow, signedRequest } from '@/test-utils/auth-request';
 import type { createPrismaMock } from '@/test-utils/prisma-mock';
 import { GET as listPickupLocations } from '@/app/api/pickup-locations/route';
-import { GET as listMappings, POST as createMapping } from '@/app/api/admin/cross-app-mappings/route';
-import { PUT as updateMapping, DELETE as deleteMapping } from '@/app/api/admin/cross-app-mappings/[id]/route';
 import { GET as getClientSettings, PUT as putClientSettings } from '@/app/api/admin/settings/clients/[id]/route';
 import { GET as listClientConfigurations } from '@/app/api/admin/client-configurations/route';
 
@@ -28,21 +26,11 @@ const { join } = jest.requireActual('path');
 const prisma = realPrisma as unknown as ReturnType<typeof createPrismaMock>;
 
 const DELHIVERY_KEY = 'dlv-secret-0123456789abcdef';
-const CATALOG_KEY = 'cat-secret-fedcba9876543210';
 
 const PICKUPS = [
   { id: 'p1', clientId: 'client-a', value: 'north', label: 'North', delhiveryApiKey: DELHIVERY_KEY },
   { id: 'p2', clientId: 'client-a', value: 'south', label: 'South', delhiveryApiKey: null },
 ];
-const MAPPING = {
-  id: 'map-1',
-  scan2shipClientId: 'client-a',
-  catalogClientId: 'cat-1',
-  catalogApiKey: CATALOG_KEY,
-  isActive: true,
-  scan2shipClient: { id: 'client-a', name: 'A', companyName: 'A', email: 'a@test', isActive: true },
-};
-
 function actAs(role: string, clientId = 'client-a') {
   (prisma.users.findUnique as jest.Mock).mockResolvedValue(authUserRow(role, clientId));
 }
@@ -64,7 +52,6 @@ beforeEach(() => {
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
   (prisma.pickup_locations.findMany as jest.Mock).mockResolvedValue(PICKUPS);
-  (prisma.cross_app_mappings.findMany as jest.Mock).mockResolvedValue([MAPPING]);
 });
 
 afterEach(() => {
@@ -78,11 +65,6 @@ describe('credential DTO helpers', () => {
     expect(toPickupLocationDto({ id: 'p3', delhiveryApiKey: '   ' })).toEqual({ id: 'p3', hasApiKey: false });
     const withoutKeyField: { id: string; delhiveryApiKey?: string | null } = { id: 'p4' };
     expect(toPickupLocationDto(withoutKeyField)).toEqual({ id: 'p4', hasApiKey: false });
-  });
-
-  it('replace the Catalog key with hasApiKey', () => {
-    expect(toCrossAppMappingDto({ id: 'm', catalogApiKey: CATALOG_KEY })).toEqual({ id: 'm', hasApiKey: true });
-    expect(toCrossAppMappingDto({ id: 'm', catalogApiKey: '' })).toEqual({ id: 'm', hasApiKey: false });
   });
 
   describe('resolveSubmittedApiKey', () => {
@@ -127,91 +109,6 @@ describe('GET /api/pickup-locations', () => {
       expect.objectContaining({ id: 'p2', hasApiKey: false }),
     ]);
     expect(body.data.every((location) => !('delhiveryApiKey' in location))).toBe(true);
-  });
-});
-
-describe('cross-app mappings', () => {
-  const mappingParams = { params: Promise.resolve({ id: 'map-1' }) };
-
-  const handlers: Array<[string, () => Promise<{ status: number }>]> = [
-    ['GET', () => listMappings(signedRequest())],
-    ['POST', () => createMapping(signedRequest({ scan2shipClientId: 'client-b', catalogClientId: 'cat-2', catalogApiKey: 'k' }))],
-    ['PUT', () => updateMapping(signedRequest({ catalogApiKey: 'k' }), mappingParams)],
-    ['DELETE', () => deleteMapping(signedRequest(), mappingParams)],
-  ];
-
-  describe.each(handlers)('%s', (_method, call) => {
-    it.each(['child_user', 'user', 'client_admin'])('returns 403 to %s and writes nothing', async (role) => {
-      actAs(role);
-      const response = await call();
-      expect(response.status).toBe(403);
-      expect(prisma.writeCalls()).toEqual([]);
-    });
-
-    it('rejects unauthenticated callers', async () => {
-      (prisma.users.findUnique as jest.Mock).mockResolvedValue(null);
-      const response = await call();
-      expect(response.status).toBeGreaterThanOrEqual(401);
-      expect(prisma.writeCalls()).toEqual([]);
-    });
-  });
-
-  it('lists mappings for platform admins without the Catalog key', async () => {
-    actAs('super_admin', 'platform');
-    const response = await listMappings(signedRequest());
-    const text = await bodyText(response);
-
-    expect(response.status).toBe(200);
-    expect(text).not.toContain(CATALOG_KEY);
-    expect(JSON.parse(text).data).toEqual([expect.objectContaining({ id: 'map-1', hasApiKey: true })]);
-  });
-
-  it('creates a mapping and returns it without the key, and does not log the key', async () => {
-    actAs('super_admin', 'platform');
-    (prisma.clients.findUnique as jest.Mock).mockResolvedValue({ id: 'client-b', name: 'B' });
-    (prisma.cross_app_mappings.findUnique as jest.Mock).mockResolvedValue(null);
-    (prisma.cross_app_mappings.create as jest.Mock).mockImplementation(async ({ data }) => ({ id: 'map-2', ...data }));
-
-    const response = await createMapping(
-      signedRequest({ scan2shipClientId: 'client-b', catalogClientId: 'cat-2', catalogApiKey: CATALOG_KEY })
-    );
-
-    expect(response.status).toBe(200);
-    expect((prisma.cross_app_mappings.create as jest.Mock).mock.calls[0][0].data.catalogApiKey).toBe(CATALOG_KEY);
-    expect(await bodyText(response)).not.toContain(CATALOG_KEY);
-    expect(loggedText()).not.toContain(CATALOG_KEY.slice(-4));
-  });
-
-  it.each([
-    ['blank', ''],
-    ['masked', '••••••••••••••••'],
-  ])('keeps the stored Catalog key when the submitted key is %s', async (_label, catalogApiKey) => {
-    actAs('super_admin', 'platform');
-    (prisma.cross_app_mappings.update as jest.Mock).mockResolvedValue(MAPPING);
-
-    await updateMapping(signedRequest({ catalogApiKey, isActive: false }), mappingParams);
-
-    const { data, where } = (prisma.cross_app_mappings.update as jest.Mock).mock.calls[0][0];
-    expect(where).toEqual({ id: 'map-1' });
-    expect(data).not.toHaveProperty('catalogApiKey');
-    expect(data.isActive).toBe(false);
-  });
-
-  it('replaces the Catalog key when a new one is entered, and returns no key', async () => {
-    actAs('super_admin', 'platform');
-    (prisma.cross_app_mappings.update as jest.Mock).mockResolvedValue({ ...MAPPING, catalogApiKey: 'new-catalog-key' });
-
-    const response = await updateMapping(signedRequest({ catalogApiKey: ' new-catalog-key ' }), mappingParams);
-
-    expect((prisma.cross_app_mappings.update as jest.Mock).mock.calls[0][0].data.catalogApiKey).toBe('new-catalog-key');
-    expect(await bodyText(response)).not.toContain('new-catalog-key');
-  });
-
-  it('deletes the mapping by ID for platform admins', async () => {
-    actAs('super_admin', 'platform');
-    const response = await deleteMapping(signedRequest(), mappingParams);
-    expect(response.status).toBe(200);
-    expect(prisma.cross_app_mappings.delete).toHaveBeenCalledWith({ where: { id: 'map-1' } });
   });
 });
 
@@ -345,9 +242,4 @@ describe('pages no longer display stored keys', () => {
     expect(read('app/admin/client-configurations/page.tsx')).toContain('location.hasApiKey &&');
   });
 
-  it('cross-app mappings no longer shows or copies the Catalog key', () => {
-    const page = read('app/admin/cross-app-mappings/page.tsx');
-    expect(page).not.toContain('mapping.catalogApiKey');
-    expect(page).not.toContain('copyToClipboard');
-  });
 });

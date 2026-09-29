@@ -9,7 +9,7 @@
     "start": "next start",
     "postinstall": "rm -rf node_modules/.prisma && prisma generate",
     "lint": "eslint .",
-    "lint:ci": "eslint . --max-warnings 331",
+    "lint:ci": "eslint . --max-warnings 272",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "jest",
     "test:watch": "jest --watch",

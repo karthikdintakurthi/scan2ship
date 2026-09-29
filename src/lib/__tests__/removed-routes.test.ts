@@ -40,6 +40,26 @@ const REMOVED = [
   // including leftover Shopify and never-built WhatsApp settings
   'src/app/api/admin/system-config/route.ts',
   'src/lib/system-config.ts',
+  // Partner API (API-key auth) removed in favour of MCP OAuth; the api_keys table is kept
+  'src/app/admin/api-keys/page.tsx',
+  'src/app/api/admin/api-keys/route.ts',
+  'src/app/api/admin/api-keys/[id]/route.ts',
+  'src/app/api/api-keys/route.ts',
+  'src/app/api/api-keys/[id]/route.ts',
+  'src/app/api/external/orders/route.ts',
+  'src/app/api/carrier/rates/route.ts',
+  'src/lib/api-key-auth.ts',
+  'src/lib/application/api-key-provisioning.ts',
+  // Catalog app integration removed, unused; the cross_app_mappings table is kept
+  'src/app/admin/cross-app-mappings/page.tsx',
+  'src/app/api/admin/cross-app-mappings/route.ts',
+  'src/app/api/admin/cross-app-mappings/[id]/route.ts',
+  'src/app/api/catalog/route.ts',
+  'src/lib/cross-app-auth.ts',
+  'src/lib/application/catalog-inventory.ts',
+  'src/components/ProductSelection.tsx',
+  'src/components/ProductSearch.tsx',
+  'src/types/catalog.ts',
 ];
 
 function sourceFiles(dir: string): string[] {

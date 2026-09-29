@@ -267,58 +267,6 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* Master Admin Only: API Keys Management */}
-        {isMasterAdmin && (
-          <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 ml-3">API Keys</h3>
-            </div>
-            <p className="text-gray-600 mb-4">
-              Manage API keys for external integrations and third-party services.
-            </p>
-            <Link
-              href="/admin/api-keys"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Manage API Keys
-              <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
-        )}
-
-        {/* Master Admin Only: Cross-App Mappings */}
-        {isMasterAdmin && (
-          <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 ml-3">Cross-App Mappings</h3>
-            </div>
-            <p className="text-gray-600 mb-4">
-              Configure integrations with external apps and manage data mappings.
-            </p>
-            <Link
-              href="/admin/cross-app-mappings"
-              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            >
-              Manage Mappings
-              <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
-        )}
-
         {/* Master Admin Only: Client Wallet Management */}
         {isMasterAdmin && (
           <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">

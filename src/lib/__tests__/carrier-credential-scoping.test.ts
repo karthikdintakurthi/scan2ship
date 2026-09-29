@@ -27,7 +27,6 @@ jest.mock('@/lib/delhivery', () => {
   };
 });
 jest.mock('@/lib/pickup-location-config', () => ({ getDelhiveryApiKey: jest.fn() }));
-jest.mock('@/lib/cross-app-auth', () => ({ getCatalogApiKey: jest.fn().mockResolvedValue(null) }));
 jest.mock('@/lib/analytics-service', () => ({ __esModule: true, default: { trackOrderCreation: jest.fn() } }));
 jest.mock('@/lib/credit-service', () => ({ CreditService: {} }));
 jest.mock('@/lib/webhook-service', () => ({ WebhookService: { triggerWebhooks: jest.fn() } }));

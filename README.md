@@ -44,12 +44,10 @@ Feature-gated — omit them and the corresponding feature is unavailable:
 | Feature | Variables |
 |---|---|
 | AI address parsing | `OPENAI_API_KEY`, `OPENAI_MODEL` |
-| Shopify | `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`, `SHOPIFY_WEBHOOK_SECRET`, `SHOPIFY_SHOP_NAME`, `SHOPIFY_API_VERSION`, `SHOPIFY_ADMIN_ACCESS_TOKEN` |
 | Delhivery | `DELHIVERY_BASE_URL`, `DELHIVERY_WEBHOOK_SECRET` (per-tenant API keys live in the `pickup_locations` table, not env) |
-| Catalog app | `CATALOG_APP_URL` |
 | Payments UI | `NEXT_PUBLIC_UPI_ID`, `NEXT_PUBLIC_PAYEE_NAME` |
 
-> **`env-template.env` is incomplete.** 18 variables read by the code are absent from it — notably `ALLOWED_ORIGINS`, the nine `DB_POOL_*`/`DB_*` tuning vars, and the four `*_TIMEOUT` vars. It also lists 8 variables nothing reads (`MAX_FILE_SIZE`, `ALLOWED_FILE_TYPES`, `RATE_LIMIT_WINDOW`, `RATE_LIMIT_MAX_REQUESTS`, `LOG_FILE_PATH`, `NEXT_PUBLIC_CATALOG_APP_URL`, `SHOPIFY_APP_URL`, `NEXT_TELEMETRY_DISABLED`) — setting those has no effect.
+> **`env-template.env` is incomplete.** 18 variables read by the code are absent from it — notably `ALLOWED_ORIGINS`, the nine `DB_POOL_*`/`DB_*` tuning vars, and the four `*_TIMEOUT` vars. It also lists variables nothing reads (`MAX_FILE_SIZE`, `ALLOWED_FILE_TYPES`, `RATE_LIMIT_WINDOW`, `RATE_LIMIT_MAX_REQUESTS`, `LOG_FILE_PATH`, `NEXT_TELEMETRY_DISABLED`) — setting those has no effect.
 
 ---
 
@@ -71,7 +69,7 @@ prisma/schema.prisma  27 models, 34 migrations
 
 **Multi-tenancy.** Every tenant is a `clients` row; almost every table carries `clientId`. Isolation is enforced **per query, by hand** — there is no Prisma middleware or RLS enforcing it. Any new query against a tenant-scoped table must include `clientId` in its `where`. Several existing handlers do not; see the audit.
 
-**Auth.** JWT bearer tokens (`src/lib/auth-middleware.ts`), plus API-key auth for the external/partner API (`src/lib/api-key-auth.ts`). Roles, ascending: `child_user` → `user` → `client_admin` → `super_admin` → `master_admin`. Note `UserRole.ADMIN` appears in several routes but **is not a member of the enum**.
+**Auth.** JWT bearer tokens for the website (`src/lib/auth-middleware.ts`, with sessions enforced per request), and OAuth for customer AI assistants via MCP (`src/lib/mcp/`). The partner API with API keys and the Catalog app integration were removed (2026-09-29). Roles, ascending: `child_user` → `user` → `client_admin` → `super_admin` → `master_admin`. Note `UserRole.ADMIN` appears in several routes but **is not a member of the enum**.
 
 **Credits.** One credit per order by default (`CREDIT_COSTS` in `src/lib/credit-service.ts`). Balances live in `client_credits`, with a `credit_transactions` ledger.
 

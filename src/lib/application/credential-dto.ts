@@ -4,16 +4,10 @@
  */
 
 export type PickupLocationDto<T> = Omit<T, 'delhiveryApiKey'> & { hasApiKey: boolean };
-export type CrossAppMappingDto<T> = Omit<T, 'catalogApiKey'> & { hasApiKey: boolean };
 
 export function toPickupLocationDto<T extends { delhiveryApiKey?: string | null }>(location: T): PickupLocationDto<T> {
   const { delhiveryApiKey, ...rest } = location;
   return { ...rest, hasApiKey: Boolean(delhiveryApiKey?.trim()) };
-}
-
-export function toCrossAppMappingDto<T extends { catalogApiKey?: string | null }>(mapping: T): CrossAppMappingDto<T> {
-  const { catalogApiKey, ...rest } = mapping;
-  return { ...rest, hasApiKey: Boolean(catalogApiKey?.trim()) };
 }
 
 const MASK_CHARACTER = '•';

@@ -24,7 +24,6 @@ export const ACTIONS = [
   'credits:recharge',
   'integrations:manage',
   'users:manage',
-  'api_keys:manage',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -51,7 +50,7 @@ const USER_ACTIONS: Action[] = [
   'integrations:manage',
 ];
 
-const CLIENT_ADMIN_ACTIONS: Action[] = [...USER_ACTIONS, 'users:manage', 'api_keys:manage'];
+const CLIENT_ADMIN_ACTIONS: Action[] = [...USER_ACTIONS, 'users:manage'];
 
 export const ROLE_ACTIONS: Record<UserRole, ReadonlySet<Action>> = {
   [UserRole.CHILD_USER]: new Set(CHILD_USER_ACTIONS),

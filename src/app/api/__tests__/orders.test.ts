@@ -22,7 +22,6 @@ jest.mock('@/lib/analytics-service', () => ({
   default: { trackOrderCreation: jest.fn(), trackEvent: jest.fn() },
 }));
 jest.mock('@/lib/webhook-service', () => ({ WebhookService: { triggerWebhooks: jest.fn() } }));
-jest.mock('@/lib/cross-app-auth', () => ({ getCatalogApiKey: jest.fn() }));
 jest.mock('@/lib/credit-service', () => ({
   CreditService: {
     getCreditCost: () => 1,
@@ -41,7 +40,6 @@ jest.mock('@/lib/credit-service', () => ({
 import { prisma as realPrisma } from '@/lib/prisma';
 import { CreditService, InsufficientCreditsError } from '@/lib/credit-service';
 import { WebhookService } from '@/lib/webhook-service';
-import { getCatalogApiKey } from '@/lib/cross-app-auth';
 import { authUserRow, signedRequest, TEST_USER_ID } from '@/test-utils/auth-request';
 import type { createPrismaMock } from '@/test-utils/prisma-mock';
 import { matchesWhere } from '@/test-utils/prisma-where';
@@ -109,7 +107,6 @@ beforeEach(() => {
   (CreditService.refundCredits as jest.Mock).mockResolvedValue(undefined);
   (CreditService.attachOrderToTransaction as jest.Mock).mockResolvedValue(undefined);
   (WebhookService.triggerWebhooks as jest.Mock).mockResolvedValue(undefined);
-  (getCatalogApiKey as jest.Mock).mockResolvedValue(null);
   delhivery.createOrder.mockResolvedValue({ success: true, waybill_number: 'AWB-NEW', order_id: 'DLV-1' });
   delhivery.cancelOrder.mockResolvedValue({ success: true, message: 'cancelled' });
 });
@@ -615,20 +612,13 @@ describe('DELETE /api/orders', () => {
     expect(body.delhiveryCancellations).toEqual([{ orderId: 1, waybill: 'AWB-1', success: false, message: 'Error cancelling Delhivery order' }]);
   });
 
-  it("restores catalog inventory with the tenant's catalog credentials", async () => {
+  it('deletes orders with stored products without calling any inventory service', async () => {
     actAs('user');
-    (prisma.clients.findUnique as jest.Mock).mockResolvedValue({ id: 'client-a', slug: 'acme', name: 'Acme' });
-    (getCatalogApiKey as jest.Mock).mockResolvedValue({ catalogApiKey: 'cat-key', catalogClientId: 'cat-client' });
-    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: { summary: { totalRestored: 2 } } }) });
-
     const body = await (await del({ orderIds: [2] })).json();
 
-    expect(getCatalogApiKey).toHaveBeenCalledWith('client-a');
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toMatch(/\/api\/public\/inventory\/restore\?client=acme$/);
-    expect(init.headers).toMatchObject({ 'X-API-Key': 'cat-key', 'X-Client-ID': 'cat-client' });
-    expect(JSON.parse(init.body)).toMatchObject({ orderId: 'scan2ship_order_2', items: [{ sku: 'SKU-1', quantity: 2 }] });
-    expect(body.inventoryRestorations).toEqual([{ orderId: 2, success: true, restoredItems: 2 }]);
+    expect(deletedIds()).toEqual([2]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(body).not.toHaveProperty('inventoryRestorations');
   });
 
   it('returns 500 when the delete transaction fails', async () => {

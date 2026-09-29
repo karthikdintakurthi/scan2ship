@@ -7,7 +7,6 @@ import { usePickupLocation } from '@/hooks/usePickupLocation'
 import { useAuth } from '@/contexts/AuthContext'
 import { getPickupLocationConfig } from '@/lib/pickup-location-config'
 import { getOrderConfig, validateOrderData } from '@/lib/order-config'
-import { OrderItem } from '@/types/catalog'
 
 
 
@@ -35,12 +34,11 @@ interface AddressFormData {
 }
 
 interface OrderFormProps {
-  selectedProducts?: OrderItem[];
   onOrderSuccess?: () => void;
 }
 
-export default function OrderForm({ selectedProducts = [], onOrderSuccess }: OrderFormProps) {
-  const { refreshCredits, currentClient, currentSession } = useAuth();
+export default function OrderForm({ onOrderSuccess }: OrderFormProps) {
+  const { refreshCredits, currentClient } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentStep, setCurrentStep] = useState<'idle' | 'creating' | 'completed'>('idle')
   const [error, setError] = useState('')
@@ -786,39 +784,6 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
       return
     }
 
-    // Validate product stock before order submission
-    if (selectedProducts.length > 0) {
-      console.log('📦 [ORDER_FORM] Validating product stock before order submission');
-      for (const item of selectedProducts) {
-        const product = item.product;
-        const currentStock = product.stockLevel || 0;
-        const minStock = product.minStock || 0;
-        const requestedQuantity = item.quantity;
-        
-        console.log(`📦 [STOCK_VALIDATION] ${product.name}: Stock=${currentStock}, Min=${minStock}, Requested=${requestedQuantity}, IsPreorder=${item.isPreorder}`);
-        
-        // Skip stock validation for preorder items
-        if (item.isPreorder) {
-          console.log(`📦 [STOCK_VALIDATION] ${product.name} is a preorder - skipping stock validation`);
-          continue;
-        }
-        
-        if (currentStock <= 0) {
-          setError(`${product.name} is out of stock (Stock: ${currentStock}). Please remove it from the order or add it as a preorder.`);
-          return;
-        }
-        
-        const remainingStock = currentStock - requestedQuantity;
-        if (remainingStock < minStock) {
-          const maxAllowedQuantity = currentStock - minStock;
-          setError(`${product.name} - Cannot order ${requestedQuantity} units. Maximum allowed: ${maxAllowedQuantity} (to maintain minimum stock of ${minStock}). Consider adding as preorder instead.`);
-          return;
-        }
-      }
-      console.log('✅ [ORDER_FORM] All products have sufficient stock or are preorders');
-    }
-
-
     // Validate reseller mobile number if provided
     if (formData.reseller_mobile && !validateMobileNumber(formData.reseller_mobile)) {
       setError('Reseller mobile number must be exactly 10 digits and start with 6, 7, 8, or 9')
@@ -936,24 +901,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
         waybill: formData.tracking_number,
         reference_number: formData.reference_number,
         skip_tracking: formData.skip_tracking,
-        creationPattern, // Add creation pattern to order data
-        // Include product details if any products were selected
-        products: selectedProducts.length > 0 ? selectedProducts.map(item => {
-          console.log('🔍 [ORDER_FORM] Mapping product for order:', {
-            sku: item.product.sku,
-            name: item.product.name,
-            thumbnailUrl: item.product.thumbnailUrl,
-            isPreorder: item.isPreorder
-          });
-          return {
-            sku: item.product.sku,
-            name: item.product.name,
-            quantity: item.quantity,
-            price: item.price,
-            thumbnailUrl: item.product.thumbnailUrl,
-            isPreorder: item.isPreorder || false
-          };
-        }) : undefined
+        creationPattern // Add creation pattern to order data
       }
 
       // Debug logging to see what values are being sent
@@ -1003,41 +951,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
         setCurrentStep('completed')
         setSuccess(`Order created successfully! Order Number: ${result.order.referenceNumber}`)
         
-        // Update inventory in catalog-app if products were selected
-        if (selectedProducts.length > 0) {
-          try {
-            console.log('🔄 [ORDER_FORM] Updating inventory in catalog-app...');
-            // The server reduces the items stored on this order
-            const inventoryResponse = await fetch('/api/catalog', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentSession?.token}`,
-              },
-              body: JSON.stringify({
-                action: 'reduce_inventory',
-                data: { orderId: result.order.id }
-              }),
-            });
-            
-            if (inventoryResponse.ok) {
-              const data = await inventoryResponse.json();
-              if (data.data?.allItemsAvailable) {
-                console.log('✅ [ORDER_FORM] Inventory updated successfully in catalog-app');
-              } else {
-                console.warn('⚠️ [ORDER_FORM] Some items were not available in inventory');
-              }
-            } else {
-              console.warn('⚠️ [ORDER_FORM] Failed to update inventory in catalog-app');
-            }
-          } catch (inventoryError) {
-            console.error('❌ [ORDER_FORM] Failed to update inventory in catalog-app:', inventoryError);
-            // Don't fail the order creation if inventory update fails
-            setError(prev => prev + ' (Note: Order created but inventory update failed)');
-          }
-        }
-        
-        // Call the success callback to reset product selection
+        // Call the success callback
         if (onOrderSuccess) {
           console.log('🔄 [ORDER_FORM] Calling onOrderSuccess callback');
           onOrderSuccess();

@@ -21,14 +21,18 @@ jest.mock('@/lib/security-middleware', () => ({
   applySecurityMiddleware: jest.fn().mockResolvedValue(null),
   securityHeaders: jest.fn(),
 }));
-jest.mock('@/lib/api-key-auth', () => ({ authenticateApiKey: jest.fn().mockResolvedValue(null), hasPermission: jest.fn() }));
 
 import { prisma } from '@/lib/prisma';
 import { UserRole } from '@/lib/auth-middleware';
 import { ACTIONS, can, ROLE_ACTIONS } from '@/lib/application/permissions';
 import { authUserRow, signedRequest, TEST_USER_ID } from '@/test-utils/auth-request';
 import { matchesWhere } from '@/test-utils/prisma-where';
-import { POST as createCourierService } from '@/app/api/courier-services/route';
+import {
+  GET as listCourierServices,
+  POST as createCourierService,
+  PUT as updateCourierServices,
+} from '@/app/api/courier-services/route';
+import type { NextRequest } from 'next/server';
 import { PUT as updateLogo, DELETE as deleteLogo } from '@/app/api/logo/route';
 import { PUT as updateOrderConfig } from '@/app/api/order-config/route';
 import { GET as getWaybill } from '@/app/api/orders/[id]/waybill/route';
@@ -58,16 +62,15 @@ describe('role actions', () => {
     const child = { role: UserRole.CHILD_USER };
     expect(can(child, 'orders:create')).toBe(true);
     expect(can(child, 'shipments:book')).toBe(true);
-    for (const action of ['settings:write', 'credits:read', 'credits:recharge', 'pickups:book', 'users:manage', 'api_keys:manage'] as const) {
+    for (const action of ['settings:write', 'credits:read', 'credits:recharge', 'pickups:book', 'users:manage'] as const) {
       expect(can(child, action)).toBe(false);
     }
   });
 
-  it('keeps user and API key management with client admins', () => {
+  it('keeps user management with client admins', () => {
     expect(can({ role: UserRole.USER }, 'settings:write')).toBe(true);
     expect(can({ role: UserRole.USER }, 'users:manage')).toBe(false);
     expect(can({ role: UserRole.CLIENT_ADMIN }, 'users:manage')).toBe(true);
-    expect(can({ role: UserRole.CLIENT_ADMIN }, 'api_keys:manage')).toBe(true);
   });
 
   it('gives each higher role every action of the roles below it', () => {
@@ -104,6 +107,38 @@ describe('tenant settings writes', () => {
     actAs('user');
     const response = await call();
     expect(response.status).not.toBe(403);
+  });
+});
+
+describe('courier services without a signed-in user', () => {
+  // The partner API (API-key auth) was removed; a key-style bearer token is not a session.
+  function apiKeyRequest(body: unknown = {}): NextRequest {
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      authorization: 'Bearer sk_live_0123456789abcdef',
+      'x-api-key': 'sk_live_0123456789abcdef',
+    };
+    return {
+      url: 'http://localhost/api/courier-services',
+      nextUrl: new URL('http://localhost/api/courier-services'),
+      headers: {
+        get: (name: string) => headers[name.toLowerCase()] ?? null,
+        forEach: (fn: (value: string, key: string) => void) => Object.entries(headers).forEach(([k, v]) => fn(v, k)),
+      },
+      cookies: { get: () => undefined },
+      json: async () => body,
+    } as unknown as NextRequest;
+  }
+
+  it.each([
+    ['GET', () => listCourierServices(apiKeyRequest())],
+    ['POST', () => createCourierService(apiKeyRequest({ name: 'X', code: 'x' }))],
+    ['PUT', () => updateCourierServices(apiKeyRequest({ services: [{ id: 'c1', label: 'X', value: 'x' }] }))],
+  ])('%s /api/courier-services rejects an API-key-style bearer token with 401', async (_method, call) => {
+    const response = await call();
+    expect(response.status).toBe(401);
+    expect(findUser).not.toHaveBeenCalled();
+    expect(prisma.courier_services.create).not.toHaveBeenCalled();
   });
 });
 

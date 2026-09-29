@@ -31,21 +31,14 @@ jest.mock('@/lib/credit-service', () => {
 });
 jest.mock('@/lib/analytics-service', () => ({ __esModule: true, default: { trackOrderCreation: jest.fn(), trackEvent: jest.fn() } }));
 jest.mock('@/lib/webhook-service', () => ({ WebhookService: { triggerWebhooks: jest.fn().mockResolvedValue(undefined) } }));
-jest.mock('@/lib/cross-app-auth', () => ({ getCatalogApiKey: jest.fn() }));
-jest.mock('@/lib/api-key-auth', () => ({
-  authenticateApiKey: jest.fn(),
-  hasPermission: jest.fn(() => true),
-}));
 
 import fs from 'node:fs';
 import { prisma as realPrisma } from '@/lib/prisma';
 import { delhiveryService } from '@/lib/delhivery';
 import { CreditService, InsufficientCreditsError } from '@/lib/credit-service';
-import { authenticateApiKey } from '@/lib/api-key-auth';
 import { authUserRow, signedRequest, TEST_USER_ID } from '@/test-utils/auth-request';
 import type { createPrismaMock } from '@/test-utils/prisma-mock';
 import { POST as createOrderRoute } from '@/app/api/orders/route';
-import { POST as createExternalOrder } from '@/app/api/external/orders/route';
 
 jest.unmock('path');
 const { join } = jest.requireActual('path');
@@ -241,60 +234,6 @@ describe('POST /api/orders credit handling', () => {
   });
 });
 
-describe('POST /api/external/orders credit handling', () => {
-  beforeEach(() => {
-    (authenticateApiKey as jest.Mock).mockResolvedValue({ clientId: 'client-a', permissions: ['orders:write'] });
-  });
-
-  it('charges with the shared conditional deduction and links the charge', async () => {
-    const response = await createExternalOrder(signedRequest(ORDER_INPUT));
-
-    expect(response.status).toBe(200);
-    expect(credits.deductCredits).toHaveBeenCalledWith('client-a', 1, 'Order creation via API', 'ORDER');
-    expect(credits.attachOrderToTransaction).toHaveBeenCalledWith('txn-charge', 501);
-    expect(prisma.client_credits.update).not.toHaveBeenCalled();
-    expect(prisma.credit_transactions.create).not.toHaveBeenCalled();
-  });
-
-  it('returns 402 without creating an order when the balance is too low', async () => {
-    credits.deductCredits.mockRejectedValue(new InsufficientCreditsError(1));
-
-    const response = await createExternalOrder(signedRequest(ORDER_INPUT));
-
-    expect(response.status).toBe(402);
-    expect(prisma.orders.create).not.toHaveBeenCalled();
-  });
-
-  it('returns 500 without creating an order when charging fails for another reason', async () => {
-    credits.deductCredits.mockRejectedValue(new Error('Failed to deduct credits'));
-    const response = await createExternalOrder(signedRequest(ORDER_INPUT));
-    expect(response.status).toBe(500);
-    expect(prisma.orders.create).not.toHaveBeenCalled();
-  });
-
-  it('refunds when the order cannot be saved', async () => {
-    (prisma.orders.create as jest.Mock).mockRejectedValue(new Error('db down'));
-
-    const response = await createExternalOrder(signedRequest(ORDER_INPUT));
-
-    expect(response.status).toBe(500);
-    expect(credits.refundCredits).toHaveBeenCalledWith('client-a', 1, 'Refund: API order could not be saved', 'ORDER');
-  });
-
-  it('logs when the refund or linking fails', async () => {
-    (prisma.orders.create as jest.Mock).mockRejectedValueOnce(new Error('db down'));
-    credits.refundCredits.mockRejectedValueOnce(new Error('refund failed'));
-    await createExternalOrder(signedRequest(ORDER_INPUT));
-
-    credits.attachOrderToTransaction.mockRejectedValueOnce(new Error('link failed'));
-    await createExternalOrder(signedRequest(ORDER_INPUT));
-
-    const logged = (console.error as jest.Mock).mock.calls.map(([message]) => String(message)).join(' ');
-    expect(logged).toContain('External orders refund failed; reconcile manually');
-    expect(logged).toContain('External orders: could not link credit charge to order');
-  });
-});
-
 describe('order creation field allowlist', () => {
   const PROTECTED = {
     clientId: 'client-b',
@@ -340,19 +279,5 @@ describe('order creation field allowlist', () => {
     const data = created();
     expect(data.tracking_id).toBeNull();
     expect(data).not.toHaveProperty('delhivery_waybill_number');
-  });
-
-  it('POST /api/external/orders ignores fields the server controls and uses the key tenant', async () => {
-    (authenticateApiKey as jest.Mock).mockResolvedValue({ clientId: 'client-a', permissions: ['orders:write'] });
-
-    const response = await createExternalOrder(signedRequest({ ...ORDER_INPUT, ...PROTECTED }));
-
-    expect(response.status).toBe(200);
-    const data = created();
-    expect(data.clientId).toBe('client-a');
-    for (const field of ['created_by', 'sub_group', 'delhivery_api_status', 'tracking_status', 'shopify_status', 'seller_address', 'id']) {
-      expect(data).not.toHaveProperty(field);
-    }
-    expect(data).toMatchObject({ name: 'Asha', pincode: '560001' });
   });
 });

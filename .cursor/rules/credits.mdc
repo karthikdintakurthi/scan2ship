@@ -1,6 +1,6 @@
 ---
 description: Credit wallet mutations must be atomic, gated, and never fail-open
-globs: src/lib/credit-service.ts,src/lib/client-credit-costs-service.ts,src/app/api/credits/**/*.ts,src/app/api/admin/credits/**/*.ts,src/app/api/external/orders/route.ts,src/app/api/orders/**/*.ts
+globs: src/lib/credit-service.ts,src/lib/client-credit-costs-service.ts,src/app/api/credits/**/*.ts,src/app/api/admin/credits/**/*.ts,src/app/api/orders/**/*.ts,src/lib/application/order-creation.ts
 alwaysApply: false
 ---
 
@@ -24,4 +24,4 @@ await tx.client_credits.updateMany({
 
 - Wrap order-create + deduction in the same `$transaction`. If deduction fails, **fail the request** — do not swallow and return 200.
 - Never credit from a request-body `amount` (`credits/verify-payment` does this today). Retry-Delhivery and Shopify webhook creates currently skip credits; do not add more free paths.
-- `external/orders` must not `decrement` without a `gte` guard. Ledger `balance` must come from the row after the update, not a stale pre-read.
+- Never `decrement` credits without a `gte` guard. Ledger `balance` must come from the row after the update, not a stale pre-read.
