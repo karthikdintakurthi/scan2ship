@@ -221,7 +221,7 @@ export async function DELETE(
         delhiveryCancelResult = await delhiveryService.cancelOrder(
           order.tracking_id,
           order.pickup_location || '',
-          order.clientId ? parseInt(order.clientId) : undefined
+          order.clientId
         );
         
         if (delhiveryCancelResult.success) {

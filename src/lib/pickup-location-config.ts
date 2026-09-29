@@ -34,7 +34,7 @@ export interface PickupLocationConfig {
 const defaultPickupLocationConfig: PickupLocationConfig = {
   value: 'Scan2Ship',
   label: 'Scan2Ship',
-  delhiveryApiKey: '2bce24815f3e4da2513ab4aafb7ecb251469c4a9',
+  delhiveryApiKey: '',
   productDetails: {
     description: 'ARTIFICAL JEWELLERY',
     commodity_value: 5000,
@@ -149,134 +149,47 @@ export async function getPickupLocationLabels(): Promise<string[]> {
   return locations.map(config => config.label);
 }
 
-// Helper function to get Delhivery API key for a specific pickup location
-export async function getDelhiveryApiKey(pickupLocation: string, clientId?: string): Promise<string> {
+/**
+ * Server-only: returns the Delhivery API key for a tenant's pickup location,
+ * or '' when the tenant, location, or key is missing.
+ */
+export async function getDelhiveryApiKey(pickupLocation: string, clientId: string): Promise<string> {
+  if (typeof window !== 'undefined') {
+    console.error('❌ [DELHIVERY_KEY] getDelhiveryApiKey must not be called in the browser');
+    return '';
+  }
+
+  if (!clientId || !pickupLocation) {
+    console.error(`❌ [DELHIVERY_KEY] Tenant and pickup location are required (pickup: ${pickupLocation || 'missing'}, client: ${clientId || 'missing'})`);
+    return '';
+  }
+
   try {
-    console.log(`🔑 [REALTIME] Fetching Delhivery API key for pickup location: ${pickupLocation}${clientId ? ` (Client: ${clientId})` : ''}`);
-    
-    // Always fetch in real-time from the API endpoint
-    // This ensures we get the latest configuration from the database
-    
-    // Check if we're on the server side
-    if (typeof window === 'undefined') {
-      // Server-side: fetch directly from database for immediate access
-      console.log(`🔑 [SERVER] Fetching Delhivery API key for pickup location: ${pickupLocation}${clientId ? ` (Client: ${clientId})` : ''}`);
-      
-      // Import Prisma client for server-side database access
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
-      
-      try {
-        // Build the where clause with proper client filtering
-        const whereClause: any = {
-          value: {
-            equals: pickupLocation,
-            mode: 'insensitive'
-          }
-        };
-        
-        // Add client filtering if clientId is provided
-        if (clientId) {
-          whereClause.clientId = clientId;
-          console.log(`🔑 [SERVER] Filtering by client ID: ${clientId}`);
-        } else {
-          console.warn(`⚠️ [SERVER] No client ID provided - this may lead to incorrect API key selection`);
-        }
-        
-        const pickupLocationRecord = await prisma.pickup_locations.findFirst({
-          where: whereClause,
-          select: { 
-            delhiveryApiKey: true,
-            clients: {
-              select: {
-                companyName: true,
-                id: true
-              }
-            }
-          }
-        });
-        
-        if (pickupLocationRecord?.delhiveryApiKey) {
-          console.log(`🔑 [SERVER] Found Delhivery API key for pickup location: ${pickupLocation}`);
-          if (pickupLocationRecord.clients) {
-            console.log(`🔑 [SERVER] API key belongs to client: ${pickupLocationRecord.clients.companyName} (ID: ${pickupLocationRecord.clients.id})`);
-          }
-          
-          let apiKey = pickupLocationRecord.delhiveryApiKey;
-          
-          // Extract API key if it's wrapped in JavaScript code
-          if (apiKey.includes("'") && apiKey.includes('clientKeyD')) {
-            const match = apiKey.match(/'([^']+)'/);
-            if (match) {
-              apiKey = match[1];
-              console.log(`🔑 [SERVER] Extracted clean API key from JavaScript code: ${apiKey}`);
-            }
-          }
-          
-          // Use API key as raw data - no encryption/decryption
-          console.log(`🔑 [SERVER] Found raw API key for pickup location: ${pickupLocation}`);
-          return apiKey;
-        } else {
-          console.warn(`⚠️ [SERVER] No Delhivery API key found for pickup location: ${pickupLocation}${clientId ? ` and client: ${clientId}` : ''}`);
-          return '';
-        }
-      } finally {
-        await prisma.$disconnect();
-      }
-    } else {
-      // Client-side: fetch in real-time from API endpoint
-      console.log(`🔑 [CLIENT] Fetching Delhivery API key in real-time for pickup location: ${pickupLocation}${clientId ? ` (Client: ${clientId})` : ''}`);
-      
-      try {
-        // Get authentication token
-        const token = localStorage.getItem('authToken');
-        if (!token) {
-          console.warn('⚠️ [CLIENT] No auth token found for real-time API key fetch');
-          return '';
-        }
+    // Imported lazily because this module is also bundled into client components
+    const { prisma } = await import('@/lib/prisma');
 
-        // Fetch pickup locations in real-time from API
-        const response = await fetch('/api/pickup-locations', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+    const pickupLocationRecord = await prisma.pickup_locations.findFirst({
+      where: {
+        clientId,
+        value: { equals: pickupLocation, mode: 'insensitive' }
+      },
+      select: { delhiveryApiKey: true }
+    });
 
-        if (response.ok) {
-          const data = await response.json();
-          const pickupLocations = data.data || [];
-          
-          // Find the specific pickup location
-          let location = pickupLocations.find((loc: any) => 
-            loc.value.toLowerCase() === pickupLocation.toLowerCase()
-          );
-          
-          // If clientId is provided, ensure we get the correct client's pickup location
-          if (clientId && location) {
-            // The API endpoint should already filter by client, but double-check
-            console.log(`🔑 [CLIENT] Verifying pickup location belongs to correct client: ${clientId}`);
-          }
-          
-          if (location?.delhiveryApiKey) {
-            console.log(`🔑 [CLIENT] Found real-time Delhivery API key for pickup location: ${pickupLocation}`);
-            console.log(`🔑 [CLIENT] API key: ${location.delhiveryApiKey.substring(0, 8)}...`);
-            return location.delhiveryApiKey;
-          } else {
-            console.warn(`⚠️ [CLIENT] No Delhivery API key found in real-time data for pickup location: ${pickupLocation}`);
-            console.warn(`💡 Available pickup locations: ${pickupLocations.map((loc: any) => loc.value).join(', ')}`);
-            return '';
-          }
-        } else {
-          console.error(`❌ [CLIENT] Failed to fetch pickup locations in real-time: ${response.status}`);
-          return '';
-        }
-      } catch (error) {
-        console.error(`❌ [CLIENT] Error fetching pickup locations in real-time:`, error);
-        return '';
-      }
+    let apiKey = pickupLocationRecord?.delhiveryApiKey?.trim() || '';
+    if (!apiKey) {
+      console.warn(`⚠️ [DELHIVERY_KEY] No Delhivery API key for pickup location ${pickupLocation} (client ${clientId})`);
+      return '';
     }
+
+    // Some keys were saved wrapped in a JavaScript snippet, e.g. clientKeyD = '...'
+    if (apiKey.includes("'") && apiKey.includes('clientKeyD')) {
+      apiKey = apiKey.match(/'([^']+)'/)?.[1] ?? apiKey;
+    }
+
+    return apiKey;
   } catch (error) {
-    console.error(`❌ Error getting Delhivery API key for pickup location ${pickupLocation}:`, error);
+    console.error(`❌ [DELHIVERY_KEY] Error loading Delhivery API key for pickup location ${pickupLocation}:`, error);
     return '';
   }
 }

@@ -138,7 +138,7 @@ export class DelhiveryService {
       // Extract client ID from order data if available
       const clientId = orderData.clientId;
       if (!clientId) {
-        console.warn('⚠️ [DELHIVERY] No client ID provided in order data - API key selection may be incorrect');
+        throw new Error('Client ID is required to select the Delhivery API key');
       }
       
       const apiKey = await getDelhiveryApiKey(orderData.pickup_location, clientId);
@@ -358,25 +358,7 @@ export class DelhiveryService {
     }
   }
 
-  async getOrderStatus(waybill: string, pickupLocation: string): Promise<any> {
-    try {
-      // Get API key from pickup location configuration
-      const { getDelhiveryApiKey } = await import('./pickup-location-config');
-      const apiKey = await getDelhiveryApiKey(pickupLocation);
-      
-      if (!apiKey) {
-        throw new Error(`No Delhivery API key found for pickup location: ${pickupLocation}`);
-      }
-      
-      const response = await this.makeRequest(`/api/waybill/${waybill}`, {}, apiKey);
-      return response;
-    } catch (error) {
-      console.error('Delhivery Status API Error:', error);
-      throw error;
-    }
-  }
-
-  async validatePincode(pincode: string, pickupLocation?: string): Promise<{
+  async validatePincode(pincode: string, pickupLocation?: string, clientId?: string): Promise<{
     success: boolean;
     serviceable: boolean;
     city?: string;
@@ -387,12 +369,12 @@ export class DelhiveryService {
   }> {
     try {
       // Get API key from pickup location configuration
-      if (!pickupLocation) {
-        throw new Error('Pickup location is required for pincode validation');
+      if (!pickupLocation || !clientId) {
+        throw new Error('Pickup location and client ID are required for pincode validation');
       }
       
       const { getDelhiveryApiKey } = await import('./pickup-location-config');
-      const apiKey = await getDelhiveryApiKey(pickupLocation);
+      const apiKey = await getDelhiveryApiKey(pickupLocation, clientId);
       
       if (!apiKey) {
         throw new Error(`No Delhivery API key found for pickup location: ${pickupLocation}. Please configure it in the client settings.`);
@@ -454,9 +436,13 @@ export class DelhiveryService {
     }
   }
 
-  async cancelOrder(waybill: string, pickupLocation: string, clientId?: number): Promise<{ success: boolean; message?: string; error?: string }> {
+  async cancelOrder(waybill: string, pickupLocation: string, clientId: string): Promise<{ success: boolean; message?: string; error?: string }> {
     try {
       console.log('🚫 [DELHIVERY_CANCEL] Cancelling order with waybill:', waybill);
+
+      if (!clientId) {
+        throw new Error('Client ID is required to select the Delhivery API key');
+      }
       
       // Get API key from pickup location configuration
       const { getDelhiveryApiKey } = await import('./pickup-location-config');

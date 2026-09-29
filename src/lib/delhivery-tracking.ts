@@ -1,5 +1,7 @@
 interface DelhiveryTrackingResponse {
   success: boolean;
+  /** Waybill this result belongs to; set on bulk results, including errors. */
+  trackingId?: string;
   data?: {
     tracking_id: string;
     status: string;
@@ -201,6 +203,7 @@ export class DelhiveryTrackingService {
             
             const processedResult = {
               success: true,
+              trackingId: shipment.AWB,
               data: {
                 tracking_id: shipment.AWB,
                 status: finalStatus,
@@ -236,6 +239,7 @@ export class DelhiveryTrackingService {
           batch.forEach(trackingId => {
             const errorResult = {
               success: false,
+              trackingId,
               error: data?.error || data?.message || 'No ShipmentData found in response'
             };
             console.log(`❌ [DELHIVERY_BULK_${batchId}] Error for ${trackingId}:`, errorResult.error);
@@ -256,6 +260,7 @@ export class DelhiveryTrackingService {
         batch.forEach(trackingId => {
           const errorResult = {
             success: false,
+            trackingId,
             error: error instanceof Error ? error.message : 'Unknown error occurred'
           };
           console.log(`❌ [DELHIVERY_BULK_${batchId}] Error for ${trackingId}:`, errorResult.error);

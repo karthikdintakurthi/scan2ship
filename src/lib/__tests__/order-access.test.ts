@@ -30,6 +30,7 @@ import { getDelhiveryApiKey } from '@/lib/pickup-location-config';
 import { UserRole, ROLE_PERMISSIONS, type AuthenticatedUser } from '@/lib/auth-middleware';
 import { orderAccessWhere, parseOrderId } from '@/lib/application/policy';
 import { authUserRow, signedRequest, TEST_USER_ID } from '@/test-utils/auth-request';
+import { matchesWhere } from '@/test-utils/prisma-where';
 import { GET as getOrder, PUT as updateOrder } from '@/app/api/orders/[id]/route';
 import { POST as fulfillOrder } from '@/app/api/orders/[id]/fulfill/route';
 import { POST as retryDelhivery } from '@/app/api/orders/[id]/retry-delhivery/route';
@@ -43,13 +44,6 @@ const ORDERS: OrderRow[] = [
   { id: 3, clientId: 'client-a', created_by: 'someone-else', sub_group: 'south', pickup_location: 'a-warehouse', delhivery_waybill_number: 'AWB-A3', courier_service: 'delhivery' },
   { id: 9, clientId: 'client-b', created_by: 'other-tenant-user', sub_group: null, pickup_location: 'b-warehouse', delhivery_waybill_number: 'AWB-B9', courier_service: 'delhivery' },
 ];
-
-function matches(row: Record<string, unknown>, where: Record<string, any>): boolean {
-  return Object.entries(where).every(([key, value]) => {
-    if (key === 'OR') return (value as Record<string, any>[]).some((clause) => matches(row, clause));
-    return row[key] === value;
-  });
-}
 
 const findUser = prisma.users.findUnique as jest.Mock;
 const findSubGroup = prisma.user_sub_groups.findFirst as jest.Mock;
@@ -83,7 +77,7 @@ beforeEach(() => {
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
-  findOrder.mockImplementation(async ({ where }) => ORDERS.find((row) => matches(row, where)) ?? null);
+  findOrder.mockImplementation(async ({ where }) => ORDERS.find((row) => matchesWhere(row, where)) ?? null);
   updateOrderRow.mockImplementation(async ({ where, data }) => ({ ...ORDERS.find((row) => row.id === where.id), ...data }));
 });
 
