@@ -66,6 +66,10 @@ Off unless `MCP_WRITES_ENABLED=true`. The tools are listed only while it is on, 
 | `create_shipment` | Creates the order for a preview the user confirmed in chat. It runs the same code as the website's Create Order (`createOrder` in `src/lib/application/order-creation.ts`): it charges the credit, books the Delhivery waybill for Delhivery orders, saves the order, and refunds the credit if booking fails. |
 | `get_shipment_operation` | Returns the status of a preview or creation. |
 
+- **Tracking numbers depend on the courier.**
+  - **Delhivery.** The waybill comes from the Delhivery API when the order is created, and a supplied number is refused.
+  - **DTDC** (`dtdc`, `dtdc_cod`, `dtdc_plus`). Uses the user's number if given; otherwise the next unused number from that variant's list in Settings. The preview only shows the number; it is taken on creation, atomically, so two orders never share one. It goes back to the unused list if the order is not created. With no unused numbers the order has no tracking number. A number the user gives that appears in the unused list is moved to used.
+  - **India Post and other couriers.** Uses the number the user gives, or none. `referenceNumber` is the seller's own reference; Scan2Ship appends the customer mobile. It is never a tracking number.
 - **One preview, at most one order.** `create_shipment` claims the preview atomically (`previewed` → `creating`). A repeated or concurrent call returns the first outcome instead of ordering again.
 - **Outcomes.** `succeeded` (with order ID and waybill); `failed` (not created; a Delhivery rejection refunds the credit); `expired`; `reconciliation_required` (an order may exist, e.g. it was saved but its carrier details were not, or the request died mid-way; check Scan2Ship and never retry blindly).
 - **Limits.** Up to `MCP_DAILY_SHIPMENT_LIMIT` (default 25) assistant-created orders per tenant per UTC day. The per-grant tool quota also applies.

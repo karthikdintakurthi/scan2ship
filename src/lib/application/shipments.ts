@@ -4,6 +4,7 @@ import { CreditService } from '@/lib/credit-service';
 import { getCreditBalanceReadOnly } from '@/lib/application/credits';
 import { createOrder, validateOrderInput } from '@/lib/application/order-creation';
 import { listShippingOptions } from '@/lib/application/shipping';
+import { claimDtdcSlip, isDtdcCourier, peekNextDtdcSlip, releaseDtdcSlip } from '@/lib/application/dtdc-slips';
 import type { PrepareShipmentInput } from '@/lib/application/schemas';
 import { areMcpWritesEnabled, mcpDailyShipmentLimit } from '@/lib/mcp/config';
 import { newId, sha256Hex } from '@/lib/mcp/crypto';
@@ -17,6 +18,9 @@ export const PREVIEW_TTL_MS = 15 * 60 * 1000;
 const STALE_CREATING_MS = 2 * 60 * 1000;
 
 const CHANNEL = 'mcp';
+
+/** Payload marker: take the next unused DTDC number when the order is created. */
+const AUTO_DTDC_SLIP = '_assignNextDtdcSlip';
 
 function requireWritesEnabled() {
   if (!areMcpWritesEnabled()) {
@@ -97,6 +101,12 @@ export async function prepareShipment(principal: McpPrincipal, input: PrepareShi
     );
   }
 
+  // Tracking numbers depend on the courier: Delhivery assigns a waybill on
+  // creation; DTDC takes the user's number or the account's next unused slip;
+  // other couriers use the number the user gives, or none.
+  const autoDtdcSlip = isDtdcCourier(courier.code) && !input.trackingNumber;
+  const nextDtdcSlip = autoDtdcSlip ? await peekNextDtdcSlip(principal.tenantId, courier.code) : null;
+
   const isCod = input.payment.mode === 'cod';
   // Website-shaped order input, exactly what createOrder receives on confirmation
   const orderData: Record<string, unknown> = {
@@ -118,6 +128,7 @@ export async function prepareShipment(principal: McpPrincipal, input: PrepareShi
     ...(input.referenceNumber ? { reference_number: input.referenceNumber } : {}),
     // Couriers without a carrier booking use the tracking number the user supplies
     ...(input.trackingNumber ? { tracking_id: input.trackingNumber } : {}),
+    ...(autoDtdcSlip ? { [AUTO_DTDC_SLIP]: true } : {}),
     ...(input.reseller?.name ? { reseller_name: input.reseller.name } : {}),
     ...(input.reseller?.mobile ? { reseller_mobile: input.reseller.mobile } : {}),
   };
@@ -160,7 +171,13 @@ export async function prepareShipment(principal: McpPrincipal, input: PrepareShi
       courier: { code: courier.code, name: courier.name },
       pickupLocation: pickup.name,
       referenceNumber: input.referenceNumber ?? null,
-      trackingNumber: bookedWithCarrier ? 'assigned by Delhivery on creation' : input.trackingNumber ?? null,
+      trackingNumber: bookedWithCarrier
+        ? 'assigned by Delhivery on creation'
+        : autoDtdcSlip
+          ? nextDtdcSlip
+            ? `${nextDtdcSlip} (next unused DTDC number; taken when the order is created)`
+            : 'none: no unused DTDC numbers in Settings, so the order will have no tracking number'
+          : input.trackingNumber ?? null,
       bookedWithCarrier,
     },
     cost: { credits: creditCost, currentBalance: balance, sufficient: balance >= creditCost },
@@ -237,9 +254,31 @@ export async function createShipment(principal: McpPrincipal, previewId: string)
     );
   }
 
+  // Take the DTDC number now (not at preview) so abandoned previews do not use one up
+  const { [AUTO_DTDC_SLIP]: autoSlip, ...orderData } = operation.payload as Record<string, unknown>;
+  const courierCode = String(orderData.courier_service ?? '');
+  let claimedSlip: string | null = null;
+  if (isDtdcCourier(courierCode)) {
+    try {
+      if (autoSlip) {
+        claimedSlip = await claimDtdcSlip(principal.tenantId, courierCode);
+        if (claimedSlip) orderData.tracking_id = claimedSlip;
+      } else if (typeof orderData.tracking_id === 'string') {
+        // A number the user gave is marked used if it is one of the account's slips
+        claimedSlip = await claimDtdcSlip(principal.tenantId, courierCode, orderData.tracking_id);
+      }
+    } catch (error) {
+      const updated = await prisma.shipment_operations.update({
+        where: { id: operation.id },
+        data: { status: 'failed', error: error instanceof Error ? error.message : String(error) },
+      });
+      return operationView(updated);
+    }
+  }
+
   let outcome: Awaited<ReturnType<typeof createOrder>>;
   try {
-    outcome = await createOrder(principal.user, operation.payload as Record<string, unknown>, { creationPattern: 'mcp' });
+    outcome = await createOrder(principal.user, orderData, { creationPattern: 'mcp' });
   } catch (error) {
     // Unknown state: the credit or the carrier call may have happened
     const updated = await prisma.shipment_operations.update({
@@ -269,6 +308,10 @@ export async function createShipment(principal: McpPrincipal, previewId: string)
   // The order exists but its carrier details were not saved: it is charged, so
   // it must be reconciled rather than retried.
   const orderId = typeof outcome.body.orderId === 'number' ? outcome.body.orderId : null;
+  if (!orderId && claimedSlip) {
+    // No order was created, so the DTDC number is still unused
+    await releaseDtdcSlip(principal.tenantId, courierCode, claimedSlip);
+  }
   const reason = [outcome.body.error, outcome.body.details].filter(Boolean).join(': ');
   const updated = await prisma.shipment_operations.update({
     where: { id: operation.id },

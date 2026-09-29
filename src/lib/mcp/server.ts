@@ -65,7 +65,7 @@ const TOOL_INPUT: Record<string, z.ZodTypeAny> = {
       .string()
       .max(40)
       .optional()
-      .describe('Courier tracking/consignment number the user already has, e.g. for India Post or DTDC. Not allowed for Delhivery, which assigns the waybill.'),
+      .describe('Optional courier tracking/consignment number. India Post and similar: the number the user has. DTDC: leave empty to use the next unused DTDC number from Settings. Delhivery: not allowed, Delhivery assigns the waybill.'),
     reseller: z.object({ name: z.string().optional(), mobile: z.string().optional() }).optional(),
   }),
   create_shipment: z.object({ previewId: z.string().describe('previewId returned by prepare_shipment') }),

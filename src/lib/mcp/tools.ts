@@ -86,7 +86,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'prepare_shipment',
     description:
-      'Validate a new order and return a preview with its credit cost. Nothing is charged or booked. Use list_shipping_options for valid courier codes and pickup locations. Put a courier tracking/consignment number the user gives in trackingNumber (not referenceNumber); Delhivery assigns its own. Show the preview to the user and wait for their explicit confirmation before calling create_shipment.',
+      'Validate a new order and return a preview with its credit cost. Nothing is charged or booked. Use list_shipping_options for valid courier codes and pickup locations. Tracking numbers depend on the courier: Delhivery assigns one when the order is created; DTDC uses the next unused number from Settings unless the user gives one; for India Post and others, put the number the user gives in trackingNumber (not referenceNumber), or leave it empty. Show the preview to the user and wait for their explicit confirmation before calling create_shipment.',
     scope: 'shipments:create',
     write: 'preview',
   },
