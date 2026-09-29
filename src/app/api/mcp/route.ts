@@ -1,7 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { authenticateMcpRequest } from '@/lib/mcp/auth';
 import { McpAuthError } from '@/lib/mcp/errors';
-import { assertAllowedHost, mcpCorsHeaders, mcpUnauthorized, withMcpCors } from '@/lib/mcp/http';
+import { assertAllowedHost, assertAllowedOrigin, mcpCorsHeaders, mcpUnauthorized, withMcpCors } from '@/lib/mcp/http';
 import { createMcpServer } from '@/lib/mcp/server';
 import { MODE_HEADER } from '@/lib/maintenance';
 
@@ -9,6 +9,9 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 async function handle(request: Request): Promise<Response> {
+  const originError = assertAllowedOrigin(request);
+  if (originError) return originError;
+
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: mcpCorsHeaders(request) });
   }

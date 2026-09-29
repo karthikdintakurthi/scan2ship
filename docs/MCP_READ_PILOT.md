@@ -22,6 +22,8 @@ MCP_ALLOWED_HOSTS=your-mcp-host.example
 
 `MCP_TENANT_ALLOWLIST=*` allows every tenant (local only). An empty allowlist allows none.
 
+Browser requests to `/api/mcp` must come from this server's own origin, `https://claude.ai` or `https://claude.com`; others get 403. Clients that send no `Origin` (Claude Code, server-side connectors) are unaffected. To allow a browser-based tool such as MCP Inspector, add its origin: `MCP_ALLOWED_ORIGINS=http://localhost:6274`.
+
 Apply Prisma migration `20260929180000_mcp_read_pilot` on **this app’s database**, not current Scan2Ship production.
 
 ## Connect a client

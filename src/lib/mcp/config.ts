@@ -60,6 +60,22 @@ export function mcpAllowedHosts(): string[] {
   }
 }
 
+/**
+ * Browser origins allowed to call the MCP and OAuth endpoints: this server's own
+ * origin, Claude's web apps, and any in MCP_ALLOWED_ORIGINS. Requests without an
+ * Origin header (server-side clients such as Claude Code) are not affected.
+ */
+export function mcpAllowedOrigins(): string[] {
+  const fromEnv = process.env.MCP_ALLOWED_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) ?? [];
+  const origins = ['https://claude.ai', 'https://claude.com', ...fromEnv];
+  try {
+    origins.push(new URL(mcpPublicBaseUrl()).origin);
+  } catch {
+    // No public base URL configured
+  }
+  return [...new Set(origins.map((o) => o.replace(/\/+$/, '').toLowerCase()))];
+}
+
 export const MCP_ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const MCP_REFRESH_TOKEN_TTL_SECONDS = 14 * 24 * 60 * 60;
 export const MCP_AUTHORIZATION_CODE_TTL_SECONDS = 10 * 60;

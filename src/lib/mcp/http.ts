@@ -1,15 +1,34 @@
-import { mcpAllowedHosts, mcpResourceUrl } from './config';
+import { mcpAllowedHosts, mcpAllowedOrigins, mcpResourceUrl } from './config';
 
+/** True when the request has no Origin (not from a browser) or an allowed one. */
+export function isAllowedMcpOrigin(request: Request): boolean {
+  const origin = request.headers.get('origin');
+  return !origin || mcpAllowedOrigins().includes(origin.toLowerCase());
+}
+
+/** CORS headers that let only allowed browser origins read responses. */
 export function mcpCorsHeaders(request: Request): HeadersInit {
   const origin = request.headers.get('origin');
   return {
-    'Access-Control-Allow-Origin': origin || '*',
+    ...(origin && isAllowedMcpOrigin(request) ? { 'Access-Control-Allow-Origin': origin } : {}),
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type, MCP-Protocol-Version, MCP-Session-Id',
     'Access-Control-Expose-Headers': 'WWW-Authenticate, MCP-Session-Id',
     'Access-Control-Max-Age': '86400',
-    ...(origin ? { Vary: 'Origin' } : {}),
+    Vary: 'Origin',
   };
+}
+
+/**
+ * Rejects browser requests from other origins, as the MCP transport spec
+ * requires, so a web page cannot drive the MCP endpoint (e.g. via DNS rebinding).
+ */
+export function assertAllowedOrigin(request: Request): Response | null {
+  if (isAllowedMcpOrigin(request)) return null;
+  return new Response(JSON.stringify({ error: 'invalid_origin' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json', Vary: 'Origin' },
+  });
 }
 
 export function withMcpCors(request: Request, response: Response): Response {
