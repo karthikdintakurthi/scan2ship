@@ -9,6 +9,9 @@ jest.mock('@/lib/prisma', () => ({
     user_sub_groups: { findFirst: jest.fn() },
     orders: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     pickup_locations: { findFirst: jest.fn() },
+    user_pickup_locations: { findMany: jest.fn().mockResolvedValue([]) },
+    // Courier checks are covered in orders.test.ts; every courier is active here
+    courier_services: { findFirst: jest.fn().mockResolvedValue({ code: 'any' }) },
   },
 }));
 
@@ -168,6 +171,34 @@ describe('PUT /api/orders/[id]', () => {
       expect(updateOrderRow).not.toHaveBeenCalled();
     }
   );
+
+  it('rejects moving an order to a pickup location the user may not use', async () => {
+    actAs('user');
+    (prisma.pickup_locations.findFirst as jest.Mock).mockResolvedValue(null);
+    const response = await updateOrder(signedRequest({ pickup_location: 'b-warehouse' }), params('2'));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/Pickup location "b-warehouse" is not available/);
+    expect(updateOrderRow).not.toHaveBeenCalled();
+  });
+
+  it('rejects switching an order to an inactive courier', async () => {
+    actAs('user');
+    (prisma.courier_services.findFirst as jest.Mock).mockResolvedValueOnce(null);
+    const response = await updateOrder(signedRequest({ courier_service: 'blue_dart' }), params('2'));
+    expect(response.status).toBe(400);
+    expect(updateOrderRow).not.toHaveBeenCalled();
+  });
+
+  it('keeps older orders editable when their courier and pickup are sent back unchanged', async () => {
+    actAs('user');
+    const response = await updateOrder(
+      signedRequest({ name: 'New Name', courier_service: 'delhivery', pickup_location: 'a-warehouse' }),
+      params('2')
+    );
+    expect(response.status).toBe(200);
+    expect(prisma.courier_services.findFirst).not.toHaveBeenCalled();
+    expect(prisma.pickup_locations.findFirst).not.toHaveBeenCalled();
+  });
 
   it('returns 404 and does not update another tenant order', async () => {
     actAs('client_admin');

@@ -74,6 +74,9 @@ beforeEach(() => {
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
   (prisma.users.findUnique as jest.Mock).mockResolvedValue(authUserRow('user'));
+  // Every courier and pickup is allowed unless a test says otherwise
+  (prisma.courier_services.findFirst as jest.Mock).mockResolvedValue({ code: 'allowed' });
+  (prisma.pickup_locations.findFirst as jest.Mock).mockResolvedValue({ value: 'allowed' });
   credits.deductCredits.mockResolvedValue({ balance: 9, transactionId: 'txn-charge' });
   credits.refundCredits.mockResolvedValue({ balance: 10 });
   credits.attachOrderToTransaction.mockResolvedValue(undefined);

@@ -65,3 +65,34 @@ export async function pickupAccessWhere(user: AuthenticatedUser): Promise<Prisma
   }
   return { ...tenantScope, id: { in: assigned.map((row) => row.pickupLocationId) } };
 }
+
+/**
+ * Why a courier or pickup location may not be used on an order, or null. The
+ * courier must be active for the tenant and the pickup location one this user
+ * may use (for child users, one assigned to them), as the order form and
+ * list_shipping_options offer them. Only the fields given are checked.
+ */
+export async function courierOrPickupError(
+  user: AuthenticatedUser,
+  choice: { courier?: unknown; pickupLocation?: unknown }
+): Promise<string | null> {
+  const courierCode = choice.courier === undefined ? null : String(choice.courier).trim();
+  const pickupValue = choice.pickupLocation === undefined ? null : String(choice.pickupLocation);
+  const [courier, pickup] = await Promise.all([
+    courierCode === null
+      ? null
+      : prisma.courier_services.findFirst({
+          where: { clientId: user.clientId, isActive: true, code: { equals: courierCode, mode: 'insensitive' } },
+          select: { code: true },
+        }),
+    pickupValue === null
+      ? null
+      : prisma.pickup_locations.findFirst({
+          where: { AND: [await pickupAccessWhere(user), { value: pickupValue }] },
+          select: { value: true },
+        }),
+  ]);
+  if (courierCode !== null && !courier) return `Courier "${courierCode}" is not active for this account`;
+  if (pickupValue !== null && !pickup) return `Pickup location "${pickupValue}" is not available to you`;
+  return null;
+}

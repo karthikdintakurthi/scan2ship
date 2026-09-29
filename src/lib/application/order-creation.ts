@@ -7,6 +7,7 @@ import { CreditService, InsufficientCreditsError, type CreditCharge } from '@/li
 import { pickCreatableOrderFields } from '@/lib/application/order-fields';
 import { WebhookService } from '@/lib/webhook-service';
 import type { AuthenticatedUser } from '@/lib/auth-middleware';
+import { courierOrPickupError } from '@/lib/application/policy';
 import { claimDtdcSlip, claimListedDtdcSlip, isDtdcCourier, releaseDtdcSlip } from '@/lib/application/dtdc-slips';
 
 const delhiveryService = new DelhiveryService();
@@ -77,6 +78,12 @@ export async function createOrder(
   const invalid = validateOrderInput(orderData);
   if (invalid) {
     return invalid;
+  }
+
+  // Checked for every channel, before anything is charged or claimed
+  const notAllowed = await courierOrPickupError(user, { courier: orderData.courier_service, pickupLocation: orderData.pickup_location });
+  if (notAllowed) {
+    return fail(400, { error: notAllowed, details: 'Choose a courier and pickup location from your Settings.' });
   }
 
   // Get client order configuration for reference number prefix

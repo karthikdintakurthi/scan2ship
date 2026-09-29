@@ -98,6 +98,9 @@ beforeEach(() => {
   );
   (prisma.orders.count as jest.Mock).mockImplementation(async ({ where }) => ORDERS.filter((row) => matchesWhere(row, where)).length);
   (prisma.orders.create as jest.Mock).mockImplementation(async ({ data }) => ({ id: 101, ...data }));
+  // Every courier and pickup is allowed unless a test says otherwise
+  (prisma.courier_services.findFirst as jest.Mock).mockResolvedValue({ code: 'allowed' });
+  (prisma.pickup_locations.findFirst as jest.Mock).mockResolvedValue({ value: 'allowed' });
   (prisma.orders.findUnique as jest.Mock).mockImplementation(async ({ where }) => ({ id: where.id, reference_number: 'REF' }));
   (prisma.orders.delete as jest.Mock).mockImplementation(async ({ where }) => ORDERS.find((row) => row.id === where.id));
   (prisma.client_order_configs.findUnique as jest.Mock).mockResolvedValue(null);
@@ -158,6 +161,59 @@ describe('POST /api/orders', () => {
       expect(response.status).toBe(400);
       expect((await response.json()).error).toMatch(/^Reseller mobile number/);
       expect(CreditService.deductCredits).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('courier and pickup rules', () => {
+    const COURIERS = [
+      { clientId: 'client-a', code: 'dtdc', isActive: true },
+      { clientId: 'client-a', code: 'Delhivery', isActive: true },
+      { clientId: 'client-a', code: 'blue_dart', isActive: false },
+      { clientId: 'client-b', code: 'india_post', isActive: true },
+    ];
+    const PICKUPS = [
+      { id: 'p1', clientId: 'client-a', value: 'a-wh' },
+      { id: 'p2', clientId: 'client-a', value: 'a-branch' },
+      { id: 'p9', clientId: 'client-b', value: 'b-wh' },
+    ];
+
+    beforeEach(() => {
+      (prisma.courier_services.findFirst as jest.Mock).mockImplementation(async ({ where }) => COURIERS.find((row) => matchesWhere(row, where)) ?? null);
+      (prisma.pickup_locations.findFirst as jest.Mock).mockImplementation(async ({ where }) => PICKUPS.find((row) => matchesWhere(row, where)) ?? null);
+      (prisma.user_pickup_locations.findMany as jest.Mock).mockResolvedValue([{ pickupLocationId: 'p2' }]);
+    });
+
+    const expectNothingDone = () => {
+      expect(CreditService.deductCredits).not.toHaveBeenCalled();
+      expect(delhivery.createOrder).not.toHaveBeenCalled();
+      expect(prisma.orders.create).not.toHaveBeenCalled();
+    };
+
+    it.each([
+      ['an inactive courier', { courier_service: 'blue_dart' }, /Courier "blue_dart" is not active/],
+      ['a courier the tenant does not have', { courier_service: 'india_post' }, /Courier "india_post" is not active/],
+      ["another tenant's pickup location", { pickup_location: 'b-wh' }, /Pickup location "b-wh" is not available/],
+      ['a pickup value that is not a location', { pickup_location: 'Scan2Ship' }, /Pickup location "Scan2Ship" is not available/],
+    ])('rejects %s before charging', async (_case, change, message) => {
+      actAs('user');
+      const response = await post({ ...VALID_ORDER, ...change });
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toMatch(message);
+      expectNothingDone();
+    });
+
+    it('matches courier codes without regard to case', async () => {
+      actAs('user');
+      expect((await post({ ...VALID_ORDER, courier_service: 'delhivery' })).status).toBe(200);
+    });
+
+    it('keeps child users to their assigned pickup locations', async () => {
+      actAs('child_user');
+      const response = await post({ ...VALID_ORDER, pickup_location: 'a-wh' });
+      expect(response.status).toBe(400);
+      expectNothingDone();
+
+      expect((await post({ ...VALID_ORDER, pickup_location: 'a-branch' })).status).toBe(200);
     });
   });
 

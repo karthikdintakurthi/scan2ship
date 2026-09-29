@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { delhiveryService } from '@/lib/delhivery';
-import { findAccessibleOrder, parseOrderId } from '@/lib/application/policy';
+import { courierOrPickupError, findAccessibleOrder, parseOrderId } from '@/lib/application/policy';
 
 // Fields the order edit form may change. Tenant, creator, sub-group, billing,
 // and carrier state are deliberately excluded.
@@ -110,7 +110,9 @@ export async function PUT(
     }
 
     const orderId = parseOrderId((await params).id)
-    const existing = orderId ? await findAccessibleOrder(authResult.user!, orderId, { select: { id: true } }) : null
+    const existing = orderId
+      ? await findAccessibleOrder(authResult.user!, orderId, { select: { id: true, courier_service: true, pickup_location: true } })
+      : null
     if (!existing) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
@@ -128,6 +130,16 @@ export async function PUT(
         { error: `These fields cannot be updated: ${rejectedFields.join(', ')}` },
         { status: 400 }
       )
+    }
+
+    // A changed courier or pickup must be one this user may use now; unchanged
+    // values are left alone so older orders stay editable
+    const choiceError = await courierOrPickupError(authResult.user!, {
+      ...('courier_service' in body && body.courier_service !== existing.courier_service ? { courier: body.courier_service } : {}),
+      ...('pickup_location' in body && body.pickup_location !== existing.pickup_location ? { pickupLocation: body.pickup_location } : {}),
+    })
+    if (choiceError) {
+      return NextResponse.json({ error: choiceError }, { status: 400 })
     }
 
     const data: Prisma.ordersUpdateInput = Object.fromEntries(
