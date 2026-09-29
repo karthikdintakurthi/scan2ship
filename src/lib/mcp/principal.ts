@@ -10,6 +10,8 @@ export type McpPrincipal = {
   scopes: McpScope[];
   role: UserRole;
   user: AuthenticatedUser;
+  /** Read-only maintenance: write tools are paused and hidden */
+  writesPaused?: boolean;
 };
 
 export function userFromGrant(row: {

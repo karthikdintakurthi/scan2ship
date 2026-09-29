@@ -22,9 +22,12 @@ const CHANNEL = 'mcp';
 /** Payload marker: take the next unused DTDC number when the order is created. */
 const AUTO_DTDC_SLIP = '_assignNextDtdcSlip';
 
-function requireWritesEnabled() {
+function requireWritesEnabled(principal: McpPrincipal) {
   if (!areMcpWritesEnabled()) {
     throw new McpToolError('forbidden', 'Creating shipments through the assistant is turned off');
+  }
+  if (principal.writesPaused) {
+    throw new McpToolError('forbidden', 'Scan2Ship is in read-only maintenance; creating shipments is paused', true);
   }
 }
 
@@ -67,7 +70,7 @@ function sameText(a: string, b: string) {
  * call createShipment only after the user confirms.
  */
 export async function prepareShipment(principal: McpPrincipal, input: PrepareShipmentInput) {
-  requireWritesEnabled();
+  requireWritesEnabled(principal);
   await assertUnderDailyLimit(principal.tenantId);
 
   const options = await listShippingOptions(principal.user);
@@ -224,7 +227,7 @@ export async function findOwnOperation(principal: McpPrincipal, id: string) {
  * order: repeating the call returns the first outcome instead of ordering again.
  */
 export async function createShipment(principal: McpPrincipal, previewId: string) {
-  requireWritesEnabled();
+  requireWritesEnabled(principal);
 
   // Claim the preview atomically so concurrent or repeated calls cannot both create
   const claimed = await prisma.shipment_operations.updateMany({

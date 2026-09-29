@@ -3,6 +3,7 @@ import { authenticateMcpRequest } from '@/lib/mcp/auth';
 import { McpAuthError } from '@/lib/mcp/errors';
 import { assertAllowedHost, mcpCorsHeaders, mcpUnauthorized, withMcpCors } from '@/lib/mcp/http';
 import { createMcpServer } from '@/lib/mcp/server';
+import { MODE_HEADER } from '@/lib/maintenance';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,9 @@ async function handle(request: Request): Promise<Response> {
     }
     return mcpUnauthorized(request, 401, 'invalid_token', 'Authentication failed');
   }
+
+  // Set by src/middleware.ts from the maintenance switch
+  principal.writesPaused = request.headers.get(MODE_HEADER) === 'read_only';
 
   const server = createMcpServer(principal);
   const transport = new WebStandardStreamableHTTPServerTransport({

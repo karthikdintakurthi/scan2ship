@@ -319,6 +319,13 @@ describe('scopes and tool listing', () => {
     expect(listed()).toEqual(['get_account_context', 'list_shipping_options']);
   });
 
+  it('pauses and hides the shipment tools during read-only maintenance', async () => {
+    const paused = { ...principalFor(), writesPaused: true };
+    await expect(prepareShipment(paused, INPUT)).rejects.toMatchObject({ code: 'forbidden', message: expect.stringMatching(/read-only maintenance/) });
+    const server = createMcpServer(paused) as unknown as { _registeredTools: Record<string, unknown> };
+    expect(Object.keys(server._registeredTools).sort()).toEqual(['get_account_context', 'list_shipping_options']);
+  });
+
   it('marks create_shipment as acting on the outside world', () => {
     const server = createMcpServer(principalFor()) as unknown as { _registeredTools: Record<string, { annotations?: Record<string, boolean> }> };
     expect(server._registeredTools.create_shipment.annotations).toMatchObject({ readOnlyHint: false, openWorldHint: true, idempotentHint: true });

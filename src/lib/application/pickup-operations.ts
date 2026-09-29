@@ -56,6 +56,9 @@ export async function preparePickup(principal: McpPrincipal, input: PreparePicku
   if (!areMcpWritesEnabled()) {
     throw new McpToolError('forbidden', 'Scheduling pickups through the assistant is turned off');
   }
+  if (principal.writesPaused) {
+    throw new McpToolError('forbidden', 'Scan2Ship is in read-only maintenance; scheduling pickups is paused', true);
+  }
 
   // Reject dates JavaScript would silently roll over (e.g. 2026-02-30 -> 2026-03-02)
   const parsedDate = new Date(`${input.pickupDate}T00:00:00Z`);
@@ -138,6 +141,9 @@ export async function preparePickup(principal: McpPrincipal, input: PreparePicku
 export async function schedulePickup(principal: McpPrincipal, previewId: string) {
   if (!areMcpWritesEnabled()) {
     throw new McpToolError('forbidden', 'Scheduling pickups through the assistant is turned off');
+  }
+  if (principal.writesPaused) {
+    throw new McpToolError('forbidden', 'Scan2Ship is in read-only maintenance; scheduling pickups is paused', true);
   }
 
   const claimed = await prisma.shipment_operations.updateMany({

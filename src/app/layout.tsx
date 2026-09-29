@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
+import MaintenanceBanner from '@/components/MaintenanceBanner';
 import AuthWrapper from '@/components/AuthWrapper';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -108,6 +109,7 @@ export default function RootLayout({
           <AuthWrapper>
             {children}
           </AuthWrapper>
+          <MaintenanceBanner />
         </AuthProvider>
       </body>
     </html>

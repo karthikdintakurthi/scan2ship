@@ -119,7 +119,7 @@ export function createMcpServer(principal: McpPrincipal): McpServer {
   );
 
   // Only list tools this connection may call, so assistants are not offered tools they cannot use.
-  const writesEnabled = areMcpWritesEnabled();
+  const writesEnabled = areMcpWritesEnabled() && !principal.writesPaused;
   for (const tool of MCP_TOOL_DEFINITIONS.filter(
     (item) => toolAllowed(item, principal.scopes) && (!item.write || writesEnabled)
   )) {

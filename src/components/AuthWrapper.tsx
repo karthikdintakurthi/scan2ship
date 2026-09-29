@@ -18,8 +18,8 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
   // Always call useAuth hook to maintain hook order consistency
   const auth = useAuth();
 
-  // Allow public access to tracking page
-  const isPublicPage = pathname === '/tracking';
+  // Pages that render without signing in
+  const isPublicPage = pathname === '/tracking' || pathname === '/maintenance';
 
   // Handle authentication errors gracefully
   useEffect(() => {
