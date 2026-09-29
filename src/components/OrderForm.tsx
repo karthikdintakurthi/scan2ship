@@ -1062,13 +1062,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
         if (selectedProducts.length > 0) {
           try {
             console.log('🔄 [ORDER_FORM] Updating inventory in catalog-app...');
-            const inventoryItems = selectedProducts.map(item => ({
-              sku: item.product.sku,
-              quantity: item.quantity,
-              isPreorder: item.isPreorder || false
-            }));
-
-            // Call catalog API to reduce inventory
+            // The server reduces the items stored on this order
             const inventoryResponse = await fetch('/api/catalog', {
               method: 'POST',
               headers: {
@@ -1077,7 +1071,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
               },
               body: JSON.stringify({
                 action: 'reduce_inventory',
-                data: { items: inventoryItems, orderNumber: result.order.orderNumber }
+                data: { orderId: result.order.id }
               }),
             });
             
