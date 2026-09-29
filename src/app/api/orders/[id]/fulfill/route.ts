@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { delhiveryService } from '@/lib/delhivery';
-import { ShopifyApiService } from '@/lib/shopify-api';
 import { WebhookService } from '@/lib/webhook-service';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { findAccessibleOrder, parseOrderId } from '@/lib/application/policy';
@@ -16,7 +15,7 @@ interface FulfillResponse {
 }
 
 /**
- * Fulfill an order by calling Delhivery API and updating Shopify
+ * Fulfill an order by calling the Delhivery API
  */
 export async function POST(
   request: NextRequest,
@@ -149,7 +148,6 @@ export async function POST(
           delhivery_api_status: 'success',
           tracking_status: 'manifested',
           last_delhivery_attempt: new Date(),
-          shopify_status: 'pending', // Will be updated after Shopify call
           updated_at: new Date()
         }
       });
@@ -159,79 +157,6 @@ export async function POST(
     }
 
     console.log(`✅ [FULFILL_ORDER] Updated order ${orderId} with tracking: ${delhiveryResponse.waybill_number}`);
-
-    // Find the corresponding Shopify order
-    const shopifyOrder = await prisma.shopify_orders.findFirst({
-      where: {
-        orderId: orderId
-      }
-    });
-
-    if (shopifyOrder) {
-      console.log(`🛍️ [FULFILL_ORDER] Found Shopify order: ${shopifyOrder.shopifyOrderId}`);
-      
-      // Update Shopify with tracking information using order update (more reliable)
-      const shopifyUpdateResult = await ShopifyApiService.updateOrderWithTracking(
-        shopifyOrder.syncData?.shop?.domain || 'www.vanithafashionjewelry.com',
-        shopifyOrder.shopifyOrderId,
-        delhiveryResponse.waybill_number,
-        order.courier_service,
-        `https://www.delhivery.com/track/package/${delhiveryResponse.waybill_number}`
-      );
-
-      if (shopifyUpdateResult.success) {
-        console.log(`✅ [FULFILL_ORDER] Successfully updated Shopify order with tracking`);
-        
-        // Update Shopify order status
-        try {
-          await prisma.shopify_orders.update({
-            where: { id: shopifyOrder.id },
-            data: {
-              status: 'fulfilled',
-              updatedAt: new Date()
-            }
-          });
-        } catch (shopifyDbError) {
-          console.error(`❌ [FULFILL_ORDER] Failed to update Shopify order in database:`, shopifyDbError);
-        }
-
-        // Update order with Shopify success status
-        try {
-          await prisma.orders.update({
-            where: { id: orderId },
-            data: {
-              shopify_status: 'fulfilled',
-              shopify_tracking_number: delhiveryResponse.waybill_number,
-              shopify_api_status: 'success',
-              last_shopify_attempt: new Date(),
-              updated_at: new Date()
-            }
-          });
-        } catch (orderDbError) {
-          console.error(`❌ [FULFILL_ORDER] Failed to update order with Shopify status:`, orderDbError);
-        }
-      } else {
-        console.warn(`⚠️ [FULFILL_ORDER] Failed to update Shopify order:`, shopifyUpdateResult.error);
-        
-        // Update order with Shopify error status
-        try {
-          await prisma.orders.update({
-            where: { id: orderId },
-            data: {
-              shopify_status: 'error',
-              shopify_api_status: 'failed',
-              shopify_api_error: shopifyUpdateResult.error,
-              last_shopify_attempt: new Date(),
-              updated_at: new Date()
-            }
-          });
-        } catch (shopifyErrorDbError) {
-          console.error(`❌ [FULFILL_ORDER] Failed to update order with Shopify error status:`, shopifyErrorDbError);
-        }
-      }
-    } else {
-      console.log(`⚠️ [FULFILL_ORDER] No Shopify order found for Scan2Ship order ${orderId}`);
-    }
 
     // Trigger webhooks for fulfillment
     await WebhookService.triggerWebhooks('order.fulfilled', {

@@ -24,7 +24,6 @@ export interface TimeoutConfig {
   
   // External service timeouts
   external: {
-    shopify: number; // 30 seconds
     payment: number; // 45 seconds
     email: number; // 30 seconds
     sms: number; // 15 seconds
@@ -78,7 +77,6 @@ export const defaultTimeoutConfig: TimeoutConfig = {
   },
   
   external: {
-    shopify: 30000, // 30 seconds
     payment: 45000, // 45 seconds
     email: 30000, // 30 seconds
     sms: 15000, // 15 seconds
@@ -124,7 +122,7 @@ export function getTimeoutConfig(): TimeoutConfig {
   }
   
   if (process.env.EXTERNAL_TIMEOUT) {
-    config.external.shopify = parseInt(process.env.EXTERNAL_TIMEOUT, 10);
+    config.external.webhook = parseInt(process.env.EXTERNAL_TIMEOUT, 10);
   }
   
   if (process.env.FILE_UPLOAD_TIMEOUT) {
@@ -188,7 +186,7 @@ export function createTimeoutController(timeoutMs: number): AbortController {
 export async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
-  timeoutMs: number = defaultTimeoutConfig.external.shopify
+  timeoutMs: number = defaultTimeoutConfig.external.webhook
 ): Promise<Response> {
   const controller = createTimeoutController(timeoutMs);
   
@@ -275,8 +273,8 @@ export function validateTimeoutConfig(config: TimeoutConfig): {
   }
   
   // Validate external timeouts
-  if (config.external.shopify <= 0) {
-    errors.push('Shopify timeout must be positive');
+  if (config.external.webhook <= 0) {
+    errors.push('External webhook timeout must be positive');
   }
   
   // Validate file timeouts

@@ -42,13 +42,6 @@ interface Order {
   delhivery_retry_count?: number
   last_delhivery_attempt?: string
   
-  // Shopify integration fields
-  shopify_status?: string
-  shopify_tracking_number?: string
-  shopify_fulfillment_id?: string
-  shopify_api_status?: string
-  shopify_api_error?: string
-  last_shopify_attempt?: string
   
   // Additional Delhivery fields
   shipment_length?: number
@@ -1376,21 +1369,6 @@ export default function OrderList() {
 
 
 
-
-  const getShopifyStatusBadge = (order: Order) => {
-    switch (order.shopify_status) {
-      case 'fulfilled':
-        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">✓ Fulfilled</span>
-      case 'error':
-        return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">✗ Error</span>
-      case 'pending':
-        return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">⏳ Pending</span>
-      case 'synced':
-        return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">🔄 Synced</span>
-      default:
-        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">❓ Not Connected</span>
-    }
-  }
 
   const getCourierServiceName = (courierCode: string): string => {
     const courierMap: { [key: string]: string } = {

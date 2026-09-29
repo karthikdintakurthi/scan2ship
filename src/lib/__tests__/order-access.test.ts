@@ -8,7 +8,6 @@ jest.mock('@/lib/prisma', () => ({
     user_sub_groups: { findFirst: jest.fn() },
     orders: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     pickup_locations: { findFirst: jest.fn() },
-    shopify_orders: { findFirst: jest.fn() },
   },
 }));
 
@@ -25,7 +24,6 @@ jest.mock('@/lib/delhivery', () => ({
 }));
 jest.mock('@/lib/pickup-location-config', () => ({ getDelhiveryApiKey: jest.fn() }));
 jest.mock('@/lib/cross-app-auth', () => ({ getCatalogApiKey: jest.fn() }));
-jest.mock('@/lib/shopify-api', () => ({ ShopifyApiService: { updateOrderWithTracking: jest.fn() } }));
 jest.mock('@/lib/webhook-service', () => ({ WebhookService: { triggerWebhooks: jest.fn() } }));
 
 import { prisma } from '@/lib/prisma';
@@ -278,7 +276,6 @@ describe('POST /api/orders/[id]/fulfill: accessible orders', () => {
   it('books the shipment for an order in the caller tenant and stores the waybill', async () => {
     actAs('user');
     (delhiveryService.createOrder as jest.Mock).mockResolvedValue({ success: true, waybill_number: 'WB-NEW', order_id: 'DL-1' });
-    (prisma.shopify_orders.findFirst as jest.Mock).mockResolvedValue(null);
 
     const response = await fulfillOrder(signedRequest(), params('1'));
     const body = await response.json();

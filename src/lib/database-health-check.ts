@@ -66,10 +66,6 @@ export class DatabaseHealthCheck {
       const rateLimitsColumns = await this.checkAndFixRateLimits();
       fixedColumns.push(...rateLimitsColumns);
 
-      // Check and fix orders table
-      const ordersColumns = await this.checkAndFixOrders();
-      fixedColumns.push(...ordersColumns);
-
     } catch (error) {
       console.error('❌ [DB_HEALTH] Error fixing missing columns:', error);
     }
@@ -197,92 +193,6 @@ export class DatabaseHealthCheck {
 
     } catch (error) {
       console.error('❌ [DB_HEALTH] Error fixing rate_limits columns:', error);
-    }
-
-    return fixedColumns;
-  }
-
-  /**
-   * Check and fix orders table
-   */
-  private async checkAndFixOrders(): Promise<string[]> {
-    const fixedColumns: string[] = [];
-    
-    try {
-      // Check if shopify_customer_email column exists
-      const hasShopifyCustomerEmail = await this.columnExists('orders', 'shopify_customer_email');
-      if (!hasShopifyCustomerEmail) {
-        await prisma.$executeRaw`ALTER TABLE orders ADD COLUMN shopify_customer_email TEXT`;
-        fixedColumns.push('orders.shopify_customer_email');
-        console.log('✅ [DB_HEALTH] Added shopify_customer_email column to orders');
-      }
-
-      // Check if shopify_fulfillment_id column exists
-      const hasShopifyFulfillmentId = await this.columnExists('orders', 'shopify_fulfillment_id');
-      if (!hasShopifyFulfillmentId) {
-        await prisma.$executeRaw`ALTER TABLE orders ADD COLUMN shopify_fulfillment_id TEXT`;
-        fixedColumns.push('orders.shopify_fulfillment_id');
-        console.log('✅ [DB_HEALTH] Added shopify_fulfillment_id column to orders');
-      }
-
-      // Check if shopify_note column exists
-      const hasShopifyNote = await this.columnExists('orders', 'shopify_note');
-      if (!hasShopifyNote) {
-        await prisma.$executeRaw`ALTER TABLE orders ADD COLUMN shopify_note TEXT`;
-        fixedColumns.push('orders.shopify_note');
-        console.log('✅ [DB_HEALTH] Added shopify_note column to orders');
-      }
-
-      // Check if shopify_order_id column exists
-      const hasShopifyOrderId = await this.columnExists('orders', 'shopify_order_id');
-      if (!hasShopifyOrderId) {
-        await prisma.$executeRaw`ALTER TABLE orders ADD COLUMN shopify_order_id TEXT`;
-        fixedColumns.push('orders.shopify_order_id');
-        console.log('✅ [DB_HEALTH] Added shopify_order_id column to orders');
-      }
-
-      // Check if shopify_order_number column exists
-      const hasShopifyOrderNumber = await this.columnExists('orders', 'shopify_order_number');
-      if (!hasShopifyOrderNumber) {
-        await prisma.$executeRaw`ALTER TABLE orders ADD COLUMN shopify_order_number TEXT`;
-        fixedColumns.push('orders.shopify_order_number');
-        console.log('✅ [DB_HEALTH] Added shopify_order_number column to orders');
-      }
-
-      // Check if shopify_tags column exists
-      const hasShopifyTags = await this.columnExists('orders', 'shopify_tags');
-      if (!hasShopifyTags) {
-        await prisma.$executeRaw`ALTER TABLE orders ADD COLUMN shopify_tags TEXT`;
-        fixedColumns.push('orders.shopify_tags');
-        console.log('✅ [DB_HEALTH] Added shopify_tags column to orders');
-      }
-
-      // Check if shopify_update_error column exists
-      const hasShopifyUpdateError = await this.columnExists('orders', 'shopify_update_error');
-      if (!hasShopifyUpdateError) {
-        await prisma.$executeRaw`ALTER TABLE orders ADD COLUMN shopify_update_error TEXT`;
-        fixedColumns.push('orders.shopify_update_error');
-        console.log('✅ [DB_HEALTH] Added shopify_update_error column to orders');
-      }
-
-      // Check if shopify_update_status column exists
-      const hasShopifyUpdateStatus = await this.columnExists('orders', 'shopify_update_status');
-      if (!hasShopifyUpdateStatus) {
-        await prisma.$executeRaw`ALTER TABLE orders ADD COLUMN shopify_update_status TEXT`;
-        fixedColumns.push('orders.shopify_update_status');
-        console.log('✅ [DB_HEALTH] Added shopify_update_status column to orders');
-      }
-
-      // Check if shopify_update_timestamp column exists
-      const hasShopifyUpdateTimestamp = await this.columnExists('orders', 'shopify_update_timestamp');
-      if (!hasShopifyUpdateTimestamp) {
-        await prisma.$executeRaw`ALTER TABLE orders ADD COLUMN shopify_update_timestamp TIMESTAMP`;
-        fixedColumns.push('orders.shopify_update_timestamp');
-        console.log('✅ [DB_HEALTH] Added shopify_update_timestamp column to orders');
-      }
-
-    } catch (error) {
-      console.error('❌ [DB_HEALTH] Error fixing orders columns:', error);
     }
 
     return fixedColumns;

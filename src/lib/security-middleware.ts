@@ -78,11 +78,6 @@ export const corsConfig = {
     'Origin',
     'X-API-Key',
     'X-Webhook-Signature',
-    'X-Shopify-Hmac-Sha256',
-    'X-Shopify-Shop-Domain',
-    'X-Shopify-Topic',
-    'X-Shopify-Webhook-Id',
-    'X-Shopify-Webhook-Attempt',
     'X-Forwarded-For',
     'X-Real-IP',
     'X-CSRF-Token'

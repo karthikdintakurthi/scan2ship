@@ -24,6 +24,10 @@ const REMOVED = [
   'src/app/debug-auth/page.tsx',
   'src/app/api/tracking/update-single/route.ts',
   'src/components/TrackingStatusLabel.tsx',
+  // Shopify integration moved to the scan2ship-b2b application
+  'src/app/api/shopify/auth/route.ts',
+  'src/app/api/shopify/config/route.ts',
+  'src/app/api/shopify/webhooks/route.ts',
 ];
 
 function sourceFiles(dir: string): string[] {
@@ -50,5 +54,29 @@ describe('removed public routes', () => {
       );
     });
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('Shopify integration removal', () => {
+  const read = (file: string) => fs.readFileSync(join(ROOT, file), 'utf8');
+
+  it('only the Delhivery webhook still imports the Shopify client', () => {
+    const importers = sourceFiles(join(ROOT, 'src'))
+      .filter((file) => /shopify-api['"]/.test(fs.readFileSync(file, 'utf8')))
+      .map((file) => file.slice(ROOT.length + 1));
+    expect(importers).toEqual(['src/app/api/webhooks/delhivery/route.ts']);
+  });
+
+  it('fulfillment no longer syncs orders to Shopify', () => {
+    const fulfill = read('src/app/api/orders/[id]/fulfill/route.ts');
+    expect(fulfill).not.toMatch(/shopify/i);
+  });
+
+  it('CORS no longer allows Shopify webhook headers', () => {
+    expect(read('src/lib/security-middleware.ts')).not.toContain('X-Shopify-');
+  });
+
+  it('the Delhivery webhook is left as it was', () => {
+    expect(fs.existsSync(join(ROOT, 'src/app/api/webhooks/delhivery/route.ts'))).toBe(true);
   });
 });
