@@ -36,6 +36,10 @@ const REMOVED = [
   'src/app/api/admin/clients/[id]/update-password/route.ts',
   'src/app/api/auth/change-password/route.ts',
   'src/app/api/upload/route.ts',
+  // System settings that nothing read (the app uses environment variables),
+  // including leftover Shopify and never-built WhatsApp settings
+  'src/app/api/admin/system-config/route.ts',
+  'src/lib/system-config.ts',
 ];
 
 function sourceFiles(dir: string): string[] {
