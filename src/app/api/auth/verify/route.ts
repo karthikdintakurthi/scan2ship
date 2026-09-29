@@ -1,91 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
+import { getAuthenticatedUser } from '@/lib/auth-middleware';
 
+/**
+ * GET /api/auth/verify  (Authorization: Bearer <access token>)
+ *
+ * Tells the app whether its stored token is still signed in. Uses the same
+ * check as every API route, so a logged-out or revoked session is reported as
+ * signed out immediately.
+ */
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'No token provided' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'No token provided' }, { status: 401 });
     }
 
-    const token = authHeader.substring(7);
-
-    // Verify JWT token with backward-compatible configuration
-    let decoded;
-    let verificationError;
-    
-    // Strategy 1: Try with new configuration
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET!, {
-        issuer: process.env.JWT_ISSUER || 'scan2ship-saas',
-        audience: process.env.JWT_AUDIENCE || 'scan2ship-users',
-        algorithms: ['HS256']
-      }) as any;
-    } catch (error) {
-      verificationError = error;
-      
-      // Strategy 2: Try without issuer/audience validation (for old tokens)
-      try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET!, {
-          algorithms: ['HS256']
-        }) as any;
-      } catch {
-        // Strategy 3: Try with old hardcoded values for backward compatibility
-        try {
-          decoded = jwt.verify(token, process.env.JWT_SECRET!, {
-            issuer: 'vanitha-logistics',
-            audience: 'vanitha-logistics-users',
-            algorithms: ['HS256']
-          }) as any;
-        } catch {
-          return NextResponse.json(
-            { error: 'Invalid token' },
-            { status: 401 }
-          );
-        }
-      }
+    const auth = await getAuthenticatedUser(request);
+    if (!auth || !auth.sessionId) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Get user and client data from database
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
-    });
+    const [user, session] = await Promise.all([
+      prisma.users.findUnique({ where: { id: auth.id }, include: { clients: true } }),
+      prisma.sessions.findUnique({ where: { id: auth.sessionId }, select: { id: true, expiresAt: true } }),
+    ]);
 
-    if (!user || !user.isActive || !user.clients.isActive) {
-      return NextResponse.json(
-        { error: 'User or client not found or inactive' },
-        { status: 401 }
-      );
+    if (!user || !session) {
+      return NextResponse.json({ error: 'User or client not found or inactive' }, { status: 401 });
     }
 
-    // Return user and client data
-    const { password: _, ...userWithoutPassword } = user;
-    
+    const { password: _password, ...userWithoutPassword } = user;
     return NextResponse.json({
       user: userWithoutPassword,
       client: user.clients,
       session: {
-        id: 'session-id', // We'll implement proper session management later
+        id: session.id,
         userId: user.id,
         clientId: user.clientId,
-        token: token,
-        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) // 8 hours from now
-      }
+        token: authHeader.slice(7),
+        expiresAt: session.expiresAt,
+      },
     });
-
   } catch (error) {
-    console.error('Session verification error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Session verification error:', error instanceof Error ? error.message : String(error));
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

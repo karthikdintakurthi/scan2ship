@@ -59,6 +59,8 @@ export const ROLE_PERMISSIONS = {
 // Interface for authenticated user
 export interface AuthenticatedUser {
   id: string;
+  /** Website session behind the request; absent for principals without one (e.g. MCP). */
+  sessionId?: string;
   email: string;
   role: UserRole;
   clientId: string;
@@ -197,9 +199,16 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
     
     console.log('✅ [JWT_VERIFY] JWT decoded successfully, userId:', decoded.userId);
     
-    // Get user and client data from database
+    // Get user and client data from database, and the session this token belongs to.
+    // A token is only accepted while its session is active: logging out, a password
+    // change, or an admin reset revokes the session and ends the token immediately.
     console.log('🔍 [DB_QUERY] Fetching user from database');
-    const user = await prisma.users.findUnique({
+    const [session, user] = await Promise.all([
+      prisma.sessions.findUnique({
+        where: { sessionToken: token },
+        select: { id: true, userId: true, isActive: true, revokedAt: true, expiresAt: true }
+      }),
+      prisma.users.findUnique({
       where: { id: decoded.userId },
       include: {
         clients: {
@@ -234,7 +243,19 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
           }
         }
       }
-    });
+    })
+    ]);
+
+    if (
+      !session ||
+      session.userId !== decoded.userId ||
+      !session.isActive ||
+      session.revokedAt ||
+      session.expiresAt.getTime() <= Date.now()
+    ) {
+      console.log('🚫 [AUTH] Token has no active session (logged out, revoked, or expired)');
+      return null;
+    }
 
     if (!user) {
       console.log('🚫 [DB_QUERY] User not found in database for userId:', decoded.userId);
@@ -263,6 +284,7 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
 
     return {
       id: user.id,
+      sessionId: session.id,
       email: user.email,
       role: user.role as UserRole,
       clientId: user.clientId,

@@ -226,6 +226,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = () => {
+    // End this device's session on the server so the token stops working
+    // immediately. keepalive lets the request finish if the page navigates away.
+    const token = getStoredToken();
+    if (token) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        keepalive: true,
+      }).catch(() => {
+        // Local sign-out still happens; the token expires on its own.
+      });
+    }
     removeStoredToken();
     setIsAuthenticated(false);
     setCurrentUser(null);

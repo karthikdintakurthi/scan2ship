@@ -326,7 +326,16 @@ All nine bugs listed above are fixed, with tests.
 - **Orders.** The create response returns the saved waybill and booking status. Bulk delete rejects non-integer IDs with 400, and a non-string `mobile` gets 400 instead of a 500.
 - **Sanitizer.** `allowHTML` output is no longer entity-encoded, and phone numbers keep at most one leading `+`.
 - **Health checks.** Only one database health-check timer runs per process.
-- **Still open.** `getAuthenticatedUser` does not check the session, so revoking a session (at the next login) does not end an access token already issued; it expires within 8 hours. Closing that means checking `sessions.sessionToken` on each request and adding a server-side logout.
+- **Session enforcement (done later the same day, see below).**
+
+### Sessions: logout, several devices, credential changes (2026-09-29)
+
+- `getAuthenticatedUser` accepts a token only if its session (looked up by the unique `sessionToken`, in parallel with the user) belongs to the same user and is active, unrevoked, and unexpired. `/api/auth/verify` uses the same check and returns the real session instead of a placeholder.
+- Login no longer revokes a user's other sessions, so any number of devices work in parallel. Access tokens carry a random `jti`, so two logins in the same second get distinct tokens; `sessionToken` is unique, so a duplicate would have failed the second login.
+- `POST /api/auth/logout` ends only the presented token's session, and with it that device's refresh token. It always returns 200. The app's Log out calls it with `keepalive` before clearing local state.
+- Changing your own password ends your other sessions and keeps the current one. An admin password reset, or deactivating a user through `PUT /api/users/[id]`, ends all of that user's sessions (`revokeUserSessions`). No "sign out everywhere" action was added (not requested).
+- Only login and refresh issue website tokens, and both create or update a session row, so enforcement locks out no current sign-ins. Legacy tokens without a session row (the old issuer fallbacks) stop working. After deployment, a device whose session was revoked by a later login under the old single-session behaviour is signed out on its next request.
+- MCP connections are unaffected; they use their own grants.
 
 ### Phase 1–3 outline
 

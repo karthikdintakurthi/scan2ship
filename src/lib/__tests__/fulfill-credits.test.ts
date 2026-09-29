@@ -3,6 +3,7 @@ jest.unmock('jsonwebtoken');
 jest.mock('next/server', () => require('@/test-utils/auth-request').nextServerMock);
 jest.mock('@/lib/prisma', () => ({
   prisma: {
+    sessions: { findUnique: jest.fn((args) => require('@/test-utils/auth-request').liveSessionFor(args)) },
     users: { findUnique: jest.fn() },
     user_sub_groups: { findFirst: jest.fn() },
     orders: { findFirst: jest.fn(), update: jest.fn() },

@@ -20,6 +20,26 @@ export function authUserRow(role: string, clientId = 'client-a') {
   };
 }
 
+/**
+ * Stand-in for prisma.sessions.findUnique: getAuthenticatedUser only accepts a
+ * token with a live session, so a lookup by sessionToken returns an active
+ * session for the user named in that token. Other lookups (e.g. by refresh
+ * token) return null unless a test overrides them.
+ */
+export async function liveSessionFor(args?: { where?: { sessionToken?: string } }) {
+  const token = args?.where?.sessionToken;
+  if (!token) return null;
+  const claims = jwt.decode(token) as { userId?: string } | null;
+  if (!claims?.userId) return null;
+  return {
+    id: `session-${claims.userId}`,
+    userId: claims.userId,
+    isActive: true,
+    revokedAt: null,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  };
+}
+
 /** Minimal request carrying a valid Scan2Ship JWT; enough for authorizeUser and route handlers. */
 export function signedRequest(
   body: unknown = {},

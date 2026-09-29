@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import { prisma } from '@/lib/prisma';
 
 /** Lifetime of a website access token and of each session extension. */
 export const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
@@ -27,6 +28,9 @@ export function signSessionToken(user: SessionTokenSubject): string {
     { userId: user.id, clientId: user.clientId, email: user.email, role: user.role },
     secret,
     {
+      // Unique per token: two logins in the same second must not produce the same
+      // token, since each one keys its own session (sessions.sessionToken is unique).
+      jwtid: crypto.randomUUID(),
       expiresIn: Math.floor(SESSION_TTL_MS / 1000),
       issuer: process.env.JWT_ISSUER || 'scan2ship-saas',
       audience: process.env.JWT_AUDIENCE || 'scan2ship-users',
@@ -46,4 +50,24 @@ export function newRefreshToken(): { token: string; hash: string } {
 
 export function hashRefreshToken(token: string): string {
   return `sha256:${crypto.createHash('sha256').update(token).digest('hex')}`;
+}
+
+/**
+ * Ends a user's website sessions, e.g. after a password change or reset, or on
+ * deactivation. Pass keepSessionId to leave the caller's own device signed in.
+ * Their access tokens stop working on the next request.
+ */
+export async function revokeUserSessions(
+  userId: string,
+  options: { keepSessionId?: string } = {}
+): Promise<number> {
+  const result = await prisma.sessions.updateMany({
+    where: {
+      userId,
+      isActive: true,
+      ...(options.keepSessionId ? { id: { not: options.keepSessionId } } : {}),
+    },
+    data: { isActive: false, revokedAt: new Date() },
+  });
+  return result.count;
 }

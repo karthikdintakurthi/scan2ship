@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import bcrypt from 'bcryptjs';
+import { revokeUserSessions } from '@/lib/session-tokens';
 
 const prisma = new PrismaClient();
 
@@ -140,6 +141,9 @@ export async function PUT(request: NextRequest) {
         updatedAt: new Date()
       }
     });
+
+    // Sign out the user's other devices; this one stays signed in
+    await revokeUserSessions(auth.userId, { keepSessionId: auth.user.sessionId });
 
     // Log password change for security audit
     console.log(`🔒 [PASSWORD_CHANGE] User ${user.email} (${user.id}) changed password`);

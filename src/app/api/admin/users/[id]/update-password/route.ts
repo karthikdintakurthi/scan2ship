@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { revokeUserSessions } from '@/lib/session-tokens';
 
 export async function PUT(
   request: NextRequest,
@@ -77,6 +78,9 @@ export async function PUT(
         updatedAt: new Date()
       }
     });
+
+    // An admin reset ends every session the user had
+    await revokeUserSessions(userId);
 
     console.log('✅ [ADMIN_UPDATE_USER_PASSWORD] User password updated successfully');
 

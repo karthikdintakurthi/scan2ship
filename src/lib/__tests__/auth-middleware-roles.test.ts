@@ -13,6 +13,7 @@ jest.mock('next/server', () => ({
 
 jest.mock('@/lib/prisma', () => ({
   prisma: {
+    sessions: { findUnique: jest.fn((args) => require('@/test-utils/auth-request').liveSessionFor(args)) },
     users: { findUnique: jest.fn() },
     clients: { findUnique: jest.fn() },
   },

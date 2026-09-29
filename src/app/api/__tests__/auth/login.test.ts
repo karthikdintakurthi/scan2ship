@@ -187,16 +187,14 @@ describe('successful login', () => {
     expect(body.client).toEqual(USER.clients);
   });
 
-  it('revokes earlier active sessions and records a new one holding the issued token', async () => {
+  it('records a new session holding the issued token and leaves other devices signed in', async () => {
     const response = await login(
       loginRequest(VALID, { headers: { 'x-forwarded-for': '203.0.113.9', 'user-agent': 'jest-agent' } })
     );
     const body = await response.json();
 
-    expect(prisma.sessions.updateMany).toHaveBeenCalledWith({
-      where: { userId: USER.id, isActive: true },
-      data: { isActive: false, revokedAt: expect.any(Date) },
-    });
+    // Logging in on one device must not sign the user out elsewhere
+    expect(prisma.sessions.updateMany).not.toHaveBeenCalled();
     const [[{ data }]] = (prisma.sessions.create as jest.Mock).mock.calls;
     expect(data).toMatchObject({
       userId: USER.id,
@@ -218,13 +216,6 @@ describe('successful login', () => {
   it('falls back to x-real-ip and "unknown" for request metadata', async () => {
     await login(loginRequest(VALID, { headers: { 'x-real-ip': '198.51.100.4' } }));
     expect((prisma.sessions.create as jest.Mock).mock.calls[0][0].data).toMatchObject({ ipAddress: '198.51.100.4', userAgent: 'unknown' });
-  });
-
-  it('still logs in when revoking old sessions fails', async () => {
-    (prisma.sessions.updateMany as jest.Mock).mockRejectedValue(new Error('db hiccup'));
-    const response = await login(loginRequest(VALID));
-    expect(response.status).toBe(200);
-    expect(prisma.sessions.create).toHaveBeenCalled();
   });
 
   it('sets defensive security headers', async () => {

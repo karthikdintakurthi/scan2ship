@@ -20,7 +20,12 @@ export function createPrismaMock() {
       models.set(
         name,
         new Proxy(methods, {
-          get: (target, method: string) => (target[method] ??= jest.fn(async () => defaultResult(method))),
+          get: (target, method: string) =>
+            (target[method] ??=
+              name === 'sessions' && method === 'findUnique'
+                ? // Authenticated test requests need a live session for their token
+                  jest.fn(async (args) => require('./auth-request').liveSessionFor(args))
+                : jest.fn(async () => defaultResult(method))),
         })
       );
     }

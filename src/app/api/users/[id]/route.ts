@@ -4,6 +4,7 @@ import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middlew
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import bcrypt from 'bcryptjs';
 import { normalizeEmail } from '@/lib/email';
+import { revokeUserSessions } from '@/lib/session-tokens';
 
 export async function GET(
   request: NextRequest,
@@ -236,6 +237,12 @@ export async function PUT(
       where: { id: userId },
       data: updateData
     });
+
+    // A new password or deactivation ends the user's sessions. If admins change
+    // their own password here, their current device stays signed in.
+    if (hashedPassword || updateData.isActive === false) {
+      await revokeUserSessions(userId, userId === user.id ? { keepSessionId: user.sessionId } : {});
+    }
 
     // Update sub-group assignments
     if (subGroupIds !== undefined) {

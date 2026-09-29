@@ -111,23 +111,8 @@ export async function POST(request: NextRequest) {
     const loginToken = signSessionToken(user);
     const refresh = newRefreshToken();
 
-    // Revoke existing active sessions for this user (optional - you can limit concurrent sessions)
-    // This ensures only one active session per user at a time
-    try {
-      await prisma.sessions.updateMany({
-        where: {
-          userId: user.id,
-          isActive: true
-        },
-        data: {
-          isActive: false,
-          revokedAt: new Date()
-        }
-      });
-    } catch (revokeError) {
-      console.warn('⚠️ [LOGIN] Could not revoke existing sessions:', revokeError);
-      // Continue with session creation even if revocation fails
-    }
+    // Each login gets its own session, so a user can be signed in on several
+    // devices at once. Logging out ends only that device's session.
 
     // Create new session
     const sessionExpiresAt = new Date(Date.now() + SESSION_TTL_MS);
