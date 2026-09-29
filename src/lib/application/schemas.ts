@@ -42,6 +42,49 @@ export const getShippingLabelInputSchema = z.object({
   format: z.enum(['standard', 'thermal', 'a5', 'r4']).optional(),
 });
 
+export const prepareShipmentInputSchema = z
+  .object({
+    recipient: z.object({
+      name: z.string().trim().min(1).max(120),
+      mobile: z.string().trim().min(10).max(20),
+      address: z.string().trim().min(5).max(500),
+      city: z.string().trim().min(1).max(80),
+      state: z.string().trim().min(1).max(80),
+      pincode: z.string().trim().regex(/^\d{6}$/, 'pincode must be 6 digits'),
+      country: z.string().trim().min(1).max(60).default('India'),
+    }),
+    package: z.object({
+      weightGrams: z.number().positive().max(50000),
+      packageValueInr: z.number().positive().max(1_000_000),
+      totalItems: z.number().int().min(1).max(1000).default(1),
+      description: z.string().trim().max(200).optional(),
+    }),
+    payment: z.object({
+      mode: z.enum(['prepaid', 'cod']),
+      codAmountInr: z.number().positive().max(1_000_000).optional(),
+    }),
+    courierCode: z.string().trim().min(1).max(80),
+    pickupLocation: z.string().trim().min(1).max(120),
+    referenceNumber: z.string().trim().max(60).optional(),
+    reseller: z
+      .object({ name: z.string().trim().max(120).optional(), mobile: z.string().trim().max(20).optional() })
+      .optional(),
+  })
+  .refine((value) => value.payment.mode !== 'cod' || value.payment.codAmountInr !== undefined, {
+    message: 'codAmountInr is required for cash on delivery',
+    path: ['payment', 'codAmountInr'],
+  });
+
+export const createShipmentInputSchema = z.object({
+  previewId: z.string().trim().min(1).max(80),
+});
+
+export const getShipmentOperationInputSchema = z.object({
+  operationId: z.string().trim().min(1).max(80),
+});
+
+export type PrepareShipmentInput = z.infer<typeof prepareShipmentInputSchema>;
+
 export type SearchOrdersInput = z.infer<typeof searchOrdersInputSchema>;
 export type GetOrderInput = z.infer<typeof getOrderInputSchema>;
 export type GetTrackingStatusInput = z.infer<typeof getTrackingStatusInputSchema>;

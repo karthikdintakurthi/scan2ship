@@ -134,12 +134,12 @@ describe('consent scopes', () => {
     const user = { role: UserRole.USER };
     expect(approvedScopes('orders:read customers:read labels:read', [], user)).toEqual(['orders:read']);
     expect(approvedScopes('orders:read', ['labels:read'], user)).toEqual(['orders:read', 'labels:read']);
-    expect(approvedScopes(null, ['customers:read', 'shipments:create'], user)).toContain('customers:read');
-    expect(approvedScopes(null, ['customers:read', 'shipments:create'], user)).not.toContain('shipments:create');
+    expect(approvedScopes(null, ['customers:read', 'orders:delete'], user)).toContain('customers:read');
+    expect(approvedScopes(null, ['customers:read', 'orders:delete'], user)).not.toContain('orders:delete');
   });
 
   it('offers the optional scopes to child users, without credits', () => {
-    expect(optionalScopesForUser({ role: UserRole.CHILD_USER })).toEqual(['customers:read', 'labels:read']);
+    expect(optionalScopesForUser({ role: UserRole.CHILD_USER })).toEqual(['customers:read', 'labels:read', 'shipments:create']);
     expect(approvedScopes(null, [], { role: UserRole.CHILD_USER })).not.toContain('credits:read');
   });
 });

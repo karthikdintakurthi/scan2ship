@@ -56,7 +56,23 @@ PKCE `S256` is required. Access tokens last 15 minutes and are bound to audience
 
 `get_shipping_label` returns a link, `/api/mcp/labels/<signed token>`, valid for 10 minutes. The token uses its own audience, so it cannot act as an access token. Opening it re-checks the grant, user, tenant allowlist, role, `labels:read`, and order access, so revoking the connection disables its links. The label defaults to the tenant's print mode (`standard`, `thermal`, `a5`, `r4`).
 
-Writes (`prepare_shipment` / `commit_shipment`) are not in this pilot.
+## Shipment creation (Phase 4)
+
+Off unless `MCP_WRITES_ENABLED=true`. The tools are listed only while it is on, and only to connections that ticked the opt-in `shipments:create` scope. Child users may have that scope; it maps to the existing `shipments:book` action.
+
+| Tool | What it does |
+|---|---|
+| `prepare_shipment` | Checks the recipient, package, payment, courier (must be active for the tenant), and pickup location (must be permitted to the user), then saves a preview valid for 15 minutes with its credit cost and current balance. Nothing is charged and no carrier is contacted. |
+| `create_shipment` | Creates the order for a preview the user confirmed in chat. It runs the same code as the website's Create Order (`createOrder` in `src/lib/application/order-creation.ts`): it charges the credit, books the Delhivery waybill for Delhivery orders, saves the order, and refunds the credit if booking fails. |
+| `get_shipment_operation` | Returns the status of a preview or creation. |
+
+- **One preview, at most one order.** `create_shipment` claims the preview atomically (`previewed` → `creating`). A repeated or concurrent call returns the first outcome instead of ordering again.
+- **Outcomes.** `succeeded` (with order ID and waybill); `failed` (not created; a Delhivery rejection refunds the credit); `expired`; `reconciliation_required` (an order may exist, e.g. it was saved but its carrier details were not, or the request died mid-way; check Scan2Ship and never retry blindly).
+- **Limits.** Up to `MCP_DAILY_SHIPMENT_LIMIT` (default 25) assistant-created orders per tenant per UTC day. The per-grant tool quota also applies.
+- **Confirmation** happens in chat: the preview is shown and the user confirms. `create_shipment` is annotated as having external effects, so clients ask before calling it.
+- **Beta warning.** Beta holds live Delhivery keys copied from production, so a Delhivery shipment created on beta books a real waybill on that tenant's Delhivery account. Test with a non-Delhivery courier first (no carrier call), or with a tenant whose Delhivery key points at a test account.
+
+Pickup booking (`prepare_pickup` / `commit_pickup`) is not built yet.
 
 ## Kill switch
 

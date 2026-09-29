@@ -1,7 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { McpPrincipal } from './principal';
-import { executeMcpTool, MCP_TOOL_DEFINITIONS, toolErrorPayload } from './tools';
+import { areMcpWritesEnabled } from './config';
+import { executeMcpTool, MCP_TOOL_DEFINITIONS, toolErrorPayload, type McpToolDefinition } from './tools';
 
 const emptySchema = z.object({});
 
@@ -33,6 +34,33 @@ const TOOL_INPUT: Record<string, z.ZodTypeAny> = {
   get_customer_order_history: z.object({
     mobile: z.string().min(10).max(20).describe('Customer or reseller mobile number; the last 10 digits are used'),
   }),
+  prepare_shipment: z.object({
+    recipient: z.object({
+      name: z.string().max(120),
+      mobile: z.string().max(20).describe('10-digit Indian mobile, optionally with +91'),
+      address: z.string().max(500),
+      city: z.string().max(80),
+      state: z.string().max(80),
+      pincode: z.string().describe('6-digit PIN code'),
+      country: z.string().max(60).optional(),
+    }),
+    package: z.object({
+      weightGrams: z.number().positive(),
+      packageValueInr: z.number().positive(),
+      totalItems: z.number().int().min(1).optional(),
+      description: z.string().max(200).optional(),
+    }),
+    payment: z.object({
+      mode: z.enum(['prepaid', 'cod']),
+      codAmountInr: z.number().positive().optional().describe('Required for cod'),
+    }),
+    courierCode: z.string().describe('A courier code from list_shipping_options'),
+    pickupLocation: z.string().describe('A pickup location name or value from list_shipping_options'),
+    referenceNumber: z.string().max(60).optional(),
+    reseller: z.object({ name: z.string().optional(), mobile: z.string().optional() }).optional(),
+  }),
+  create_shipment: z.object({ previewId: z.string().describe('previewId returned by prepare_shipment') }),
+  get_shipment_operation: z.object({ operationId: z.string() }),
   get_shipping_label: z.object({
     orderId: z.number().int().positive(),
     format: z
@@ -49,6 +77,20 @@ const READ_ANNOTATIONS = {
   openWorldHint: false,
 };
 
+function annotationsFor(tool: McpToolDefinition) {
+  switch (tool.write) {
+    case 'preview':
+      // Saves a preview only; nothing charged or sent to a carrier
+      return { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
+    case 'create':
+      // Charges credits and may book a real carrier shipment; repeatable per preview
+      return { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true };
+    case 'status':
+    default:
+      return READ_ANNOTATIONS;
+  }
+}
+
 export function createMcpServer(principal: McpPrincipal): McpServer {
   const server = new McpServer(
     { name: 'scan2ship', version: '0.1.0' },
@@ -56,13 +98,16 @@ export function createMcpServer(principal: McpPrincipal): McpServer {
   );
 
   // Only list tools this connection may call, so assistants are not offered tools they cannot use.
-  for (const tool of MCP_TOOL_DEFINITIONS.filter((item) => principal.scopes.includes(item.scope))) {
+  const writesEnabled = areMcpWritesEnabled();
+  for (const tool of MCP_TOOL_DEFINITIONS.filter(
+    (item) => principal.scopes.includes(item.scope) && (!item.write || writesEnabled)
+  )) {
     server.registerTool(
       tool.name,
       {
         description: tool.description,
         inputSchema: TOOL_INPUT[tool.name] ?? emptySchema,
-        annotations: READ_ANNOTATIONS,
+        annotations: annotationsFor(tool),
       },
       async (args) => {
         try {

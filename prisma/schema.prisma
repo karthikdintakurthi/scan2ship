@@ -194,6 +194,7 @@ model clients {
   users                 users[]
   webhooks              webhooks[]
   mcp_grants            mcp_grants[]
+  shipment_operations   shipment_operations[]
 }
 
 model courier_services {
@@ -525,6 +526,7 @@ model users {
   parentUser             users?                    @relation("UserHierarchy", fields: [parentUserId], references: [id])
   childUsers             users[]                   @relation("UserHierarchy")
   mcp_grants             mcp_grants[]
+  shipment_operations    shipment_operations[]
 
   @@unique([email, clientId])
   @@index([parentUserId])
@@ -687,3 +689,30 @@ model mcp_refresh_tokens {
   @@index([grantId])
   @@index([familyId])
 }
+
+/// A shipment an MCP client prepared and may create. The preview is the unit of
+/// idempotency: one preview creates at most one order.
+model shipment_operations {
+  id          String   @id
+  tenantId    String
+  userId      String
+  grantId     String?
+  channel     String
+  /// previewed | creating | succeeded | failed | expired | reconciliation_required
+  status      String
+  payload     Json
+  payloadHash String
+  creditCost  Int
+  orderId     Int?
+  result      Json?
+  error       String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  clients     clients  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users       users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+}
+

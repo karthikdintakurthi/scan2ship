@@ -9,6 +9,7 @@ export const MCP_SCOPES = [
   'credits:read',
   'customers:read',
   'labels:read',
+  'shipments:create',
 ] as const;
 
 export type McpScope = (typeof MCP_SCOPES)[number];
@@ -22,7 +23,7 @@ export const MCP_READ_SCOPES: McpScope[] = [
 ];
 
 /** Customer PII and label downloads are granted only when the user ticks them at consent. */
-export const MCP_OPTIONAL_SCOPES: McpScope[] = ['customers:read', 'labels:read'];
+export const MCP_OPTIONAL_SCOPES: McpScope[] = ['customers:read', 'labels:read', 'shipments:create'];
 
 export const MCP_GRANTABLE_SCOPES: McpScope[] = [...MCP_READ_SCOPES, ...MCP_OPTIONAL_SCOPES];
 
@@ -37,6 +38,7 @@ export const SCOPE_ACTION: Record<McpScope, Action> = {
   'credits:read': 'credits:read',
   'customers:read': 'customers:read',
   'labels:read': 'labels:read',
+  'shipments:create': 'shipments:book',
 };
 
 /** A scope never grants more than the connecting user's role allows. */
@@ -77,4 +79,5 @@ export const SCOPE_DESCRIPTIONS: Record<McpScope, string> = {
   'credits:read': 'See your remaining shipping credit balance',
   'customers:read': "See customers' full phone numbers and addresses, and look up a customer's order history",
   'labels:read': 'Open printable shipping labels through links that expire after 10 minutes',
+  'shipments:create': 'Create orders and book shipments. Each order uses credits, and the assistant must show you a preview and get your confirmation first',
 };

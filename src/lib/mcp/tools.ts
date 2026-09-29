@@ -8,7 +8,10 @@ import {
   searchOrders,
 } from '@/lib/application/orders';
 import {
+  createShipmentInputSchema,
   customerOrderHistoryInputSchema,
+  getShipmentOperationInputSchema,
+  prepareShipmentInputSchema,
   getOrderInputSchema,
   getShippingLabelInputSchema,
   getTrackingStatusInputSchema,
@@ -16,6 +19,7 @@ import {
   searchOrdersInputSchema,
 } from '@/lib/application/schemas';
 import { listShippingOptions, quoteShipping } from '@/lib/application/shipping';
+import { createShipment, getShipmentOperation, prepareShipment } from '@/lib/application/shipments';
 import { consumeMcpQuota, requireScope, touchGrant } from './auth';
 import { logMcpEvent } from './audit';
 import { McpAuthError, McpToolError } from './errors';
@@ -27,6 +31,8 @@ export type McpToolDefinition = {
   name: string;
   description: string;
   scope: McpScope;
+  /** Changes data; listed only while MCP_WRITES_ENABLED is on */
+  write?: 'preview' | 'create' | 'status';
 };
 
 export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
@@ -77,6 +83,26 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
       "Return a link to one order's printable shipping label. The link expires after 10 minutes and stops working if the connection is revoked. Share the link with the user; do not fetch it.",
     scope: 'labels:read',
   },
+  {
+    name: 'prepare_shipment',
+    description:
+      'Validate a new order and return a preview with its credit cost. Nothing is charged or booked. Use list_shipping_options for valid courier codes and pickup locations. Show the preview to the user and wait for their explicit confirmation before calling create_shipment.',
+    scope: 'shipments:create',
+    write: 'preview',
+  },
+  {
+    name: 'create_shipment',
+    description:
+      'Create the order for a preview the user has explicitly confirmed. Uses credits and, for Delhivery, books a real waybill. Calling it again with the same previewId never creates a second order; it returns the first outcome.',
+    scope: 'shipments:create',
+    write: 'create',
+  },
+  {
+    name: 'get_shipment_operation',
+    description: 'Return the status of a prepared or created shipment by its previewId/operationId.',
+    scope: 'shipments:create',
+    write: 'status',
+  },
 ];
 
 function summaryFor(name: string, data: unknown): string {
@@ -95,6 +121,15 @@ function summaryFor(name: string, data: unknown): string {
   if (name === 'get_shipping_label' && data && typeof data === 'object' && 'url' in data) {
     const label = data as { orderId: number; url: string; expiresAt: string };
     return `Label for order ${label.orderId}: ${label.url} (expires ${label.expiresAt}).`;
+  }
+  if (name === 'prepare_shipment' && data && typeof data === 'object' && 'previewId' in data) {
+    const preview = data as { previewId: string; cost: { credits: number; sufficient: boolean } };
+    return `Preview ${preview.previewId} ready (${preview.cost.credits} credit${preview.cost.credits === 1 ? '' : 's'}${preview.cost.sufficient ? '' : ', insufficient balance'}). Confirm with the user before creating it.`;
+  }
+  if ((name === 'create_shipment' || name === 'get_shipment_operation') && data && typeof data === 'object' && 'status' in data) {
+    const op = data as { status: string; orderId: number | null; error: string | null };
+    if (op.status === 'succeeded') return `Order ${op.orderId} created.`;
+    return `Shipment ${op.status}${op.error ? `: ${op.error}` : ''}.`;
   }
   if (name === 'get_credit_balance' && data && typeof data === 'object' && 'balance' in data) {
     return `Credit balance: ${(data as { balance: number }).balance}.`;
@@ -148,6 +183,21 @@ export async function executeMcpTool(
       case 'get_customer_order_history': {
         const input = customerOrderHistoryInputSchema.parse(rawArgs ?? {});
         structured = await getCustomerOrderHistory(principal.user, input);
+        break;
+      }
+      case 'prepare_shipment': {
+        const input = prepareShipmentInputSchema.parse(rawArgs ?? {});
+        structured = await prepareShipment(principal, input);
+        break;
+      }
+      case 'create_shipment': {
+        const input = createShipmentInputSchema.parse(rawArgs ?? {});
+        structured = await createShipment(principal, input.previewId);
+        break;
+      }
+      case 'get_shipment_operation': {
+        const input = getShipmentOperationInputSchema.parse(rawArgs ?? {});
+        structured = await getShipmentOperation(principal, input.operationId);
         break;
       }
       case 'get_shipping_label': {

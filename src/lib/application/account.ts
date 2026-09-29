@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import type { AuthenticatedUser } from '@/lib/auth-middleware';
 import type { McpScope } from '@/lib/mcp/scopes';
+import { areMcpWritesEnabled } from '@/lib/mcp/config';
 
 export async function getAccountContext(user: AuthenticatedUser, scopes: readonly McpScope[] | readonly string[]) {
   const [client, orderConfig] = await Promise.all([
@@ -44,7 +45,7 @@ export async function getAccountContext(user: AuthenticatedUser, scopes: readonl
       fullCustomerContact: scopes.includes('customers:read'),
       customerOrderHistory: scopes.includes('customers:read'),
       shippingLabels: scopes.includes('labels:read'),
-      createShipments: false,
+      createShipments: scopes.includes('shipments:create') && areMcpWritesEnabled(),
     },
     defaults: orderConfig
       ? {

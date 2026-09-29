@@ -32,6 +32,17 @@ export function isMcpEnabled(): boolean {
   return process.env.MCP_ENABLED === 'true';
 }
 
+/** Shipment creation through MCP is off unless explicitly enabled (kill switch). */
+export function areMcpWritesEnabled(): boolean {
+  return isMcpEnabled() && process.env.MCP_WRITES_ENABLED === 'true';
+}
+
+/** Orders a tenant may create through MCP per UTC day. */
+export function mcpDailyShipmentLimit(): number {
+  const parsed = Number(process.env.MCP_DAILY_SHIPMENT_LIMIT);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 25;
+}
+
 export function isTenantAllowedForMcp(tenantId: string): boolean {
   const raw = process.env.MCP_TENANT_ALLOWLIST?.trim();
   if (!raw) return false;

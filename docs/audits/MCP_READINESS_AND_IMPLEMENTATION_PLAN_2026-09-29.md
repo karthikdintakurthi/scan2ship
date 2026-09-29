@@ -337,6 +337,12 @@ All nine bugs listed above are fixed, with tests.
 - Only login and refresh issue website tokens, and both create or update a session row, so enforcement locks out no current sign-ins. Legacy tokens without a session row (the old issuer fallbacks) stop working. After deployment, a device whose session was revoked by a later login under the old single-session behaviour is signed out on its next request.
 - MCP connections are unaffected; they use their own grants.
 
+### Phase 4: shipment creation (2026-09-29)
+
+- **Decisions.** Confirmation happens in chat, and creation runs within the request; there is no queue, since Delhivery booking already completes within the website's request.
+- **Shared order creation.** The logic moved from `POST /api/orders` into `createOrder` (`src/lib/application/order-creation.ts`), and `validateOrderInput` is shared. The website route only authenticates and maps results. All existing order tests pass unchanged. The partner API (`/api/external/orders`) does not use it yet: switching it would make partner orders start booking Delhivery waybills, so that is a product decision.
+- **MCP tools.** `prepare_shipment`, `create_shipment`, and `get_shipment_operation`, recorded in the new `shipment_operations` table (additive migration `20260929200000_shipment_operations`). They sit behind the `MCP_WRITES_ENABLED` kill switch, a per-tenant daily cap (`MCP_DAILY_SHIPMENT_LIMIT`), and the opt-in `shipments:create` scope. See `docs/MCP_READ_PILOT.md`.
+
 ### Phase 1–3 outline
 
 - **Phase 1 (started on `feature/mcp-implementation`):** policy and scoped read services with Zod schemas (`src/lib/application/{orders,credits,shipping,account,schemas}.ts`); pickup access helper; additive `orders` indexes `(clientId, created_at)`, `(clientId, tracking_id)`, `(clientId, reference_number)`. Website JWT fallback is unchanged; MCP tokens use a strict issuer/audience and no fallback. ESLint/CI ratchet left for later.
