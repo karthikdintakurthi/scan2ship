@@ -217,11 +217,14 @@ export async function createOrder(
     throw creditError;
   }
 
-  const refundCharge = async (reason: string) => {
+  /** Returns whether the credit was actually given back, so responses can say so truthfully. */
+  const refundCharge = async (reason: string): Promise<boolean> => {
     try {
       await CreditService.refundCredits(client.id, orderCreditCost, `Refund: ${reason}`, 'ORDER', user.id);
+      return true;
     } catch (refundError) {
       console.error('❌ [ORDER_CREATE] Credit refund failed; reconcile manually:', { transactionId: charge.transactionId, refundError });
+      return false;
     }
   };
 
@@ -245,12 +248,13 @@ export async function createOrder(
       
       if (!delhiveryResponse.success) {
         console.log('❌ [ORDER_CREATE] Delhivery API failed, not creating order');
-        await refundCharge('Delhivery booking failed');
+        const creditRefunded = await refundCharge('Delhivery booking failed');
         return fail(400, {
           success: false,
           error: 'Delhivery API failed',
           details: delhiveryResponse.error || 'Failed to create order with Delhivery',
-          delhiveryError: delhiveryResponse.error
+          delhiveryError: delhiveryResponse.error,
+          creditRefunded
         });
       }
       
@@ -280,11 +284,12 @@ export async function createOrder(
         });
       }
 
-      await refundCharge('Delhivery booking failed');
+      const creditRefunded = await refundCharge('Delhivery booking failed');
       return fail(400, {
         success: false,
         error: 'Delhivery API failed',
-        details: error instanceof Error ? error.message : 'Unknown error occurred while creating order with Delhivery'
+        details: error instanceof Error ? error.message : 'Unknown error occurred while creating order with Delhivery',
+        creditRefunded
       });
     }
   } else {
@@ -347,9 +352,9 @@ export async function createOrder(
     }
 
     if (!order) {
-      await refundCharge('order could not be saved');
+      const creditRefunded = await refundCharge('order could not be saved');
       await releaseSlip();
-      return fail(500, { error: 'Failed to create order' });
+      return fail(500, { error: 'Failed to create order', creditRefunded });
     }
 
     // The order and any waybill exist and remain charged; only saving carrier details failed

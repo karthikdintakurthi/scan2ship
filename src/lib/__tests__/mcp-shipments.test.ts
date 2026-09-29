@@ -265,9 +265,21 @@ describe('create_shipment', () => {
   });
 
   it('reports a carrier rejection as failed with the credit refunded', async () => {
-    createOrderMock.mockResolvedValue({ ok: false, status: 400, body: { error: 'Delhivery API failed', details: 'Pincode not serviceable' } });
+    createOrderMock.mockResolvedValue({ ok: false, status: 400, body: { error: 'Delhivery API failed', details: 'Pincode not serviceable', creditRefunded: true } });
     const result = await createShipment(principalFor(), await preview());
     expect(result).toMatchObject({ status: 'failed', error: 'Delhivery API failed: Pincode not serviceable', creditsRefunded: true });
+    expect(result).not.toHaveProperty('creditNote');
+  });
+
+  it('does not claim a refund that failed', async () => {
+    createOrderMock.mockResolvedValue({ ok: false, status: 400, body: { error: 'Delhivery API failed', creditRefunded: false } });
+    const result = await createShipment(principalFor(), await preview());
+    expect(result).toMatchObject({ status: 'failed', creditsRefunded: false, creditNote: expect.stringMatching(/could not be refunded/) });
+  });
+
+  it('says nothing about refunds when nothing was charged', async () => {
+    createOrderMock.mockResolvedValue({ ok: false, status: 400, body: { error: 'Missing required field: name' } });
+    expect(await createShipment(principalFor(), await preview())).not.toHaveProperty('creditsRefunded');
   });
 
   it('marks an order that exists but lost its carrier details for reconciliation', async () => {

@@ -341,7 +341,15 @@ export async function createShipment(principal: McpPrincipal, previewId: string)
   return {
     ...operationView(updated),
     ...(outcome.status === 402 ? { hint: 'Not enough credits. The user can recharge in Scan2Ship, then prepare the shipment again.' } : {}),
-    ...(outcome.status === 400 && !orderId ? { creditsRefunded: true } : {}),
+    // Only a charge that was actually refunded is reported as refunded
+    ...(typeof outcome.body.creditRefunded === 'boolean'
+      ? {
+          creditsRefunded: outcome.body.creditRefunded,
+          ...(outcome.body.creditRefunded
+            ? {}
+            : { creditNote: 'The credit could not be refunded automatically. The user should contact Scan2Ship support to have it returned.' }),
+        }
+      : {}),
   };
 }
 

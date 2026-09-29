@@ -143,6 +143,14 @@ describe('POST /api/orders credit handling', () => {
     expect(prisma.orders.create).not.toHaveBeenCalled();
   });
 
+  it('says whether the credit was actually refunded', async () => {
+    createDelhiveryOrder.mockResolvedValue({ success: false, error: 'pincode not serviceable' });
+    expect(await (await createOrderRoute(order())).json()).toMatchObject({ creditRefunded: true });
+
+    credits.refundCredits.mockRejectedValueOnce(new Error('db down'));
+    expect(await (await createOrderRoute(order())).json()).toMatchObject({ creditRefunded: false });
+  });
+
   it('refunds when the Delhivery call throws', async () => {
     createDelhiveryOrder.mockRejectedValue(new Error('timeout'));
 
