@@ -343,6 +343,11 @@ All nine bugs listed above are fixed, with tests.
 - **Shared order creation.** The logic moved from `POST /api/orders` into `createOrder` (`src/lib/application/order-creation.ts`), and `validateOrderInput` is shared. The website route only authenticates and maps results. All existing order tests pass unchanged. The partner API (`/api/external/orders`) does not use it yet: switching it would make partner orders start booking Delhivery waybills, so that is a product decision.
 - **MCP tools.** `prepare_shipment`, `create_shipment`, and `get_shipment_operation`, recorded in the new `shipment_operations` table (additive migration `20260929200000_shipment_operations`). They sit behind the `MCP_WRITES_ENABLED` kill switch, a per-tenant daily cap (`MCP_DAILY_SHIPMENT_LIMIT`), and the opt-in `shipments:create` scope. See `docs/MCP_READ_PILOT.md`.
 
+### Phase 4b: pickups (2026-09-29)
+
+- The pickup logic moved from `POST /api/pickup-request` into `requestPickups` (`src/lib/application/pickups.ts`). The route keeps its responses. Locations without a Delhivery key are skipped instead of being called with `Token null`.
+- The MCP tools `prepare_pickup` and `schedule_pickup` sit behind the opt-in `pickups:create` scope (not for child users) and `MCP_WRITES_ENABLED`. They are recorded in `shipment_operations` with the new `type` column (additive migration `20260929210000_operation_type`); shipment and pickup previews cannot be used interchangeably.
+
 ### Phase 1–3 outline
 
 - **Phase 1 (started on `feature/mcp-implementation`):** policy and scoped read services with Zod schemas (`src/lib/application/{orders,credits,shipping,account,schemas}.ts`); pickup access helper; additive `orders` indexes `(clientId, created_at)`, `(clientId, tracking_id)`, `(clientId, reference_number)`. Website JWT fallback is unchanged; MCP tokens use a strict issuer/audience and no fallback. ESLint/CI ratchet left for later.

@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { McpPrincipal } from './principal';
 import { areMcpWritesEnabled } from './config';
-import { executeMcpTool, MCP_TOOL_DEFINITIONS, toolErrorPayload, type McpToolDefinition } from './tools';
+import { executeMcpTool, MCP_TOOL_DEFINITIONS, toolAllowed, toolErrorPayload, type McpToolDefinition } from './tools';
 
 const emptySchema = z.object({});
 
@@ -70,6 +70,13 @@ const TOOL_INPUT: Record<string, z.ZodTypeAny> = {
   }),
   create_shipment: z.object({ previewId: z.string().describe('previewId returned by prepare_shipment') }),
   get_shipment_operation: z.object({ operationId: z.string() }),
+  prepare_pickup: z.object({
+    pickupDate: z.string().describe('YYYY-MM-DD, today or up to 14 days ahead (India time)'),
+    pickupTime: z.string().describe('24-hour HH:MM in IST, later than now if the date is today'),
+    expectedPackageCount: z.number().int().min(1),
+    pickupLocations: z.array(z.string()).min(1).describe('Pickup location names or values from list_shipping_options'),
+  }),
+  schedule_pickup: z.object({ previewId: z.string().describe('previewId returned by prepare_pickup') }),
   get_shipping_label: z.object({
     orderId: z.number().int().positive(),
     format: z
@@ -109,7 +116,7 @@ export function createMcpServer(principal: McpPrincipal): McpServer {
   // Only list tools this connection may call, so assistants are not offered tools they cannot use.
   const writesEnabled = areMcpWritesEnabled();
   for (const tool of MCP_TOOL_DEFINITIONS.filter(
-    (item) => principal.scopes.includes(item.scope) && (!item.write || writesEnabled)
+    (item) => toolAllowed(item, principal.scopes) && (!item.write || writesEnabled)
   )) {
     server.registerTool(
       tool.name,

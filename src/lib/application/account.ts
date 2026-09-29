@@ -46,6 +46,7 @@ export async function getAccountContext(user: AuthenticatedUser, scopes: readonl
       customerOrderHistory: scopes.includes('customers:read'),
       shippingLabels: scopes.includes('labels:read'),
       createShipments: scopes.includes('shipments:create') && areMcpWritesEnabled(),
+      schedulePickups: scopes.includes('pickups:create') && areMcpWritesEnabled(),
     },
     defaults: orderConfig
       ? {

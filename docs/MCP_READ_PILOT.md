@@ -76,7 +76,17 @@ Off unless `MCP_WRITES_ENABLED=true`. The tools are listed only while it is on, 
 - **Confirmation** happens in chat: the preview is shown and the user confirms. `create_shipment` is annotated as having external effects, so clients ask before calling it.
 - **Beta warning.** Beta holds live Delhivery keys copied from production, so a Delhivery shipment created on beta books a real waybill on that tenant's Delhivery account. Test with a non-Delhivery courier first (no carrier call), or with a tenant whose Delhivery key points at a test account.
 
-Pickup booking (`prepare_pickup` / `commit_pickup`) is not built yet.
+## Pickups (Phase 4b)
+
+Same kill switch and preview-then-confirm pattern, behind the opt-in `pickups:create` scope. It maps to `pickups:book`, so child users cannot have it, as on the website. Pickups do not use credits.
+
+| Tool | What it does |
+|---|---|
+| `prepare_pickup` | Checks the date (a real date, today or up to 14 days ahead, India time), the time (24-hour, later than now for today), the package count, and the pickup locations (permitted to the user and set up with a Delhivery key), then saves a 15-minute preview. Delhivery is not contacted. |
+| `schedule_pickup` | Books a confirmed preview through the same service as the website's pickup form (`requestPickups` in `src/lib/application/pickups.ts`), one Delhivery request per location. Outcomes: `succeeded`, `partially_succeeded` (per-location errors listed), `failed`, or `reconciliation_required` if the request died mid-way. Each preview books at most once. |
+| `get_shipment_operation` | Also reports pickup previews and bookings. |
+
+The shared service also fixes a website issue: a location without a Delhivery key used to be sent to Delhivery with `Token null`; it is now skipped with a clear error.
 
 ## Kill switch
 

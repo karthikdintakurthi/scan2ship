@@ -690,15 +690,17 @@ model mcp_refresh_tokens {
   @@index([familyId])
 }
 
-/// A shipment an MCP client prepared and may create. The preview is the unit of
-/// idempotency: one preview creates at most one order.
+/// A shipment or pickup an MCP client prepared and may carry out. The preview is
+/// the unit of idempotency: one preview creates at most one order or pickup booking.
 model shipment_operations {
   id          String   @id
   tenantId    String
   userId      String
   grantId     String?
   channel     String
-  /// previewed | creating | succeeded | failed | expired | reconciliation_required
+  /// shipment | pickup
+  type        String   @default("shipment")
+  /// previewed | creating | succeeded | partially_succeeded | failed | expired | reconciliation_required
   status      String
   payload     Json
   payloadHash String

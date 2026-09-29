@@ -88,6 +88,22 @@ export const getShipmentOperationInputSchema = z.object({
   operationId: z.string().trim().min(1).max(80),
 });
 
+export const preparePickupInputSchema = z.object({
+  pickupDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'pickupDate must be YYYY-MM-DD'),
+  pickupTime: z
+    .string()
+    .trim()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'pickupTime must be 24-hour HH:MM'),
+  expectedPackageCount: z.number().int().min(1).max(500),
+  pickupLocations: z.array(z.string().trim().min(1).max(120)).min(1).max(20),
+});
+
+export const schedulePickupInputSchema = z.object({
+  previewId: z.string().trim().min(1).max(80),
+});
+
+export type PreparePickupInput = z.infer<typeof preparePickupInputSchema>;
+
 export type PrepareShipmentInput = z.infer<typeof prepareShipmentInputSchema>;
 
 export type SearchOrdersInput = z.infer<typeof searchOrdersInputSchema>;

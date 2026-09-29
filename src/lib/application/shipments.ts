@@ -39,6 +39,7 @@ function countTodaysCreations(tenantId: string) {
     where: {
       tenantId,
       channel: CHANNEL,
+      type: 'shipment',
       status: { in: ['creating', 'succeeded', 'reconciliation_required'] },
       createdAt: { gte: startOfUtcDay() },
     },
@@ -148,6 +149,7 @@ export async function prepareShipment(principal: McpPrincipal, input: PrepareShi
       userId: principal.userId,
       grantId: principal.grantId,
       channel: CHANNEL,
+      type: 'shipment',
       status: 'previewed',
       payload: orderData as Prisma.InputJsonValue,
       payloadHash: sha256Hex(JSON.stringify(orderData)),
@@ -187,12 +189,13 @@ export async function prepareShipment(principal: McpPrincipal, input: PrepareShi
   };
 }
 
-function operationView(op: shipment_operations) {
+export function operationView(op: shipment_operations) {
   let status = op.status;
   if (status === 'previewed' && op.expiresAt.getTime() <= Date.now()) status = 'expired';
   if (status === 'creating' && Date.now() - op.updatedAt.getTime() > STALE_CREATING_MS) status = 'reconciliation_required';
   return {
     operationId: op.id,
+    type: op.type,
     status,
     orderId: op.orderId,
     result: op.result ?? null,
@@ -200,12 +203,17 @@ function operationView(op: shipment_operations) {
     expiresAt: op.expiresAt.toISOString(),
     createdAt: op.createdAt.toISOString(),
     ...(status === 'reconciliation_required'
-      ? { note: 'The outcome is uncertain. Check the order list on Scan2Ship before trying again; do not create a duplicate.' }
+      ? {
+          note:
+            op.type === 'pickup'
+              ? 'The outcome is uncertain. Check pickup requests on Scan2Ship before trying again; do not request a duplicate pickup.'
+              : 'The outcome is uncertain. Check the order list on Scan2Ship before trying again; do not create a duplicate.',
+        }
       : {}),
   };
 }
 
-async function findOwnOperation(principal: McpPrincipal, id: string) {
+export async function findOwnOperation(principal: McpPrincipal, id: string) {
   return prisma.shipment_operations.findFirst({
     where: { id, tenantId: principal.tenantId, userId: principal.userId, channel: CHANNEL },
   });
@@ -225,6 +233,7 @@ export async function createShipment(principal: McpPrincipal, previewId: string)
       tenantId: principal.tenantId,
       userId: principal.userId,
       channel: CHANNEL,
+      type: 'shipment',
       status: 'previewed',
       expiresAt: { gt: new Date() },
     },
@@ -233,7 +242,7 @@ export async function createShipment(principal: McpPrincipal, previewId: string)
 
   if (claimed.count !== 1) {
     const existing = await findOwnOperation(principal, previewId);
-    if (!existing) throw new McpToolError('not_found', 'Preview not found');
+    if (!existing || existing.type !== 'shipment') throw new McpToolError('not_found', 'Preview not found');
     // Already handled, in progress, expired, or failed: report it without ordering again
     return { ...operationView(existing), replayed: true };
   }

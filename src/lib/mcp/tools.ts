@@ -11,7 +11,9 @@ import {
   createShipmentInputSchema,
   customerOrderHistoryInputSchema,
   getShipmentOperationInputSchema,
+  preparePickupInputSchema,
   prepareShipmentInputSchema,
+  schedulePickupInputSchema,
   getOrderInputSchema,
   getShippingLabelInputSchema,
   getTrackingStatusInputSchema,
@@ -20,7 +22,8 @@ import {
 } from '@/lib/application/schemas';
 import { listShippingOptions, quoteShipping } from '@/lib/application/shipping';
 import { createShipment, getShipmentOperation, prepareShipment } from '@/lib/application/shipments';
-import { consumeMcpQuota, requireScope, touchGrant } from './auth';
+import { preparePickup, schedulePickup } from '@/lib/application/pickup-operations';
+import { consumeMcpQuota, touchGrant } from './auth';
 import { logMcpEvent } from './audit';
 import { McpAuthError, McpToolError } from './errors';
 import { createLabelLink } from './labels';
@@ -31,6 +34,8 @@ export type McpToolDefinition = {
   name: string;
   description: string;
   scope: McpScope;
+  /** Also callable with any of these scopes instead of `scope` */
+  alsoAllowedScopes?: McpScope[];
   /** Changes data; listed only while MCP_WRITES_ENABLED is on */
   write?: 'preview' | 'create' | 'status';
 };
@@ -99,11 +104,31 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   },
   {
     name: 'get_shipment_operation',
-    description: 'Return the status of a prepared or created shipment by its previewId/operationId.',
+    description: 'Return the status of a prepared or created shipment, or of a prepared or scheduled pickup, by its previewId/operationId.',
     scope: 'shipments:create',
+    alsoAllowedScopes: ['pickups:create'],
     write: 'status',
   },
+  {
+    name: 'prepare_pickup',
+    description:
+      'Validate a Delhivery pickup request (date, time in IST, package count, pickup locations from list_shipping_options) and return a preview. Nothing is sent to Delhivery. Show the preview to the user and wait for their explicit confirmation before calling schedule_pickup.',
+    scope: 'pickups:create',
+    write: 'preview',
+  },
+  {
+    name: 'schedule_pickup',
+    description:
+      'Ask Delhivery to send a pickup for a preview the user has explicitly confirmed. Each location is booked separately, so some may succeed while others fail. Calling it again with the same previewId never books twice.',
+    scope: 'pickups:create',
+    write: 'create',
+  },
 ];
+
+/** Whether the connection's scopes allow calling this tool. */
+export function toolAllowed(tool: McpToolDefinition, scopes: readonly string[]): boolean {
+  return [tool.scope, ...(tool.alsoAllowedScopes ?? [])].some((scope) => scopes.includes(scope));
+}
 
 function summaryFor(name: string, data: unknown): string {
   if (name === 'search_orders' && data && typeof data === 'object' && 'orders' in data) {
@@ -126,6 +151,13 @@ function summaryFor(name: string, data: unknown): string {
     const preview = data as { previewId: string; cost: { credits: number; sufficient: boolean } };
     return `Preview ${preview.previewId} ready (${preview.cost.credits} credit${preview.cost.credits === 1 ? '' : 's'}${preview.cost.sufficient ? '' : ', insufficient balance'}). Confirm with the user before creating it.`;
   }
+  if (name === 'prepare_pickup' && data && typeof data === 'object' && 'previewId' in data) {
+    return `Pickup preview ${(data as { previewId: string }).previewId} ready. Confirm with the user before scheduling it.`;
+  }
+  if (name === 'schedule_pickup' && data && typeof data === 'object' && 'status' in data) {
+    const op = data as { status: string; error: string | null };
+    return `Pickup ${op.status.replace('_', ' ')}${op.error ? `: ${op.error}` : ''}.`;
+  }
   if ((name === 'create_shipment' || name === 'get_shipment_operation') && data && typeof data === 'object' && 'status' in data) {
     const op = data as { status: string; orderId: number | null; error: string | null };
     if (op.status === 'succeeded') return `Order ${op.orderId} created.`;
@@ -145,7 +177,9 @@ export async function executeMcpTool(
   const tool = MCP_TOOL_DEFINITIONS.find((item) => item.name === name);
   if (!tool) throw new McpToolError('not_found', `Unknown tool: ${name}`);
 
-  requireScope(principal, tool.scope);
+  if (!toolAllowed(tool, principal.scopes)) {
+    throw new McpAuthError('insufficient_scope', `Missing scope ${tool.scope}`, 403);
+  }
   await consumeMcpQuota(principal, name);
 
   let structured: unknown;
@@ -198,6 +232,16 @@ export async function executeMcpTool(
       case 'get_shipment_operation': {
         const input = getShipmentOperationInputSchema.parse(rawArgs ?? {});
         structured = await getShipmentOperation(principal, input.operationId);
+        break;
+      }
+      case 'prepare_pickup': {
+        const input = preparePickupInputSchema.parse(rawArgs ?? {});
+        structured = await preparePickup(principal, input);
+        break;
+      }
+      case 'schedule_pickup': {
+        const input = schedulePickupInputSchema.parse(rawArgs ?? {});
+        structured = await schedulePickup(principal, input.previewId);
         break;
       }
       case 'get_shipping_label': {
