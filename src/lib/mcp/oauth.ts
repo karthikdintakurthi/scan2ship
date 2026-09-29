@@ -10,6 +10,8 @@ import { newId, randomToken, sha256Hex, sha256S256, safeEqual } from './crypto';
 import { McpAuthError } from './errors';
 import { signMcpAccessToken } from './auth';
 import {
+  MCP_GRANTABLE_SCOPES,
+  MCP_OPTIONAL_SCOPES,
   MCP_POLICY_VERSION,
   MCP_READ_SCOPES,
   intersectScopes,
@@ -47,7 +49,7 @@ export function authorizationServerMetadata() {
     grant_types_supported: ['authorization_code', 'refresh_token'],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none'],
-    scopes_supported: [...MCP_READ_SCOPES],
+    scopes_supported: [...MCP_GRANTABLE_SCOPES],
     resource: mcpResourceUrl(),
   };
 }
@@ -57,7 +59,7 @@ export function protectedResourceMetadata() {
     resource: mcpResourceUrl(),
     authorization_servers: [mcpIssuer()],
     bearer_methods_supported: ['header'],
-    scopes_supported: [...MCP_READ_SCOPES],
+    scopes_supported: [...MCP_GRANTABLE_SCOPES],
   };
 }
 
@@ -102,7 +104,7 @@ export async function createAuthorizationCode(input: {
   resource: string;
 }) {
   // Defaults are applied when parsing the request; an empty list here means nothing is permitted.
-  const scopes = intersectScopes(input.scopes, MCP_READ_SCOPES);
+  const scopes = intersectScopes(input.scopes, MCP_GRANTABLE_SCOPES);
   if (scopes.length === 0) {
     throw new McpAuthError('insufficient_scope', 'No permitted scopes requested', 400);
   }
@@ -288,8 +290,26 @@ export async function listGrantsForUser(userId: string, tenantId: string) {
   });
 }
 
-/** Requested scopes (or the defaults), limited to the pilot's read scopes and the user's role. */
+/**
+ * Requested scopes (or the defaults), limited to the basic read scopes and the user's role.
+ * Optional scopes are never granted from the request alone; see approvedScopes.
+ */
 export function parseRequestedScopes(scope: string | null, user: Pick<AuthenticatedUser, 'role'>): McpScope[] {
   const parsed = parseScopeString(scope);
   return scopesAllowedForUser(intersectScopes(parsed.length ? parsed : MCP_DEFAULT_SCOPES, MCP_READ_SCOPES), user);
+}
+
+/** Optional scopes (customer PII, labels) this user could tick at consent. */
+export function optionalScopesForUser(user: Pick<AuthenticatedUser, 'role'>): McpScope[] {
+  return scopesAllowedForUser(MCP_OPTIONAL_SCOPES, user);
+}
+
+/** Basic requested scopes plus the optional scopes the user explicitly ticked. */
+export function approvedScopes(
+  scope: string | null,
+  tickedOptional: readonly string[],
+  user: Pick<AuthenticatedUser, 'role'>
+): McpScope[] {
+  const optional = optionalScopesForUser(user).filter((item) => tickedOptional.includes(item));
+  return [...new Set([...parseRequestedScopes(scope, user), ...optional])];
 }

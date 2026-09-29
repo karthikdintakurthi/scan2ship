@@ -21,7 +21,12 @@ export const MCP_READ_SCOPES: McpScope[] = [
   'credits:read',
 ];
 
-export const MCP_POLICY_VERSION = 2;
+/** Customer PII and label downloads are granted only when the user ticks them at consent. */
+export const MCP_OPTIONAL_SCOPES: McpScope[] = ['customers:read', 'labels:read'];
+
+export const MCP_GRANTABLE_SCOPES: McpScope[] = [...MCP_READ_SCOPES, ...MCP_OPTIONAL_SCOPES];
+
+export const MCP_POLICY_VERSION = 3;
 
 /** The tenant action a user must hold for a scope to be granted or used. */
 export const SCOPE_ACTION: Record<McpScope, Action> = {
@@ -70,6 +75,6 @@ export const SCOPE_DESCRIPTIONS: Record<McpScope, string> = {
   'shipping:quote': 'Estimate shipping from your configured rates',
   'settings:read': 'See account capabilities and permitted pickup locations',
   'credits:read': 'See your remaining shipping credit balance',
-  'customers:read': 'See full recipient contact details',
-  'labels:read': 'Download shipping labels',
+  'customers:read': "See customers' full phone numbers and addresses, and look up a customer's order history",
+  'labels:read': 'Open printable shipping labels through links that expire after 10 minutes',
 };

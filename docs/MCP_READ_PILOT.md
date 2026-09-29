@@ -45,8 +45,16 @@ PKCE `S256` is required. Access tokens last 15 minutes and are bound to audience
 | `list_shipping_options` | `settings:read` |
 | `quote_shipping` | `shipping:quote` |
 | `get_credit_balance` | `credits:read` |
+| `get_customer_order_history` | `customers:read` (optional) |
+| `get_shipping_label` | `labels:read` (optional) |
 
 `quote_shipping` returns `configured_estimate` from the tenant rate table, not a live carrier quote. Tracking reads persisted status and does not refresh Delhivery. `get_order` omits street address unless `customers:read` was granted (not in the default set).
+
+`customers:read` and `labels:read` are opt-in: they appear unticked on the approval page and are granted only if the user ticks them, even when the assistant requests them. A connection is only shown the tools its scopes allow.
+
+`get_customer_order_history` looks up the last 10 digits of a customer or reseller mobile within the tenant's configured history window (1–365 days, up to 25 orders). It returns `enabled: false` when the tenant has history turned off, and applies the child-user sub-group rule. Like the create-order screen's history, it does not match the ~0.1% of orders whose stored mobile contains spaces or symbols.
+
+`get_shipping_label` returns a link, `/api/mcp/labels/<signed token>`, valid for 10 minutes. The token uses its own audience, so it cannot act as an access token. Opening it re-checks the grant, user, tenant allowlist, role, `labels:read`, and order access, so revoking the connection disables its links. The label defaults to the tenant's print mode (`standard`, `thermal`, `a5`, `r4`).
 
 Writes (`prepare_shipment` / `commit_shipment`) are not in this pilot.
 

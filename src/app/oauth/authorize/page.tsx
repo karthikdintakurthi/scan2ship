@@ -19,7 +19,9 @@ function AuthorizeInner() {
     tenantName: string;
     enabled: boolean;
     scopes: Array<{ id: string; description: string }>;
+    optionalScopes?: Array<{ id: string; description: string }>;
   } | null>(null);
+  const [optionalChosen, setOptionalChosen] = useState<string[]>([]);
 
   const query = useMemo(
     () => ({
@@ -80,7 +82,7 @@ function AuthorizeInner() {
       const response = await fetch('/api/oauth/consent', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(query),
+        body: JSON.stringify({ ...query, optional_scopes: optionalChosen }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Approval failed');
@@ -114,6 +116,28 @@ function AuthorizeInner() {
             </li>
           ))}
         </ul>
+        {(preview?.optionalScopes?.length ?? 0) > 0 && (
+          <fieldset className="space-y-2 border-t pt-3">
+            <legend className="text-sm font-medium text-gray-900">Optional access (off unless you tick it)</legend>
+            {preview!.optionalScopes!.map((scope) => (
+              <label key={scope.id} className="flex items-start gap-2 text-sm text-gray-800">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={optionalChosen.includes(scope.id)}
+                  onChange={(event) =>
+                    setOptionalChosen((current) =>
+                      event.target.checked ? [...current, scope.id] : current.filter((id) => id !== scope.id)
+                    )
+                  }
+                />
+                <span>
+                  <span className="font-medium">{scope.id}</span> — {scope.description}
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        )}
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex gap-3 pt-2">
           <button

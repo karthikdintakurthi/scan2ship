@@ -1,8 +1,16 @@
 import { getAccountContext } from '@/lib/application/account';
 import { getCreditBalanceReadOnly } from '@/lib/application/credits';
-import { getOrder, getTrackingStatus, searchOrders } from '@/lib/application/orders';
 import {
+  getCustomerOrderHistory,
+  getOrder,
+  getTrackingStatus,
+  resolveShippingLabel,
+  searchOrders,
+} from '@/lib/application/orders';
+import {
+  customerOrderHistoryInputSchema,
   getOrderInputSchema,
+  getShippingLabelInputSchema,
   getTrackingStatusInputSchema,
   quoteShippingInputSchema,
   searchOrdersInputSchema,
@@ -11,12 +19,14 @@ import { listShippingOptions, quoteShipping } from '@/lib/application/shipping';
 import { consumeMcpQuota, requireScope, touchGrant } from './auth';
 import { logMcpEvent } from './audit';
 import { McpAuthError, McpToolError } from './errors';
+import { createLabelLink } from './labels';
 import type { McpPrincipal } from './principal';
+import type { McpScope } from './scopes';
 
 export type McpToolDefinition = {
   name: string;
   description: string;
-  scope: 'settings:read' | 'orders:read' | 'tracking:read' | 'shipping:quote' | 'credits:read';
+  scope: McpScope;
 };
 
 export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
@@ -55,6 +65,18 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     description: 'Return the remaining integer shipping credit balance. Does not create or change the account.',
     scope: 'credits:read',
   },
+  {
+    name: 'get_customer_order_history',
+    description:
+      "Return a customer's recent orders (up to 25) by their 10-digit mobile number, matching customer or reseller mobile. Uses the account's own history window; returns enabled=false if the account has history turned off. Includes full contact details.",
+    scope: 'customers:read',
+  },
+  {
+    name: 'get_shipping_label',
+    description:
+      "Return a link to one order's printable shipping label. The link expires after 10 minutes and stops working if the connection is revoked. Share the link with the user; do not fetch it.",
+    scope: 'labels:read',
+  },
 ];
 
 function summaryFor(name: string, data: unknown): string {
@@ -64,6 +86,15 @@ function summaryFor(name: string, data: unknown): string {
   }
   if (name === 'get_order' && data && typeof data === 'object' && 'id' in data) {
     return `Order ${(data as { id: number }).id}.`;
+  }
+  if (name === 'get_customer_order_history' && data && typeof data === 'object' && 'count' in data) {
+    const history = data as { enabled: boolean; count: number; days: number; truncated: boolean };
+    if (!history.enabled) return 'Customer order history is turned off for this account.';
+    return `Found ${history.count}${history.truncated ? '+' : ''} order(s) in the last ${history.days} days.`;
+  }
+  if (name === 'get_shipping_label' && data && typeof data === 'object' && 'url' in data) {
+    const label = data as { orderId: number; url: string; expiresAt: string };
+    return `Label for order ${label.orderId}: ${label.url} (expires ${label.expiresAt}).`;
   }
   if (name === 'get_credit_balance' && data && typeof data === 'object' && 'balance' in data) {
     return `Credit balance: ${(data as { balance: number }).balance}.`;
@@ -114,6 +145,26 @@ export async function executeMcpTool(
       case 'get_credit_balance':
         structured = await getCreditBalanceReadOnly(principal.tenantId);
         break;
+      case 'get_customer_order_history': {
+        const input = customerOrderHistoryInputSchema.parse(rawArgs ?? {});
+        structured = await getCustomerOrderHistory(principal.user, input);
+        break;
+      }
+      case 'get_shipping_label': {
+        const input = getShippingLabelInputSchema.parse(rawArgs ?? {});
+        const label = await resolveShippingLabel(principal.user, input.orderId, input.format);
+        const link = createLabelLink(principal, label.orderId, label.format);
+        structured = {
+          orderId: label.orderId,
+          trackingId: label.trackingId,
+          format: label.format,
+          contentType: 'text/html',
+          url: link.url,
+          expiresAt: link.expiresAt,
+          instructions: 'Open the link in a browser and print. It expires after 10 minutes.',
+        };
+        break;
+      }
       default:
         throw new McpToolError('not_found', `Unknown tool: ${name}`);
     }
@@ -140,6 +191,8 @@ export async function executeMcpTool(
   const targetIds =
     structured && typeof structured === 'object' && 'id' in structured
       ? [(structured as { id: number }).id]
+      : structured && typeof structured === 'object' && 'orderId' in structured
+        ? [(structured as { orderId: number }).orderId]
       : structured && typeof structured === 'object' && 'orders' in structured
         ? (structured as { orders: Array<{ id: number }> }).orders.map((row) => row.id)
         : undefined;

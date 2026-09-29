@@ -82,6 +82,20 @@ export async function authenticateMcpRequest(request: Request): Promise<McpPrinc
     throw new McpAuthError('invalid_token', 'Invalid or expired token');
   }
 
+  return principalFromClaims(claims);
+}
+
+/**
+ * Re-checks everything a token vouches for against current state: MCP switch,
+ * tenant allowlist, grant, user, tenant, and the user's role ceiling. Shared by
+ * bearer requests and signed label links.
+ */
+export async function principalFromClaims(
+  claims: Pick<AccessClaims, 'sub' | 'tid' | 'gid' | 'scope' | 'jti'>
+): Promise<McpPrincipal> {
+  if (!isMcpEnabled()) {
+    throw new McpAuthError('disabled', 'MCP is disabled', 503);
+  }
   if (!claims.sub || !claims.tid || !claims.gid) {
     throw new McpAuthError('invalid_token', 'Invalid token claims');
   }

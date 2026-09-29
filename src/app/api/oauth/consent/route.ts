@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authorizeUser, PermissionLevel, UserRole } from '@/lib/auth-middleware';
 import { isMcpEnabled, isTenantAllowedForMcp, mcpResourceUrl } from '@/lib/mcp/config';
-import { createAuthorizationCode, getOAuthClient, isAllowedRedirectUri, parseRequestedScopes } from '@/lib/mcp/oauth';
+import {
+  approvedScopes,
+  createAuthorizationCode,
+  getOAuthClient,
+  isAllowedRedirectUri,
+  optionalScopesForUser,
+  parseRequestedScopes,
+} from '@/lib/mcp/oauth';
 import { SCOPE_DESCRIPTIONS } from '@/lib/mcp/scopes';
 
 export const runtime = 'nodejs';
@@ -41,6 +48,7 @@ export async function GET(request: NextRequest) {
     tenantId: user.clientId,
     enabled: isMcpEnabled() && isTenantAllowedForMcp(user.clientId),
     scopes: scopes.map((scope) => ({ id: scope, description: SCOPE_DESCRIPTIONS[scope] })),
+    optionalScopes: optionalScopesForUser(user).map((scope) => ({ id: scope, description: SCOPE_DESCRIPTIONS[scope] })),
   });
 }
 
@@ -91,7 +99,11 @@ export async function POST(request: NextRequest) {
     oauthClientId: client.id,
     redirectUri,
     codeChallenge,
-    scopes: parseRequestedScopes(typeof body.scope === 'string' ? body.scope : null, user),
+    scopes: approvedScopes(
+      typeof body.scope === 'string' ? body.scope : null,
+      Array.isArray(body.optional_scopes) ? body.optional_scopes.filter((item: unknown) => typeof item === 'string') : [],
+      user
+    ),
     resource,
   });
 

@@ -33,7 +33,18 @@ export const quoteShippingInputSchema = z.object({
   courierCode: z.string().trim().max(80).optional(),
 });
 
+export const customerOrderHistoryInputSchema = z.object({
+  mobile: z.string().trim().min(10).max(20),
+});
+
+export const getShippingLabelInputSchema = z.object({
+  orderId: orderIdSchema,
+  format: z.enum(['standard', 'thermal', 'a5', 'r4']).optional(),
+});
+
 export type SearchOrdersInput = z.infer<typeof searchOrdersInputSchema>;
 export type GetOrderInput = z.infer<typeof getOrderInputSchema>;
 export type GetTrackingStatusInput = z.infer<typeof getTrackingStatusInputSchema>;
 export type QuoteShippingInput = z.infer<typeof quoteShippingInputSchema>;
+export type CustomerOrderHistoryInput = z.infer<typeof customerOrderHistoryInputSchema>;
+export type GetShippingLabelInput = z.infer<typeof getShippingLabelInputSchema>;

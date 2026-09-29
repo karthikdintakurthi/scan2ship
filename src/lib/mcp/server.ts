@@ -30,6 +30,16 @@ const TOOL_INPUT: Record<string, z.ZodTypeAny> = {
     courierCode: z.string().max(80).optional(),
   }),
   get_credit_balance: emptySchema,
+  get_customer_order_history: z.object({
+    mobile: z.string().min(10).max(20).describe('Customer or reseller mobile number; the last 10 digits are used'),
+  }),
+  get_shipping_label: z.object({
+    orderId: z.number().int().positive(),
+    format: z
+      .enum(['standard', 'thermal', 'a5', 'r4'])
+      .optional()
+      .describe("Label layout; defaults to the account's print mode"),
+  }),
 };
 
 const READ_ANNOTATIONS = {
@@ -45,7 +55,8 @@ export function createMcpServer(principal: McpPrincipal): McpServer {
     { instructions: 'Customer MCP for one Scan2Ship tenant. Tools cannot select another tenant.' }
   );
 
-  for (const tool of MCP_TOOL_DEFINITIONS) {
+  // Only list tools this connection may call, so assistants are not offered tools they cannot use.
+  for (const tool of MCP_TOOL_DEFINITIONS.filter((item) => principal.scopes.includes(item.scope))) {
     server.registerTool(
       tool.name,
       {

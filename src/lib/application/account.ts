@@ -42,7 +42,8 @@ export async function getAccountContext(user: AuthenticatedUser, scopes: readonl
       quoteShipping: scopes.includes('shipping:quote'),
       getCreditBalance: scopes.includes('credits:read'),
       fullCustomerContact: scopes.includes('customers:read'),
-      shippingLabels: false,
+      customerOrderHistory: scopes.includes('customers:read'),
+      shippingLabels: scopes.includes('labels:read'),
       createShipments: false,
     },
     defaults: orderConfig

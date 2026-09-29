@@ -1,12 +1,18 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { findAccessibleOrder, orderAccessWhere, parseOrderId } from '@/lib/application/policy';
-import type { SearchOrdersInput } from '@/lib/application/schemas';
+import type { CustomerOrderHistoryInput, SearchOrdersInput } from '@/lib/application/schemas';
+import { isLabelFormat, type LabelFormat } from '@/lib/labels/render-waybill';
 import type { AuthenticatedUser } from '@/lib/auth-middleware';
 import { hasScope, type McpScope } from '@/lib/mcp/scopes';
 import { McpToolError } from '@/lib/mcp/errors';
 
 const MAX_DATE_RANGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+// Same bounds as the create-order screen's customer history (api/orders/customer-history).
+const HISTORY_MAX_RESULTS = 25;
+const HISTORY_MIN_DAYS = 1;
+const HISTORY_MAX_DAYS = 365;
 
 const LIST_SELECT = {
   id: true,
@@ -229,4 +235,74 @@ export async function getTrackingStatus(
     refreshedFromCarrier: false,
     lastUpdatedAt: order.updated_at.toISOString(),
   };
+}
+
+/**
+ * A customer's recent orders by mobile number (customer or reseller), for spotting
+ * repeat or duplicate orders. Follows the tenant's own history setting and window,
+ * and the caller's order access (child users see only their sub-group).
+ */
+export async function getCustomerOrderHistory(user: AuthenticatedUser, input: CustomerOrderHistoryInput) {
+  const mobile = input.mobile.replace(/\D/g, '').slice(-10);
+  if (mobile.length !== 10) {
+    throw new McpToolError('invalid_params', 'A valid 10-digit mobile number is required');
+  }
+
+  const config = await prisma.client_order_configs.findUnique({
+    where: { clientId: user.clientId },
+    select: { enableCustomerOrderHistory: true, customerOrderHistoryDays: true },
+  });
+  if (!config?.enableCustomerOrderHistory) {
+    return {
+      enabled: false,
+      message: 'Customer order history is turned off for this account. An admin can enable it in Settings.',
+      days: 0,
+      count: 0,
+      truncated: false,
+      orders: [] as OrderDetail[],
+    };
+  }
+
+  const days = Math.min(HISTORY_MAX_DAYS, Math.max(HISTORY_MIN_DAYS, config.customerOrderHistoryDays ?? 30));
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const rows = await prisma.orders.findMany({
+    where: {
+      AND: [
+        await orderAccessWhere(user),
+        { created_at: { gte: since } },
+        { OR: [{ mobile: { endsWith: mobile } }, { reseller_mobile: { endsWith: mobile } }] },
+      ],
+    },
+    select: DETAIL_SELECT,
+    orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+    take: HISTORY_MAX_RESULTS,
+  });
+
+  return {
+    enabled: true,
+    days,
+    count: rows.length,
+    truncated: rows.length === HISTORY_MAX_RESULTS,
+    // customers:read is required to call this, so full contact details are returned.
+    orders: rows.map((row) => toDetail(row, true)),
+  };
+}
+
+/**
+ * Confirms the caller may access the order and picks the label format: the
+ * requested one, else the tenant's print mode, else standard.
+ */
+export async function resolveShippingLabel(
+  user: AuthenticatedUser,
+  orderId: number,
+  requested?: LabelFormat
+): Promise<{ orderId: number; format: LabelFormat; trackingId: string | null }> {
+  const order = await findAccessibleOrder(user, orderId, {
+    select: { id: true, tracking_id: true, clients: { select: { client_order_configs: { select: { printmode: true } } } } },
+  });
+  if (!order) throw new McpToolError('not_found', 'Order not found');
+
+  const printmode = order.clients?.client_order_configs?.printmode;
+  const format = requested ?? (isLabelFormat(printmode) ? printmode : 'standard');
+  return { orderId: order.id, format, trackingId: order.tracking_id };
 }
