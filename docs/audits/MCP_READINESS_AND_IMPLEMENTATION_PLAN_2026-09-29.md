@@ -299,6 +299,23 @@ Each PR is independently shippable and carries route-level tests. Ordered by exp
 - Waybill rendering moved to `src/lib/labels/render-waybill.ts`; the website waybill route and the MCP label link share it.
 - Finding: the website's `/api/orders/customer-history` filters by tenant only, so child users see the whole tenant's history for a number there. The MCP tool applies the sub-group rule; the website route still needs the same fix.
 
+### Engineering cleanup (2026-09-29)
+
+- **Checks restored.** TypeScript errors went from 226 to 0, and `next.config.ts` now fails builds on type or lint errors. The type-check ratchet (`ci/check-types.js`, `typecheck-baseline.txt`) is removed, and `npm run typecheck` is plain `tsc --noEmit`. The seven quarantined legacy suites were rewritten against current behaviour (223 tests), so `test:ci` runs every suite: 39 suites and 934 tests. Lint has 0 errors and 335 warnings, down from 445; `lint:ci` caps warnings at 335. A local `next build` with checks enabled passes. It needs `ENCRYPTION_KEY` because `admin/system-config` throws at import without it; Vercel sets it.
+- **Real bugs fixed while clearing type errors.** Examples: the client name and slug were always `undefined` in about 15 routes (the auth select omitted them); the first `GET /api/order-config` for a new client returned 500 (a `const` was reassigned); creating a `client_order_configs` row always failed (it set `enableThermalPrint`, which is not in the schema); refresh wrote a `sessions.token` column that does not exist; webhook log writes got a string `orderId`; the order form saved `true` as the courier; the DTDC auto-fill button sent `?courier=[object Object]`; product search could not cancel a debounced search; database-security health actions called functions that do not exist; and file-cleanup threw when quarantine or backup was enabled.
+- **Removed.** `orders/route-new.ts` (never served) plus five unused routes that were broken or unsafe: `test-admin` (lists every client), `orders/[id]/shipping-label` (commented out), `admin/clients/[id]/update-password` and `auth/change-password` (both wrote columns that do not exist), and `upload` (its table does not exist). Thirteen handlers now take `params` as a Promise, as Next 15 requires.
+- **Scripts.** `scripts/` is no longer ignored. `backup-prod-db.sh` and `deploy-migration-with-backup.sh` are tracked; neither contains credentials. The npm scripts that pointed at 20 missing files were removed, including `prestart`, which made `npm start` fail. `db:backup` now runs `backup-prod-db.sh`, which repairs `db:migrate:dev` and `db:migrate:deploy`. `backups/` stays ignored.
+- **Suspected bugs, not yet fixed.** Found while rewriting tests; the first four were verified against the code:
+  1. `auth/refresh` accepts any valid JWT, including a login token, as a refresh token. It never checks it against `sessions.refreshToken`, and it ignores `sessions.isActive`, so revoked sessions can still refresh.
+  2. Login trims and strips the password (`InputValidator.validateString`) before comparing it, while registration hashes the raw password.
+  3. `generateSecurePassword` indexes a 26-character set with `Math.random() * 32`, so about 19% of generated passwords contain the text "undefined". It also uses `Math.random` rather than a CSPRNG.
+  4. A login 500 returns the internal `error.message`.
+  5. Login lower-cases the email, but registration and admin user creation store it as typed.
+  6. The `POST /api/orders` response reads `trackingId` from the row before the waybill update.
+  7. Bulk order DELETE passes unparsed IDs to Prisma (500 instead of 400); a numeric `mobile` on create throws (500).
+  8. `input-sanitizer`: `allowHTML` still entity-encodes, and phone cleanup keeps extra `+` signs.
+  9. `database-security` `initialize` adds another health-check interval on every call.
+
 ### Phase 1–3 outline
 
 - **Phase 1 (started on `feature/mcp-implementation`):** policy and scoped read services with Zod schemas (`src/lib/application/{orders,credits,shipping,account,schemas}.ts`); pickup access helper; additive `orders` indexes `(clientId, created_at)`, `(clientId, tracking_id)`, `(clientId, reference_number)`. Website JWT fallback is unchanged; MCP tokens use a strict issuer/audience and no fallback. ESLint/CI ratchet left for later.

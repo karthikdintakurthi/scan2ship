@@ -20,8 +20,8 @@ jobs:
       - run: npm ci
       - name: Lint (no errors, no new warnings)
         run: npm run lint:ci
-      - name: Type check (no errors beyond typecheck-baseline.txt)
+      - name: Type check
         run: npm run typecheck
-      - name: Tests (quarantined suites listed in jest.ci.config.js)
+      - name: Tests
         # Parallel workers crash loading the Next SWC binary; run in band.
         run: npm run test:ci
