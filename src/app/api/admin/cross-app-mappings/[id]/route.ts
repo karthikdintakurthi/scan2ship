@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authorizeSuperAdmin } from '@/lib/auth-middleware';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { resolveSubmittedApiKey, toCrossAppMappingDto } from '@/lib/application/credential-dto';
 
 /**
  * Cross-App Mapping by ID API
@@ -11,7 +12,7 @@ import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middlew
 // PUT /api/admin/cross-app-mappings/[id] - Update mapping
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Apply security middleware
@@ -33,13 +34,15 @@ export async function PUT(
       return authResult.response;
     }
 
+    const { id } = await params;
     const { catalogClientId, catalogApiKey, isActive } = await request.json();
+    const newCatalogApiKey = resolveSubmittedApiKey(catalogApiKey, null);
 
     const mapping = await prisma.cross_app_mappings.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(catalogClientId && { catalogClientId }),
-        ...(catalogApiKey && { catalogApiKey }),
+        ...(newCatalogApiKey && { catalogApiKey: newCatalogApiKey }),
         ...(isActive !== undefined && { isActive }),
         updatedAt: new Date()
       },
@@ -58,7 +61,7 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      data: mapping,
+      data: toCrossAppMappingDto(mapping),
       message: 'Cross-app mapping updated successfully'
     });
 
@@ -74,7 +77,7 @@ export async function PUT(
 // DELETE /api/admin/cross-app-mappings/[id] - Delete mapping
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Apply security middleware
@@ -89,16 +92,15 @@ export async function DELETE(
       return securityResponse;
     }
 
-    // Temporarily bypass super admin authentication for testing
-    // TODO: Restore authentication in production
-    // const authResult = await authorizeSuperAdmin(request);
-    // if (authResult.response) {
-    //   securityHeaders(authResult.response);
-    //   return authResult.response;
-    // }
+    const authResult = await authorizeSuperAdmin(request);
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
 
+    const { id } = await params;
     await prisma.cross_app_mappings.delete({
-      where: { id: params.id }
+      where: { id }
     });
 
     return NextResponse.json({

@@ -10,7 +10,8 @@ interface PickupLocation {
   id: string;
   name: string;
   value: string;
-  delhiveryApiKey: string | null;
+  delhiveryApiKey?: string | null;
+  hasApiKey?: boolean;
 }
 
 interface CourierService {
@@ -637,7 +638,7 @@ export default function ClientSettingsPage() {
             id: location.id,
             name: location.label, // API returns 'label', interface expects 'name'
             value: location.value,
-            delhiveryApiKey: location.delhiveryApiKey
+            hasApiKey: location.hasApiKey === true
           })),
           courierServices: (courierData.courierServices || []).map((service: any) => ({
             id: service.id,
@@ -2564,9 +2565,9 @@ export default function ClientSettingsPage() {
                     <div className="flex-1">
                       <h3 className="text-sm font-medium text-gray-900">{location.name}</h3>
                       <p className="text-sm text-gray-500">{location.value}</p>
-                      {location.delhiveryApiKey && (
+                      {location.hasApiKey && (
                         <p className="text-xs text-gray-400 mt-1">
-                          API Key: {location.delhiveryApiKey}
+                          Delhivery API key configured
                         </p>
                       )}
                     </div>

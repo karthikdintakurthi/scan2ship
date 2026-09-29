@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { resolveSubmittedApiKey } from '@/lib/application/credential-dto';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 
@@ -156,7 +157,7 @@ export async function GET(
           id: location.id,
           name: location.label,
           value: location.value,
-          delhiveryApiKey: location.delhiveryApiKey || null, // Return actual API key, not masked
+          hasApiKey: Boolean(location.delhiveryApiKey?.trim()),
           isActive: true
         })),
         courierServices: client.courier_services.map(service => ({
@@ -325,8 +326,12 @@ export async function PUT(
     const { id: clientId } = await params;
     const updateData = await request.json();
 
+    if (!updateData || typeof updateData !== 'object' || Array.isArray(updateData)) {
+      return NextResponse.json({ error: 'Request body must be an object' }, { status: 400 });
+    }
+
     console.log(`📝 [API_ADMIN_CLIENT_CONFIG_PUT] Updating client configuration for client ${clientId}`);
-    console.log(`📝 [API_ADMIN_CLIENT_CONFIG_PUT] Update data:`, JSON.stringify(updateData, null, 2));
+    console.log(`📝 [API_ADMIN_CLIENT_CONFIG_PUT] Updating sections:`, Object.keys(updateData).join(', '));
 
     // Update client basic information
     if (updateData.client) {
@@ -403,6 +408,15 @@ export async function PUT(
 
     // Update pickup locations
     if (updateData.pickupLocations) {
+      // The form never receives stored keys, so carry them over (by id, then value) before replacing rows
+      const existingLocations = await prisma.pickup_locations.findMany({
+        where: { clientId },
+        select: { id: true, value: true, delhiveryApiKey: true }
+      });
+      const existingKeyFor = (location: { id?: string; value?: string }) =>
+        (existingLocations.find((existing) => location.id && existing.id === location.id) ??
+          existingLocations.find((existing) => existing.value === location.value))?.delhiveryApiKey;
+
       // First, delete existing pickup locations
       await prisma.pickup_locations.deleteMany({
         where: { clientId }
@@ -421,9 +435,11 @@ export async function PUT(
               clientId,
               value: location.value,
               label: location.name,
-              delhiveryApiKey: location.delhiveryApiKey && !location.delhiveryApiKey.startsWith('••••••••••••••••') 
-                ? location.delhiveryApiKey  // Don't encrypt - store as plain text
-                : location.delhiveryApiKey
+              delhiveryApiKey: resolveSubmittedApiKey(
+                location.delhiveryApiKey,
+                existingKeyFor(location),
+                { clear: location.clearDelhiveryApiKey === true }
+              )
             }))
           });
           console.log(`✅ [API_ADMIN_CLIENT_CONFIG_PUT] Successfully created ${updateData.pickupLocations.length} pickup locations`);

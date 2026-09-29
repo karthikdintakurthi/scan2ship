@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authorizeSuperAdmin } from '@/lib/auth-middleware';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { toCrossAppMappingDto } from '@/lib/application/credential-dto';
 
 /**
  * Cross-App Mappings API
@@ -23,13 +24,11 @@ export async function GET(request: NextRequest) {
       return securityResponse;
     }
 
-    // Temporarily bypass super admin authentication for testing
-    // TODO: Restore authentication in production
-    // const authResult = await authorizeSuperAdmin(request);
-    // if (authResult.response) {
-    //   securityHeaders(authResult.response);
-    //   return authResult.response;
-    // }
+    const authResult = await authorizeSuperAdmin(request);
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
 
     const mappings = await prisma.cross_app_mappings.findMany({
       include: {
@@ -50,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: mappings
+      data: mappings.map(toCrossAppMappingDto)
     });
 
   } catch (error: any) {
@@ -77,13 +76,11 @@ export async function POST(request: NextRequest) {
       return securityResponse;
     }
 
-    // Temporarily bypass super admin authentication for testing
-    // TODO: Restore authentication in production
-    // const authResult = await authorizeSuperAdmin(request);
-    // if (authResult.response) {
-    //   securityHeaders(authResult.response);
-    //   return authResult.response;
-    // }
+    const authResult = await authorizeSuperAdmin(request);
+    if (authResult.response) {
+      securityHeaders(authResult.response);
+      return authResult.response;
+    }
 
     const { scan2shipClientId, catalogClientId, catalogApiKey } = await request.json();
 
@@ -141,7 +138,7 @@ export async function POST(request: NextRequest) {
     console.log('Creating cross-app mapping:', {
       scan2shipClientId,
       catalogClientId,
-      catalogApiKey: catalogApiKey ? '***' + catalogApiKey.slice(-4) : 'undefined'
+      hasApiKey: Boolean(catalogApiKey)
     });
     
     const mapping = await prisma.cross_app_mappings.create({
@@ -168,7 +165,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: mapping,
+      data: toCrossAppMappingDto(mapping),
       message: 'Cross-app mapping created successfully'
     });
 

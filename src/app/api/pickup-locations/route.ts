@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { toPickupLocationDto } from '@/lib/application/credential-dto';
 import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
-      data: pickupLocations
+      data: pickupLocations.map(toPickupLocationDto)
     });
 
     securityHeaders(response);

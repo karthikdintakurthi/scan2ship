@@ -92,9 +92,7 @@ export class DelhiveryService {
       console.log('🌐 Delhivery API Request Details:');
       console.log('  Full URL:', fullUrl);
       console.log('  Method:', options.method || 'GET');
-      console.log('  Raw API Key:', apiKey);
-      console.log('  Clean API Key:', trimmedApiKey);
-      console.log('  Final Headers:', JSON.stringify(finalHeaders, null, 2));
+      console.log('  Header names:', Object.keys(finalHeaders).join(', '));
       console.log('  Request Body:', options.body || 'No body');
       console.log('  Retry Count:', retryCount);
       

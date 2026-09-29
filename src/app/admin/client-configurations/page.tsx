@@ -22,7 +22,7 @@ interface PickupLocation {
   id: string;
   value: string;
   label: string;
-  delhiveryApiKey: string | null;
+  hasApiKey: boolean;
 }
 
 interface CourierService {
@@ -333,7 +333,7 @@ export default function ClientConfigurationsPage() {
                           <div key={location.id} className="bg-white p-3 rounded border">
                             <p className="text-sm font-medium text-gray-900">{location.label}</p>
                             <p className="text-xs text-gray-600">Value: {location.value}</p>
-                            {location.delhiveryApiKey && (
+                            {location.hasApiKey && (
                               <p className="text-xs text-green-600">🔑 API Key configured</p>
                             )}
                           </div>

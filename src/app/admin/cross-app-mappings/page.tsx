@@ -13,7 +13,7 @@ interface CrossAppMapping {
   id: string;
   scan2shipClientId: string;
   catalogClientId: string;
-  catalogApiKey: string;
+  hasApiKey: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -30,8 +30,6 @@ export default function CrossAppMappingsPage() {
   const [mappings, setMappings] = useState<CrossAppMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showApiKey, setShowApiKey] = useState<{ [key: string]: boolean }>({});
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -158,21 +156,6 @@ export default function CrossAppMappingsPage() {
     } catch (error) {
       console.error('Error deleting mapping:', error);
       toast.error('Failed to delete mapping');
-    }
-  };
-
-  const toggleApiKeyVisibility = (mappingId: string) => {
-    setShowApiKey(prev => ({ ...prev, [mappingId]: !prev[mappingId] }));
-  };
-
-  const copyToClipboard = async (text: string, mappingId: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedKey(mappingId);
-      toast.success('Copied to clipboard');
-      setTimeout(() => setCopiedKey(null), 2000);
-    } catch (error) {
-      toast.error('Failed to copy to clipboard');
     }
   };
 
@@ -331,28 +314,9 @@ export default function CrossAppMappingsPage() {
 
                     <div className="mt-3">
                       <Label className="text-sm font-medium">Catalog API Key</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Input
-                          type={showApiKey[mapping.id] ? 'text' : 'password'}
-                          value={mapping.catalogApiKey}
-                          readOnly
-                          className="font-mono text-sm"
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => toggleApiKeyVisibility(mapping.id)}
-                        >
-                          {showApiKey[mapping.id] ? 'Hide' : 'Show'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => copyToClipboard(mapping.catalogApiKey, mapping.id)}
-                        >
-                          {copiedKey === mapping.id ? <CheckCircle className="h-4 w-4" /> : 'Copy'}
-                        </Button>
-                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {mapping.hasApiKey ? 'Configured. Keys are not shown after saving.' : 'Not configured'}
+                      </p>
                     </div>
                   </div>
 

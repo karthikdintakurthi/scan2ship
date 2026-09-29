@@ -29,7 +29,9 @@ interface PickupLocation {
   id: string;
   name: string;
   value: string;
-  delhiveryApiKey: string | null;
+  // Only set when the admin enters a new key; stored keys are never sent to the browser
+  delhiveryApiKey?: string | null;
+  hasApiKey?: boolean;
   isActive: boolean;
 }
 
@@ -975,7 +977,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                                 ...location,
                                 name: editingPickupLocationData.name,
                                 value: editingPickupLocationData.value,
-                                delhiveryApiKey: editingPickupLocationData.delhiveryApiKey
+                                delhiveryApiKey: editingPickupLocationData.delhiveryApiKey || null
                               };
                               
                               setConfig({
@@ -1019,7 +1021,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       />
                       <input
                         type="password"
-                        placeholder="Delhivery API Key (optional)"
+                        placeholder={location.hasApiKey ? 'Leave blank to keep the current Delhivery API key' : 'Delhivery API Key (optional)'}
                         value={editingPickupLocationData.delhiveryApiKey}
                         onChange={(e) => setEditingPickupLocationData({...editingPickupLocationData, delhiveryApiKey: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -1031,8 +1033,8 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                       <div>
                         <h3 className="font-medium text-gray-900">{location.name}</h3>
                         <p className="text-sm text-gray-600 mb-2">Value: {location.value}</p>
-                        {location.delhiveryApiKey && (
-                          <p className="text-sm text-gray-600">API Key: {location.delhiveryApiKey}</p>
+                        {(location.hasApiKey || location.delhiveryApiKey) && (
+                          <p className="text-sm text-gray-600">Delhivery API key configured</p>
                         )}
                       </div>
                       <div className="flex items-center space-x-2">
@@ -1042,7 +1044,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
                             setEditingPickupLocationData({
                               name: location.name,
                               value: location.value,
-                              delhiveryApiKey: location.delhiveryApiKey || ''
+                              delhiveryApiKey: ''
                             });
                           }}
                           className="text-blue-600 hover:text-blue-800 text-sm"

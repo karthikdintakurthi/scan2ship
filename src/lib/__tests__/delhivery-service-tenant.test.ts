@@ -62,6 +62,17 @@ describe('delhiveryService.cancelOrder', () => {
   });
 });
 
+describe('Delhivery request logging', () => {
+  it('logs header names but never the key or Authorization header', async () => {
+    getKey.mockResolvedValue('very-secret-delhivery-key');
+    await delhiveryService.cancelOrder('AWB-1', 'Main Warehouse', 'client-a');
+
+    const logged = (console.log as jest.Mock).mock.calls.flat().map(String).join(' ');
+    expect(logged).toContain('Header names:');
+    expect(logged).not.toContain('very-secret-delhivery-key');
+  });
+});
+
 describe('delhiveryService.createOrder', () => {
   it('refuses to book a shipment without a tenant', async () => {
     await expect(delhiveryService.createOrder({ pickup_location: 'Main Warehouse', name: 'x' })).rejects.toThrow(/Client ID is required/);

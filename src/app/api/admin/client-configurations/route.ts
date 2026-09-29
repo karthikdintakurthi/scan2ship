@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { toPickupLocationDto } from '@/lib/application/credential-dto';
 import { PrismaClient } from '@prisma/client';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
@@ -105,7 +106,7 @@ export async function GET(request: NextRequest) {
           updatedAt: config.updatedAt
         })),
         // Include pickup locations
-        pickupLocations: client.pickup_locations.map((location: any) => ({
+        pickupLocations: client.pickup_locations.map((location: any) => toPickupLocationDto({
           id: location.id,
           value: location.value,
           label: location.label,
