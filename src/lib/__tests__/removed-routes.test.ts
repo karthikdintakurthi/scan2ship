@@ -28,6 +28,7 @@ const REMOVED = [
   'src/app/api/shopify/auth/route.ts',
   'src/app/api/shopify/config/route.ts',
   'src/app/api/shopify/webhooks/route.ts',
+  'src/lib/shopify-api.ts',
 ];
 
 function sourceFiles(dir: string): string[] {
@@ -60,11 +61,11 @@ describe('removed public routes', () => {
 describe('Shopify integration removal', () => {
   const read = (file: string) => fs.readFileSync(join(ROOT, file), 'utf8');
 
-  it('only the Delhivery webhook still imports the Shopify client', () => {
+  it('nothing in src imports the removed Shopify client', () => {
     const importers = sourceFiles(join(ROOT, 'src'))
       .filter((file) => /shopify-api['"]/.test(fs.readFileSync(file, 'utf8')))
       .map((file) => file.slice(ROOT.length + 1));
-    expect(importers).toEqual(['src/app/api/webhooks/delhivery/route.ts']);
+    expect(importers).toEqual([]);
   });
 
   it('fulfillment no longer syncs orders to Shopify', () => {
@@ -76,7 +77,9 @@ describe('Shopify integration removal', () => {
     expect(read('src/lib/security-middleware.ts')).not.toContain('X-Shopify-');
   });
 
-  it('the Delhivery webhook is left as it was', () => {
-    expect(fs.existsSync(join(ROOT, 'src/app/api/webhooks/delhivery/route.ts'))).toBe(true);
+  it('the Delhivery webhook no longer calls Shopify', () => {
+    const webhook = read('src/app/api/webhooks/delhivery/route.ts');
+    expect(webhook).not.toMatch(/shopify/i);
+    expect(webhook).not.toContain('myshopify.com');
   });
 });
