@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateApiKey, hasPermission } from '@/lib/api-key-auth';
 import { CreditService, InsufficientCreditsError, type CreditCharge } from '@/lib/credit-service';
+import { pickCreatableOrderFields } from '@/lib/application/order-fields';
+import type { Prisma } from '@prisma/client';
 
 // GET /api/external/orders - Get orders using API key authentication
 export async function GET(request: NextRequest) {
@@ -135,7 +137,7 @@ export async function POST(request: NextRequest) {
     try {
       order = await prisma.orders.create({
         data: {
-          ...orderData,
+          ...(pickCreatableOrderFields(orderData).fields as Prisma.ordersUncheckedCreateInput),
           clientId: apiKey.clientId,
           created_at: new Date(),
           updated_at: new Date()

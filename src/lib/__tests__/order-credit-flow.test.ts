@@ -294,3 +294,58 @@ describe('POST /api/external/orders credit handling', () => {
     expect(logged).toContain('External orders: could not link credit charge to order');
   });
 });
+
+describe('order creation field allowlist', () => {
+  const PROTECTED = {
+    clientId: 'client-b',
+    created_by: 'attacker',
+    sub_group: 'someone-elses-group',
+    delhivery_api_status: 'success',
+    delhivery_waybill_number: 'FAKE',
+    tracking_status: 'delivered',
+    shopify_status: 'fulfilled',
+    seller_address: 'Injected seller',
+    created_at: '2020-01-01',
+    id: 999,
+  };
+
+  function created() {
+    return (prisma.orders.create as jest.Mock).mock.calls[0][0].data;
+  }
+
+  it('POST /api/orders ignores fields the server controls', async () => {
+    const response = await createOrderRoute(order({ courier_service: 'dtdc', ...PROTECTED }));
+
+    expect(response.status).toBe(200);
+    const data = created();
+    expect(data).toMatchObject({ clientId: 'client-a', created_by: TEST_USER_ID, sub_group: null, tracking_status: 'pending' });
+    for (const field of ['delhivery_api_status', 'delhivery_waybill_number', 'shopify_status', 'seller_address', 'id']) {
+      expect(data).not.toHaveProperty(field);
+    }
+    expect(data.created_at).not.toBe('2020-01-01');
+  });
+
+  it('POST /api/orders keeps allowed fields and maps waybill to tracking_id without storing control flags', async () => {
+    await createOrderRoute(order({ courier_service: 'dtdc', product_description: 'Earrings', shipment_length: 10, waybill: 'WB-OWN', skip_tracking: true, creationPattern: 'manual' }));
+
+    const data = created();
+    expect(data).toMatchObject({ product_description: 'Earrings', shipment_length: 10, tracking_id: 'WB-OWN' });
+    for (const field of ['waybill', 'skip_tracking', 'creationPattern']) {
+      expect(data).not.toHaveProperty(field);
+    }
+  });
+
+  it('POST /api/external/orders ignores fields the server controls and uses the key tenant', async () => {
+    (authenticateApiKey as jest.Mock).mockResolvedValue({ clientId: 'client-a', permissions: ['orders:write'] });
+
+    const response = await createExternalOrder(signedRequest({ ...ORDER_INPUT, ...PROTECTED }));
+
+    expect(response.status).toBe(200);
+    const data = created();
+    expect(data.clientId).toBe('client-a');
+    for (const field of ['created_by', 'sub_group', 'delhivery_api_status', 'tracking_status', 'shopify_status', 'seller_address', 'id']) {
+      expect(data).not.toHaveProperty(field);
+    }
+    expect(data).toMatchObject({ name: 'Asha', pincode: '560001' });
+  });
+});

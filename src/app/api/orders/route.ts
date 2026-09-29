@@ -4,6 +4,8 @@ import { DelhiveryService } from '@/lib/delhivery';
 import { generateReferenceNumber, formatReferenceNumber, generateReferenceNumberWithPrefix, formatReferenceNumberWithPrefix } from '@/lib/reference-number';
 import AnalyticsService from '@/lib/analytics-service';
 import { CreditService, InsufficientCreditsError, type CreditCharge } from '@/lib/credit-service';
+import { pickCreatableOrderFields } from '@/lib/application/order-fields';
+import type { Prisma } from '@prisma/client';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { WebhookService } from '@/lib/webhook-service';
@@ -133,9 +135,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { fields: creatableFields, ignored: ignoredFields } = pickCreatableOrderFields(orderData);
+    if (ignoredFields.length > 0) {
+      console.log('📝 [API_ORDERS_POST] Ignoring fields that cannot be set on create:', ignoredFields.join(', '));
+    }
+
     // Convert string values to appropriate data types and map fields
-    const processedOrderData = {
-      ...orderData,
+    const processedOrderData: Record<string, any> = {
+      ...creatableFields,
       package_value: parseFloat(orderData.package_value) || 0,
       weight: parseFloat(orderData.weight) || 0,
       total_items: parseInt(orderData.total_items) || 1,
@@ -146,11 +153,6 @@ export async function POST(request: NextRequest) {
       created_at: new Date(),
       updated_at: new Date()
     };
-
-    // Remove fields that are not in the database schema
-    delete processedOrderData.waybill;
-    delete processedOrderData.creationPattern;
-    delete processedOrderData.skip_tracking;
     
     // Handle products field - convert to JSON if present
     if (orderData.products && Array.isArray(orderData.products)) {
@@ -263,7 +265,7 @@ export async function POST(request: NextRequest) {
     let order: Awaited<ReturnType<typeof prisma.orders.create>> | undefined;
     try {
       order = await prisma.orders.create({
-        data: orderDataToCreate
+        data: orderDataToCreate as Prisma.ordersUncheckedCreateInput
       });
 
       console.log('✅ [API_ORDERS_POST] Order created successfully:', order.id);
