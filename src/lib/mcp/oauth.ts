@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
   MCP_AUTHORIZATION_CODE_TTL_SECONDS,
@@ -174,12 +175,16 @@ export async function exchangeAuthorizationCode(input: {
     throw new McpAuthError('invalid_token', 'PKCE verification failed', 400);
   }
 
-  await prisma.mcp_authorization_codes.update({
-    where: { id: stored.id },
+  // Claim the code atomically: of concurrent exchanges, only one gets tokens
+  const claimed = await prisma.mcp_authorization_codes.updateMany({
+    where: { id: stored.id, consumedAt: null, expiresAt: { gt: new Date() } },
     data: { consumedAt: new Date() },
   });
+  if (claimed.count !== 1) {
+    throw new McpAuthError('invalid_token', 'Invalid authorization code', 400);
+  }
 
-  return issueTokens(stored.grant.id, stored.grant.userId, stored.grant.tenantId, stored.grant.oauthClientId, stored.grant.scopes as McpScope[], stored.resource);
+  return issueTokens(prisma, stored.grant.id, stored.grant.userId, stored.grant.tenantId, stored.grant.oauthClientId, stored.grant.scopes as McpScope[], stored.resource);
 }
 
 export async function rotateRefreshToken(input: { refreshToken: string; clientId: string; resource?: string }) {
@@ -191,7 +196,7 @@ export async function rotateRefreshToken(input: { refreshToken: string; clientId
   if (!stored) {
     throw new McpAuthError('invalid_token', 'Invalid refresh token', 400);
   }
-  if (stored.revokedAt || stored.grant.revokedAt || stored.grant.oauthClientId !== input.clientId) {
+  const revokeFamily = async () => {
     await prisma.mcp_refresh_tokens.updateMany({
       where: { familyId: stored.familyId, revokedAt: null },
       data: { revokedAt: new Date() },
@@ -200,31 +205,50 @@ export async function rotateRefreshToken(input: { refreshToken: string; clientId
       where: { id: stored.grantId },
       data: { revokedAt: new Date(), updatedAt: new Date() },
     });
+  };
+  if (stored.revokedAt || stored.grant.revokedAt || stored.grant.oauthClientId !== input.clientId) {
+    await revokeFamily();
     throw new McpAuthError('invalid_token', 'Refresh token reuse detected', 400);
   }
   if (stored.expiresAt.getTime() <= Date.now()) {
     throw new McpAuthError('invalid_token', 'Refresh token expired', 400);
   }
 
-  const next = await issueTokens(
-    stored.grant.id,
-    stored.grant.userId,
-    stored.grant.tenantId,
-    stored.grant.oauthClientId,
-    stored.grant.scopes as McpScope[],
-    input.resource || mcpResourceUrl(),
-    stored.familyId
-  );
-
-  await prisma.mcp_refresh_tokens.update({
-    where: { id: stored.id },
-    data: { revokedAt: new Date(), replacedById: next.refreshTokenId },
+  // Claim the old token and create its successor in one transaction, so of
+  // concurrent refreshes only one succeeds and a failure leaves nothing behind
+  const next = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.mcp_refresh_tokens.updateMany({
+      where: { id: stored.id, revokedAt: null, expiresAt: { gt: new Date() } },
+      data: { revokedAt: new Date() },
+    });
+    if (claimed.count !== 1) return null;
+    const issued = await issueTokens(
+      tx,
+      stored.grant.id,
+      stored.grant.userId,
+      stored.grant.tenantId,
+      stored.grant.oauthClientId,
+      stored.grant.scopes as McpScope[],
+      input.resource || mcpResourceUrl(),
+      stored.familyId
+    );
+    await tx.mcp_refresh_tokens.update({
+      where: { id: stored.id },
+      data: { replacedById: issued.refreshTokenId },
+    });
+    return issued;
   });
+  if (!next) {
+    // Another request used this token first: treat the second use as reuse
+    await revokeFamily();
+    throw new McpAuthError('invalid_token', 'Refresh token reuse detected', 400);
+  }
 
   return next;
 }
 
 async function issueTokens(
+  db: Pick<Prisma.TransactionClient, 'mcp_refresh_tokens'>,
   grantId: string,
   userId: string,
   tenantId: string,
@@ -237,7 +261,7 @@ async function issueTokens(
     throw new McpAuthError('invalid_token', 'Invalid resource', 400);
   }
   const refresh = randomToken();
-  const refreshRow = await prisma.mcp_refresh_tokens.create({
+  const refreshRow = await db.mcp_refresh_tokens.create({
     data: {
       id: `mcp_rt_${newId()}`,
       grantId,
