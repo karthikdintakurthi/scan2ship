@@ -70,7 +70,8 @@ The beta database was created from the committed migrations (all 39; `prisma mig
 | Claude (web/desktop custom connector): connect, consent, read tools | Pass |
 | Claude Code (`claude mcp add --transport http`): connect, read tools | Pass (reported by owner) |
 | Another tenant's order ID and tracking number return `not_found` | Pass |
-| Revoke in `/settings/connections`, next call denied | Pending: needs a signed-in session |
+| Revoke in `/settings/connections`: grant and all its refresh tokens revoked, next call denied, `MCP_GRANT_REVOKED` audited | Pass |
+| Disconnect inside Claude | Drops Claude's tokens only; Claude does not call the revocation endpoint, so the grant stays active until revoked in Scan2Ship or the refresh token expires (14 days) |
 | Access-token expiry (15 min) and refresh | Pending: needs a connected client left idle past expiry |
 
 ## Role ceiling
