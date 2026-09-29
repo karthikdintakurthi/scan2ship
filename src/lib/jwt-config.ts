@@ -134,7 +134,7 @@ export const enhancedJwtConfig = {
           algorithms: [securityConfig.jwt.algorithm],
           ...options
         }) as jwt.JwtPayload;
-      } catch (error) {
+      } catch {
         // Continue to next secret
       }
     }
@@ -181,7 +181,7 @@ export const enhancedJwtConfig = {
         expiresAt: decoded.exp ? new Date(decoded.exp * 1000) : null,
         payload: decoded
       };
-    } catch (error) {
+    } catch {
       return { valid: false, error: 'Failed to decode token' };
     }
   }

@@ -6,8 +6,9 @@ import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware'
 // GET /api/webhooks/[id] - Get specific webhook
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     // Apply security middleware
     const securityResponse = await applySecurityMiddleware(
@@ -75,8 +76,9 @@ export async function GET(
 // PUT /api/webhooks/[id] - Update webhook
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     // Apply security middleware
     const securityResponse = await applySecurityMiddleware(
@@ -161,8 +163,9 @@ export async function PUT(
 // DELETE /api/webhooks/[id] - Delete webhook
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     // Apply security middleware
     const securityResponse = await applySecurityMiddleware(

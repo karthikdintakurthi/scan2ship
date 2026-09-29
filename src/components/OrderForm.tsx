@@ -6,7 +6,6 @@ import { getOrderFormConfig } from '@/lib/order-form-config'
 import { usePickupLocation } from '@/hooks/usePickupLocation'
 import { useAuth } from '@/contexts/AuthContext'
 import { getPickupLocationConfig } from '@/lib/pickup-location-config'
-import { getCourierServiceByValue, validateCourierServiceRestrictions } from '@/lib/courier-service-config'
 import { getOrderConfig, validateOrderData } from '@/lib/order-config'
 import { OrderItem } from '@/types/catalog'
 
@@ -138,7 +137,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
           setFormData(prev => ({
             ...prev,
             // Priority: Valid saved selection > User selection > Default from config
-            courier_service: (savedCourierService && savedCourierService !== 'delhivery') || prev.courier_service || (formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : ''),
+            courier_service: (savedCourierService && savedCourierService !== 'delhivery' ? savedCourierService : '') || prev.courier_service || (formConfig.courierServices.length > 0 ? formConfig.courierServices[0].value : ''),
             package_value: clientConfig.defaultPackageValue.toString(),
             weight: clientConfig.defaultWeight.toString(),
             total_items: clientConfig.defaultTotalItems.toString(),
@@ -1306,7 +1305,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
                 </span>
                 <button
                   type="button"
-                  onClick={autoFillDtdcTrackingNumber}
+                  onClick={() => autoFillDtdcTrackingNumber()}
                   className="ml-2 text-xs text-blue-600 hover:text-blue-800 underline"
                 >
                   Get next available
@@ -1324,7 +1323,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
               <label htmlFor="skip_tracking" className="ml-2 text-sm text-gray-700">
-                Don't assign tracking
+                Don&apos;t assign tracking
                 <span className="text-xs text-gray-500 ml-1">(Skip Delhivery API call)</span>
               </label>
             </div>

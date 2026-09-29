@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { clearOrderConfigCache } from '@/lib/order-config';
 
 interface PickupLocation {
   id: string;
@@ -174,7 +173,7 @@ export default function ClientSettingsPage() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
-        } catch (jsonError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         throw new Error(errorMessage);
@@ -220,7 +219,7 @@ export default function ClientSettingsPage() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
-        } catch (jsonError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         throw new Error(errorMessage);
@@ -266,7 +265,7 @@ export default function ClientSettingsPage() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
-        } catch (jsonError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         throw new Error(errorMessage);
@@ -312,7 +311,7 @@ export default function ClientSettingsPage() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
-        } catch (jsonError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         throw new Error(errorMessage);
@@ -362,7 +361,7 @@ export default function ClientSettingsPage() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
-        } catch (jsonError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         throw new Error(errorMessage);
@@ -412,7 +411,7 @@ export default function ClientSettingsPage() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
-        } catch (jsonError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         throw new Error(errorMessage);
@@ -462,7 +461,7 @@ export default function ClientSettingsPage() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
-        } catch (jsonError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         throw new Error(errorMessage);
@@ -989,7 +988,7 @@ export default function ClientSettingsPage() {
         const count = Math.max(0, toNum - fromNum + 1);
         console.log('🔍 [PARSE_ALPHANUMERIC] Success! Count:', count);
         return {
-          success: true,
+          success: true as const,
           count: count,
           prefix: prefix,
           fromNum: fromNum,
@@ -1000,7 +999,7 @@ export default function ClientSettingsPage() {
     
     console.log('🔍 [PARSE_ALPHANUMERIC] Failed to parse');
     return {
-      success: false,
+      success: false as const,
       error: 'Unable to parse alphanumeric range'
     };
   };

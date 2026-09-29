@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit as persistentRateLimit } from './persistent-rate-limiter';
-import { sanitizeString, sanitizeEmail, sanitizeSearchQuery } from './input-sanitizer';
 
 // Rate limiting configuration (for reference)
 const rateLimitConfig = {
@@ -44,7 +43,7 @@ function getClientIdentifier(request: NextRequest): string {
       if (token.length > 10) {
         return `user:${token.substring(0, 8)}`;
       }
-    } catch (error) {
+    } catch {
       // Fall back to IP address
     }
   }

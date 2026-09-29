@@ -434,7 +434,7 @@ export default function RechargeModal({ isOpen, onClose, onSuccess }: RechargeMo
                   <li>• Scan the QR code with any UPI app (GPay, PhonePe, Paytm, etc.)</li>
                   <li>• Verify the payment details before confirming</li>
                   <li>• Complete the payment in your UPI app</li>
-                  <li>• Click "Payment Complete" after successful payment</li>
+                  <li>• Click &quot;Payment Complete&quot; after successful payment</li>
                 </ul>
               </div>
 

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import AnalyticsService from '@/lib/analytics-service';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
@@ -8,8 +7,9 @@ import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     // Apply security middleware
     const securityResponse = await applySecurityMiddleware(
@@ -41,9 +41,9 @@ export async function GET(
     const clientId = params.id;
 
     // Check if user has access to this client's analytics
-    // Admin and master_admin can access any client's analytics
+    // Master admins can access any client's analytics ('admin' is not a UserRole)
     // Regular users can only access their own client's analytics
-    if (auth.user.role !== 'admin' && auth.user.role !== 'master_admin') {
+    if (auth.user.role !== UserRole.MASTER_ADMIN) {
       if (auth.user.clientId !== clientId) {
         return NextResponse.json({ error: 'Forbidden - Access denied to this client\'s analytics' }, { status: 403 });
       }

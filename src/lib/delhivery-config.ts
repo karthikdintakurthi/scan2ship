@@ -1,4 +1,4 @@
-import { getPickupLocationConfig, getProductDetails, getReturnAddress, getSellerDetails, getVendorPickupLocation, getShipmentDimensions, getFragileShipment } from './pickup-location-config'
+import { getPickupLocationConfig } from './pickup-location-config'
 
 export interface DelhiveryConfig {
   shipment_dimensions: {

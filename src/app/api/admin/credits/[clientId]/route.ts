@@ -130,7 +130,7 @@ export async function POST(
       clientId,
       amount,
       description,
-      authResult.user.id, // Use user ID from authResult
+      authResult.user!.id, // Use user ID from authResult (non-null once response is absent)
       client.companyName
     );
     
@@ -210,7 +210,7 @@ export async function PUT(
       clientId,
       newBalance,
       description,
-      authResult.user.id, // Use user ID from authResult
+      authResult.user!.id, // Use user ID from authResult (non-null once response is absent)
       client.companyName
     );
     

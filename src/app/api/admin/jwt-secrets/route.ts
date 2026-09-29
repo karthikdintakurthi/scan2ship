@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { jwtSecretManager } from '@/lib/jwt-secret-manager';
 import { enhancedJwtConfig } from '@/lib/jwt-config';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';

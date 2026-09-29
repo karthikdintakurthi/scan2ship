@@ -194,7 +194,7 @@ export async function POST(
         company: order.courier_service,
         url: `https://www.delhivery.com/track/package/${delhiveryResponse.waybill_number}`
       }
-    }, order.clientId, orderId.toString());
+    }, order.clientId, orderId);
 
     console.log(`🎉 [FULFILL_ORDER] Successfully fulfilled order ${orderId}`);
 

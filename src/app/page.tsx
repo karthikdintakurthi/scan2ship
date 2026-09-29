@@ -17,8 +17,8 @@ export default function Home() {
     pickup_time: '12:00:00',
     expected_package_count: 1
   });
-  const [pickupLocations, setPickupLocations] = useState([]);
-  const [selectedPickupLocations, setSelectedPickupLocations] = useState([]);
+  const [pickupLocations, setPickupLocations] = useState<{ value: string; label: string }[]>([]);
+  const [selectedPickupLocations, setSelectedPickupLocations] = useState<string[]>([]);
   const [isSubmittingPickup, setIsSubmittingPickup] = useState(false);
   const [pickupError, setPickupError] = useState('');
   const [pickupSuccess, setPickupSuccess] = useState('');
@@ -62,7 +62,7 @@ export default function Home() {
         const data = await response.json();
         setPickupLocations(data.data || []);
         // Select all locations by default
-        setSelectedPickupLocations(data.data?.map(loc => loc.value) || []);
+        setSelectedPickupLocations(data.data?.map((loc: { value: string }) => loc.value) || []);
       } else {
         console.error('Failed to fetch pickup locations:', response.status, response.statusText);
         setPickupLocations([]);

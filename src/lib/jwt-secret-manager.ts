@@ -4,7 +4,6 @@
  */
 
 import crypto from 'crypto';
-import { prisma } from './prisma';
 import jwt from 'jsonwebtoken';
 
 export interface JWTSecret {
@@ -216,7 +215,7 @@ export class JWTSecretManager {
       try {
         jwt.verify(token, secret);
         return { success: true, secretId: this.secrets.find(s => s.secret === secret)?.id };
-      } catch (error) {
+      } catch {
         // Continue to next secret
       }
     }

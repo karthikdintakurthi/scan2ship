@@ -11,8 +11,9 @@ import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middlew
 // DELETE /api/admin/api-keys/[id] - Delete API key
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     // Apply security middleware
     const securityResponse = await applySecurityMiddleware(
@@ -69,8 +70,9 @@ export async function DELETE(
 // PUT /api/admin/api-keys/[id] - Update API key
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     // Apply security middleware
     const securityResponse = await applySecurityMiddleware(

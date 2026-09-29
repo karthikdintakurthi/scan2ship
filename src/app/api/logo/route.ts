@@ -77,7 +77,7 @@ export async function PUT(request: NextRequest) {
     if (logoUrl && logoUrl.trim() !== '') {
       try {
         new URL(logoUrl);
-      } catch (error) {
+      } catch {
         return NextResponse.json({
           success: false,
           error: 'Invalid URL format'
@@ -139,7 +139,6 @@ export async function PUT(request: NextRequest) {
             requireWeight: true,
             requireTotalItems: true,
             enableResellerFallback: true,
-            enableThermalPrint: false,
             enableReferencePrefix: true,
             // Logo settings
             logoUrl: logoUrl || null,
@@ -247,7 +246,7 @@ export async function POST(request: NextRequest) {
 
     // Create uploads directory if it doesn't exist
     // Try multiple directory locations for better production compatibility
-    let uploadsDir;
+    let uploadsDir: string | undefined;
     const possibleDirs = [
       join(process.cwd(), 'public', 'images', 'uploads', 'logos'),
       join(process.cwd(), 'uploads', 'logos'),
@@ -271,7 +270,7 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    if (!dirCreated) {
+    if (!dirCreated || !uploadsDir) {
       console.error('❌ [LOGO_UPLOAD] Failed to create any upload directory');
       return NextResponse.json({
         success: false,
@@ -369,7 +368,6 @@ export async function POST(request: NextRequest) {
             requireWeight: true,
             requireTotalItems: true,
             enableResellerFallback: true,
-            enableThermalPrint: false,
             enableReferencePrefix: true,
             // Logo settings
             logoFileName: fileName,
@@ -556,10 +554,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('❌ [API_LOGO_GET] Error getting logo:', error);
     console.error('❌ [API_LOGO_GET] Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      cause: error.cause
+      name: error instanceof Error ? error.name : undefined,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      cause: error instanceof Error ? error.cause : undefined
     });
     
     // Log additional context for debugging
@@ -572,7 +570,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: false,
       error: 'Failed to get logo information',
-      details: error.message,
+      details: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString()
     }, { status: 500 });
   }

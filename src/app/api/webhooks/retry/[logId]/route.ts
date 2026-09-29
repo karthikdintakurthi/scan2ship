@@ -6,8 +6,9 @@ import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware'
 // POST /api/webhooks/retry/[logId] - Retry failed webhook
 export async function POST(
   request: NextRequest,
-  { params }: { params: { logId: string } }
+  { params: paramsPromise }: { params: Promise<{ logId: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     // Apply security middleware
     const securityResponse = await applySecurityMiddleware(

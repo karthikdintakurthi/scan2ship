@@ -104,7 +104,7 @@ export default function EditClientPage({ params }: { params: Promise<{ id: strin
       } else {
         setError('Failed to fetch client details');
       }
-    } catch (error) {
+    } catch {
       setError('Error fetching client details');
     } finally {
       setIsLoading(false);
@@ -138,7 +138,7 @@ export default function EditClientPage({ params }: { params: Promise<{ id: strin
         const data = await response.json();
         setError(data.error || 'Failed to update client');
       }
-    } catch (error) {
+    } catch {
       setError('Error updating client');
     } finally {
       setIsSaving(false);
@@ -168,7 +168,7 @@ export default function EditClientPage({ params }: { params: Promise<{ id: strin
         const data = await response.json();
         setError(data.error || 'Failed to delete client');
       }
-    } catch (error) {
+    } catch {
       setError('Error deleting client');
     } finally {
       setIsDeleting(false);

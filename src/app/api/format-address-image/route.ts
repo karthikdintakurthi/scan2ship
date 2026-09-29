@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { CreditService } from '@/lib/credit-service'
 import { AnalyticsService } from '@/lib/analytics-service'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';

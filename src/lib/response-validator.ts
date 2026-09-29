@@ -235,7 +235,7 @@ function performSecurityValidations(data: any): string[] {
       }
     }
 
-  } catch (error) {
+  } catch {
     warnings.push('Unable to perform security validations on response data');
   }
 
@@ -318,7 +318,7 @@ export function validateErrorResponse(error: any): {
       sanitizedError.code = 'INTERNAL_ERROR';
     }
 
-  } catch (validationError) {
+  } catch {
     errors.push('Failed to validate error response');
     sanitizedError = { message: 'An error occurred', code: 'VALIDATION_ERROR' };
   }

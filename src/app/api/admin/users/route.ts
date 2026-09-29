@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
   } catch (error) {
     console.error('❌ [API_ADMIN_USERS_POST] Error creating user:', error);
-    console.error('❌ [API_ADMIN_USERS_POST] Error stack:', error.stack);
+    console.error('❌ [API_ADMIN_USERS_POST] Error stack:', error instanceof Error ? error.stack : undefined);
     return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
   }
 }

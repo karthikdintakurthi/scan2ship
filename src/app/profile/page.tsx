@@ -524,7 +524,7 @@ export default function ProfilePage() {
                   ) : (
                     <div className="text-sm text-gray-500">
                       <p>Last changed: Not available</p>
-                      <p className="mt-1">Click "Change Password" to update your password</p>
+                      <p className="mt-1">Click &quot;Change Password&quot; to update your password</p>
                     </div>
                   )}
                 </div>

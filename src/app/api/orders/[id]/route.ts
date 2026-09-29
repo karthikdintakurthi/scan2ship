@@ -239,14 +239,14 @@ export async function DELETE(
     let inventoryRestoreResult = null;
     if (order.products) {
       try {
-        const products = JSON.parse(order.products);
+        const products = typeof order.products === 'string' ? JSON.parse(order.products) : order.products;
         if (Array.isArray(products) && products.length > 0) {
           console.log(`🔄 [API_ORDERS_DELETE] Restoring inventory for order ${order.id} with ${products.length} products`);
           
           // Fetch complete client data for inventory operations
-          let fullClient = client;
+          let fullClient: typeof client = client;
           try {
-            fullClient = await prisma.clients.findUnique({
+            fullClient = (await prisma.clients.findUnique({
               where: { id: client.id },
               select: {
                 id: true,
@@ -257,7 +257,7 @@ export async function DELETE(
                 subscriptionStatus: true,
                 subscriptionExpiresAt: true
               }
-            });
+            })) ?? client;
             console.log('🔍 [API_ORDERS_DELETE] Full client data:', fullClient);
           } catch (error) {
             console.error('Error fetching full client data:', error);

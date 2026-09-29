@@ -177,7 +177,7 @@ export default function SystemSettingsPage() {
         const data = await response.json();
         setError(data.error || 'Failed to update configuration');
       }
-    } catch (error) {
+    } catch {
       setError('Error updating configuration');
     } finally {
       setIsSaving(false);

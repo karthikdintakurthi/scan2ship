@@ -82,7 +82,7 @@ function encodeCursor(createdAt: Date, id: number): string {
 function decodeCursor(cursor: string): { t: Date; id: number } | null {
   try {
     const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { t?: string; id?: number };
-    if (!parsed.t || !Number.isSafeInteger(parsed.id)) return null;
+    if (!parsed.t || typeof parsed.id !== 'number' || !Number.isSafeInteger(parsed.id)) return null;
     const t = new Date(parsed.t);
     if (Number.isNaN(t.getTime())) return null;
     return { t, id: parsed.id };

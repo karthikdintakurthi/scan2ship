@@ -184,7 +184,7 @@ export default function ProductSearch({ onProductSelect, selectedProducts, disab
       {showResults && searchResults.length === 0 && searchQuery.length >= 2 && !isSearching && (
         <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3">
           <p className="text-sm text-gray-500 text-center">
-            No products found for "{searchQuery}"
+            No products found for &quot;{searchQuery}&quot;
           </p>
         </div>
       )}

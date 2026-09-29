@@ -29,6 +29,13 @@ const REMOVED = [
   'src/app/api/shopify/config/route.ts',
   'src/app/api/shopify/webhooks/route.ts',
   'src/lib/shopify-api.ts',
+  // Unused and broken: debug client listing, a commented-out label route, password
+  // changes that wrote non-existent columns, and uploads to a missing table
+  'src/app/api/test-admin/route.ts',
+  'src/app/api/orders/[id]/shipping-label/route.ts',
+  'src/app/api/admin/clients/[id]/update-password/route.ts',
+  'src/app/api/auth/change-password/route.ts',
+  'src/app/api/upload/route.ts',
 ];
 
 function sourceFiles(dir: string): string[] {

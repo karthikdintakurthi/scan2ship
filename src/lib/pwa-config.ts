@@ -1,4 +1,9 @@
-import { Client } from '@/types/auth';
+// Only the fields used for branding lookup. (The previous import from
+// '@/types/auth' pointed at a module that does not exist.)
+type Client = {
+  id?: string | null;
+  companyName?: string | null;
+};
 
 export interface PWAManifest {
   name: string;
@@ -74,7 +79,7 @@ export function getClientBranding(client: Client | null): ClientBranding {
   const clientKey = client.companyName?.toLowerCase().replace(/\s+/g, '-') || 
                    client.id?.toLowerCase();
   
-  return clientBrandingMap[clientKey] || defaultBranding;
+  return (clientKey && clientBrandingMap[clientKey]) || defaultBranding;
 }
 
 export function generatePWAManifest(client: Client | null): PWAManifest {

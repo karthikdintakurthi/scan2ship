@@ -3,7 +3,13 @@
  * Provides safe database operations and SQL injection prevention
  */
 
-import { prisma } from './prisma';
+import {
+  prisma,
+  checkDatabaseConnection,
+  getConnectionPoolStatus,
+  initializeConnectionPool,
+  closeDatabaseConnection
+} from './prisma';
 
 export interface SafeQueryOptions {
   maxResults?: number;
@@ -323,8 +329,8 @@ export class DatabaseConnectionManager {
    * Get connection pool status
    */
   static async getStatus() {
-    const isConnected = await prisma.checkDatabaseConnection();
-    const poolStatus = prisma.getConnectionPoolStatus();
+    const isConnected = await checkDatabaseConnection();
+    const poolStatus = getConnectionPoolStatus();
     
     return {
       connected: isConnected,
@@ -338,7 +344,7 @@ export class DatabaseConnectionManager {
    */
   static async initialize() {
     try {
-      await prisma.initializeConnectionPool();
+      await initializeConnectionPool();
       return { success: true, message: 'Database connections initialized' };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -350,7 +356,7 @@ export class DatabaseConnectionManager {
    */
   static async close() {
     try {
-      await prisma.closeDatabaseConnection();
+      await closeDatabaseConnection();
       return { success: true, message: 'Database connections closed' };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };

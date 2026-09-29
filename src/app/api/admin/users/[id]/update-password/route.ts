@@ -6,8 +6,9 @@ import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     console.log('🔐 [ADMIN_UPDATE_USER_PASSWORD] Starting request...');
     

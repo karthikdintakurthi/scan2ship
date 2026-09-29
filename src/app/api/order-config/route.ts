@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     // Get order configuration for the current client
     console.log('🔍 [API_ORDER_CONFIG_GET] Querying database for order config...');
-    const orderConfig = await safeDatabaseQuery(
+    let orderConfig = await safeDatabaseQuery(
       () => prisma.client_order_configs.findUnique({
         where: { clientId: user.clientId }
       }),
@@ -195,10 +195,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('❌ [API_ORDER_CONFIG_GET] Error fetching order config:', error);
     console.error('❌ [API_ORDER_CONFIG_GET] Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      cause: error.cause
+      name: error instanceof Error ? error.name : undefined,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      cause: error instanceof Error ? error.cause : undefined
     });
     
     // Log additional context for debugging
@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.json(
       { 
         error: 'Failed to fetch order configuration',
-        details: error.message,
+        details: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString()
       },
       { status: 500 }

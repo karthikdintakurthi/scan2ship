@@ -164,7 +164,7 @@ export default function ApiKeysPage() {
       setCopiedKey(keyId);
       toast.success('Copied to clipboard');
       setTimeout(() => setCopiedKey(null), 2000);
-    } catch (error) {
+    } catch {
       toast.error('Failed to copy to clipboard');
     }
   };

@@ -361,8 +361,8 @@ class FileCleanupManager {
     let totalSize = 0;
     let oldestFile: Date | null = null;
     let newestFile: Date | null = null;
-    const quarantineFiles = 0;
-    const backupFiles = 0;
+    let quarantineFiles = 0;
+    let backupFiles = 0;
 
     for (const directory of this.config.tempDirectories) {
       const files = await this.getDirectoryFiles(directory);
@@ -383,14 +383,14 @@ class FileCleanupManager {
 
     // Count quarantine files
     if (this.config.enableQuarantine) {
-      const quarantineFiles = await this.getDirectoryFiles(this.config.quarantineDirectory);
-      quarantineFiles += quarantineFiles.length;
+      const quarantined = await this.getDirectoryFiles(this.config.quarantineDirectory);
+      quarantineFiles += quarantined.length;
     }
 
     // Count backup files
     if (this.config.enableBackup) {
-      const backupFiles = await this.getDirectoryFiles(this.config.backupDirectory);
-      backupFiles += backupFiles.length;
+      const backedUp = await this.getDirectoryFiles(this.config.backupDirectory);
+      backupFiles += backedUp.length;
     }
 
     return {

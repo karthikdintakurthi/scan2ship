@@ -4,7 +4,6 @@ import { useState, useEffect, use } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { authenticatedFetch } from '@/lib/api-client';
 
 interface ClientAnalytics {
   openaiImageCount: number;
@@ -53,7 +52,7 @@ export default function ClientAnalyticsPage({ params }: { params: Promise<{ id: 
           return;
         }
 
-        const response = await fetch(`/api/analytics/clients/${params.id}`, {
+        const response = await fetch(`/api/analytics/clients/${resolvedParams.id}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -63,7 +62,7 @@ export default function ClientAnalyticsPage({ params }: { params: Promise<{ id: 
           setAnalytics(data.analytics);
           
           // Fetch client details
-          const clientResponse = await fetch(`/api/admin/clients/${params.id}`, {
+          const clientResponse = await fetch(`/api/admin/clients/${resolvedParams.id}`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }

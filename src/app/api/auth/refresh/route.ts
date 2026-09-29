@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     let decoded;
     try {
       decoded = enhancedJwtConfig.verifyToken(refreshToken);
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: 'Invalid refresh token' },
         { status: 401 }
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       await prisma.sessions.update({
         where: { id: session.id },
         data: {
-          token: newLoginToken,
+          sessionToken: newLoginToken,
           expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) // 8 hours
         }
       });

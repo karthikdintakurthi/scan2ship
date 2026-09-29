@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 
 // Environment-based logging configuration
-const getLogLevels = () => {
+const getLogLevels = (): Prisma.LogLevel[] => {
   if (process.env.NODE_ENV === 'production') {
     // Production: Only log errors and warnings
     return ['warn', 'error'];

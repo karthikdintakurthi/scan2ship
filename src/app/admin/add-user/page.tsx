@@ -189,7 +189,7 @@ export default function AddUserPage() {
                   <option value="client_admin">Client admin</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Select the user's role within the client organization
+                  Select the user&apos;s role within the client organization
                 </p>
               </div>
             </div>

@@ -75,7 +75,7 @@ export default function CacheManager({ children }: CacheManagerProps) {
     return (
       <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-black text-center py-2 z-50">
         <p className="text-sm font-medium">
-          You're offline. Some features may not be available.
+          You&apos;re offline. Some features may not be available.
         </p>
       </div>
     );

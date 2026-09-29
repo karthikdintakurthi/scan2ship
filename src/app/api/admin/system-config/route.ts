@@ -5,11 +5,13 @@ import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware'
 import crypto from 'crypto';
 
 // Encryption key for sensitive data (SECURITY: No fallback key for security)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+const ENCRYPTION_KEY_ENV = process.env.ENCRYPTION_KEY;
 
-if (!ENCRYPTION_KEY) {
+if (!ENCRYPTION_KEY_ENV) {
   throw new Error('ENCRYPTION_KEY environment variable is required for security');
 }
+
+const ENCRYPTION_KEY: string = ENCRYPTION_KEY_ENV;
 
 // Helper function to encrypt sensitive data with proper IV
 function encrypt(text: string): string {

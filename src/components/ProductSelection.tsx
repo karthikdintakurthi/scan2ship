@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface ProductSelectionProps {
   onProductsChange: (items: OrderItem[]) => void;
   currentClient?: any;
-  onReset?: () => void; // Callback to reset the component
+  onReset?: (resetFn: () => void) => void; // Receives the component's reset function
 }
 
 export default function ProductSelection({ onProductsChange, currentClient, onReset }: ProductSelectionProps) {
@@ -166,7 +166,7 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
       const newItem: OrderItem = {
         product,
         quantity: 1,
-        price: parseFloat(product.price) || 0,
+        price: parseFloat(String(product.price)) || 0,
         isPreorder: isPreorder
       };
       setOrderItems([...orderItems, newItem]);
@@ -311,7 +311,7 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
 
       const data = await response.json();
       console.log('🔍 [PRODUCT_SELECTION] Search response:', data);
-      console.log('🔍 [PRODUCT_SELECTION] Products with thumbnails:', data.products?.map(p => ({ name: p.name, sku: p.sku, thumbnailUrl: p.thumbnailUrl })));
+      console.log('🔍 [PRODUCT_SELECTION] Products with thumbnails:', data.products?.map((p: CatalogProduct) => ({ name: p.name, sku: p.sku, thumbnailUrl: p.thumbnailUrl })));
       setSearchResults(data.products || []);
     } catch (error) {
       console.error('❌ [PRODUCT_SELECTION] Product search error:', error);
@@ -505,7 +505,7 @@ export default function ProductSelection({ onProductsChange, currentClient, onRe
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-gray-900">₹{(parseFloat(product.price) || 0).toFixed(2)}</p>
+                        <p className="font-medium text-gray-900">₹{(parseFloat(String(product.price)) || 0).toFixed(2)}</p>
                         <div className="flex space-x-1 mt-1">
                           {canAdd && (
                             <button 

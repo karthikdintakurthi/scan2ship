@@ -70,6 +70,11 @@ export interface AuthenticatedUser {
     isActive: boolean;
     subscriptionStatus: string;
     subscriptionExpiresAt: Date | null;
+    // Display/identity fields; populated by authenticateUser, optional because
+    // other principals (e.g. MCP) may construct a user without them.
+    name?: string;
+    companyName?: string;
+    slug?: string | null;
   };
   permissions: PermissionLevel[];
   subGroups?: string[];
@@ -150,7 +155,7 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
         }) as jwt.JwtPayload;
         console.log('✅ [JWT_VERIFY] Strategy 1 successful');
       } catch (error) {
-        console.log('❌ [JWT_VERIFY] Strategy 1 failed:', error.message);
+        console.log('❌ [JWT_VERIFY] Strategy 1 failed:', error instanceof Error ? error.message : String(error));
         verificationError = error;
         
         // Strategy 2: Try without issuer/audience validation (for old tokens)
@@ -161,7 +166,7 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
           }) as jwt.JwtPayload;
           console.log('✅ [JWT_VERIFY] Strategy 2 successful');
         } catch (error2) {
-          console.log('❌ [JWT_VERIFY] Strategy 2 failed:', error2.message);
+          console.log('❌ [JWT_VERIFY] Strategy 2 failed:', error2 instanceof Error ? error2.message : String(error2));
           // Strategy 3: Try with old hardcoded values for backward compatibility
           try {
             console.log('🔍 [JWT_VERIFY] Trying Strategy 3: vanitha-logistics');
@@ -171,7 +176,7 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
               algorithms: ['HS256']
             }) as jwt.JwtPayload;
             console.log('✅ [JWT_VERIFY] Strategy 3 successful');
-          } catch (error3) {
+          } catch {
             console.log('❌ [JWT_VERIFY] All strategies failed');
             // All strategies failed
             throw verificationError; // Throw the first error
@@ -202,7 +207,10 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
             id: true,
             isActive: true,
             subscriptionStatus: true,
-            subscriptionExpiresAt: true
+            subscriptionExpiresAt: true,
+            name: true,
+            companyName: true,
+            slug: true
           }
         },
         userSubGroups: {

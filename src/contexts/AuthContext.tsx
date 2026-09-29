@@ -12,7 +12,7 @@ function decodeJWT(token: string): any {
       return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
     }).join(''));
     return JSON.parse(jsonPayload);
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -214,7 +214,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else {
         return { success: false, error: data.error || 'Login failed' };
       }
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error' };
     }
   };
@@ -280,7 +280,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else {
         return { success: false, error: data.error || 'Registration failed' };
       }
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error' };
     }
   };
@@ -303,7 +303,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else {
         return { success: false, error: data.error || 'Registration failed' };
       }
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error' };
     }
   };
@@ -330,7 +330,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         logout();
         return false;
       }
-    } catch (error) {
+    } catch {
       logout();
       return false;
     }

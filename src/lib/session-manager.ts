@@ -6,7 +6,6 @@
 import { prisma } from './prisma';
 import { securityConfig } from './security-config';
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 
 interface SessionData {
   id: string;

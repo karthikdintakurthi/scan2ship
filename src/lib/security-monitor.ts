@@ -4,7 +4,7 @@
  */
 
 import { prisma } from './prisma';
-import { logAuditEvent, AuditEventType, AuditSeverity } from './audit-logger';
+import { logAuditEvent, AuditEventType } from './audit-logger';
 
 interface SecurityAlert {
   id: string;

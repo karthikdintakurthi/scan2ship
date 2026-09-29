@@ -109,7 +109,9 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
       clientOrderConfig: {
         ...config.clientOrderConfig,
         [field]: value
-      }
+        // Fields are filled in one at a time by the form; the result may be partial
+        // until the config has been loaded from the server.
+      } as ClientConfigData['clientOrderConfig']
     });
   };
   const [error, setError] = useState('');
@@ -194,7 +196,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
         const data = await response.json();
         setClientInfoError(data.error || 'Failed to update client information');
       }
-    } catch (error) {
+    } catch {
       setClientInfoError('Error updating client information');
     } finally {
       setSavingClientInfo(false);
@@ -230,7 +232,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
         const data = await response.json();
         setCourierServicesError(data.error || 'Failed to update courier services');
       }
-    } catch (error) {
+    } catch {
       setCourierServicesError('Error updating courier services');
     } finally {
       setSavingCourierServices(false);
@@ -266,7 +268,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
         const data = await response.json();
         setPickupLocationsError(data.error || 'Failed to update pickup locations');
       }
-    } catch (error) {
+    } catch {
       setPickupLocationsError('Error updating pickup locations');
     } finally {
       setSavingPickupLocations(false);
@@ -303,7 +305,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
         try {
           const data = await response.json();
           errorMessage = data.error || errorMessage;
-        } catch (jsonError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         console.error('❌ [ORDER_CONFIG_SAVE] Error response:', errorMessage);
@@ -451,7 +453,7 @@ export default function ClientSettingsPage({ params }: { params: Promise<{ id: s
         const data = await response.json();
         setError(data.error || 'Failed to save courier service');
       }
-    } catch (error) {
+    } catch {
       setError('Error saving courier service');
     }
 

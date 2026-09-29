@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { DelhiveryService } from '@/lib/delhivery';
-import { generateReferenceNumber, formatReferenceNumber, generateReferenceNumberWithPrefix, formatReferenceNumberWithPrefix } from '@/lib/reference-number';
+import { generateReferenceNumberWithPrefix, formatReferenceNumberWithPrefix } from '@/lib/reference-number';
 import AnalyticsService from '@/lib/analytics-service';
 import { CreditService, InsufficientCreditsError, type CreditCharge } from '@/lib/credit-service';
 import { pickCreatableOrderFields } from '@/lib/application/order-fields';
@@ -123,15 +123,15 @@ export async function POST(request: NextRequest) {
       referenceNumber = formatReferenceNumberWithPrefix(
         orderData.reference_number.trim(), 
         orderData.mobile,
-        clientOrderConfig?.enableReferencePrefix ?? true,
-        clientOrderConfig?.referencePrefix ?? 'REF'
+        clientOrderConfig?.enableReferencePrefix ?? true
+        // No per-client prefix column exists; the helper's default ('REF') applies.
       );
     } else {
       // Auto-generate reference number with prefix configuration
       referenceNumber = generateReferenceNumberWithPrefix(
         orderData.mobile,
-        clientOrderConfig?.enableReferencePrefix ?? true,
-        clientOrderConfig?.referencePrefix ?? 'REF'
+        clientOrderConfig?.enableReferencePrefix ?? true
+        // No per-client prefix column exists; the helper's default ('REF') applies.
       );
     }
 
@@ -668,7 +668,10 @@ export async function GET(request: NextRequest) {
     
     // Parse products JSON string for each order
     const processedOrders = orders.map(order => {
-      const parsedProducts = order.products ? JSON.parse(order.products) : null;
+      // products is usually stored as a JSON string (see POST); tolerate already-structured JSON too.
+      const parsedProducts = order.products
+        ? (typeof order.products === 'string' ? JSON.parse(order.products) : order.products)
+        : null;
       if (parsedProducts && parsedProducts.length > 0) {
         console.log('🔍 [API_ORDERS_GET] Parsed products for order:', order.id, parsedProducts);
       }
@@ -861,9 +864,9 @@ export async function DELETE(request: NextRequest) {
     const inventoryRestoreResults = [];
     
     // Fetch complete client data for inventory operations
-    let fullClient = client;
+    let fullClient: typeof client = client;
     try {
-      fullClient = await prisma.clients.findUnique({
+      fullClient = (await prisma.clients.findUnique({
         where: { id: client.id },
         select: {
           id: true,
@@ -874,7 +877,7 @@ export async function DELETE(request: NextRequest) {
           subscriptionStatus: true,
           subscriptionExpiresAt: true
         }
-      });
+      })) ?? client;
       console.log('🔍 [API_ORDERS_DELETE] Full client data:', fullClient);
     } catch (error) {
       console.error('Error fetching full client data:', error);
@@ -885,7 +888,7 @@ export async function DELETE(request: NextRequest) {
     for (const order of existingOrders) {
       if (order.products) {
         try {
-          const products = JSON.parse(order.products);
+          const products = typeof order.products === 'string' ? JSON.parse(order.products) : order.products;
           if (Array.isArray(products) && products.length > 0) {
             console.log(`🔄 [API_ORDERS_DELETE] Restoring inventory for order ${order.id} with ${products.length} products`);
             

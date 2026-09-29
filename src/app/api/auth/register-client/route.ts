@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       });
       console.log(`✅ [REGISTER_CLIENT] Created ${defaultPickupLocations.length} default pickup locations for client ${client.id}`);
     } catch (error) {
-      console.log(`⚠️ [REGISTER_CLIENT] Failed to create default pickup locations:`, error.message);
+      console.log(`⚠️ [REGISTER_CLIENT] Failed to create default pickup locations:`, error instanceof Error ? error.message : String(error));
     }
 
     // Create default courier services for the client
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       });
       console.log(`✅ [REGISTER_CLIENT] Created ${defaultCourierServices.length} default courier services for client ${client.id}`);
     } catch (error) {
-      console.log(`⚠️ [REGISTER_CLIENT] Failed to create default courier services:`, error.message);
+      console.log(`⚠️ [REGISTER_CLIENT] Failed to create default courier services:`, error instanceof Error ? error.message : String(error));
     }
 
     return NextResponse.json({

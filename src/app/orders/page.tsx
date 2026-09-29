@@ -9,7 +9,7 @@ import { OrderItem } from '@/types/catalog';
 export default function OrdersPage() {
   const { currentClient } = useAuth();
   const [selectedProducts, setSelectedProducts] = useState<OrderItem[]>([]);
-  const productSelectionRef = useRef<() => void>();
+  const productSelectionRef = useRef<(() => void) | undefined>(undefined);
 
   const handleProductsChange = (items: OrderItem[]) => {
     setSelectedProducts(items);

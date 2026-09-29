@@ -76,7 +76,6 @@ const ORDERS = [
     delhivery_waybill_number: 'AWB-A1',
     delhivery_api_status: 'success',
     product_description: 'Jewellery',
-    sub_group: null,
   },
   {
     id: 9,
@@ -104,7 +103,6 @@ const ORDERS = [
     delhivery_waybill_number: 'AWB-B9',
     delhivery_api_status: 'success',
     product_description: 'Other',
-    sub_group: null,
   },
 ];
 

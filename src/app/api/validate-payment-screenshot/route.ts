@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { CreditService } from '@/lib/credit-service';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { 
@@ -252,7 +250,8 @@ Focus on accuracy and only extract information that is clearly visible and prope
     
     return NextResponse.json({
       error: 'Failed to validate payment screenshot',
-      details: lastError instanceof Error ? lastError.message : 'Unknown error'
+      // lastError is only ever an OpenAIError (handled above) or null here
+      details: 'Unknown error'
     }, { status: 500 });
 
   } catch (error) {

@@ -69,7 +69,6 @@ export async function PUT(request: NextRequest) {
           requireWeight: true,
           requireTotalItems: true,
           enableResellerFallback: true,
-          enableThermalPrint: false,
           enableReferencePrefix: true,
           displayLogoOnWaybill: false,
           logoFileName: null,

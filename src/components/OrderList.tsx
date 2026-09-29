@@ -1884,7 +1884,7 @@ export default function OrderList() {
             )}
             {searchTerm && (
               <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-md">
-                🔍 "{searchTerm}"
+                🔍 &quot;{searchTerm}&quot;
               </span>
             )}
           </div>

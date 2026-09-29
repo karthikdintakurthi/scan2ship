@@ -179,7 +179,7 @@ async function validateImageDimensions(buffer: Buffer, mimeType: string): Promis
     }
     
     return { isValid: true };
-  } catch (error) {
+  } catch {
     return { isValid: false };
   }
 }
@@ -381,7 +381,7 @@ export async function cleanupQuarantinedFiles(retentionDays: number = 30): Promi
           deletedCount++;
         }
       }
-    } catch (error) {
+    } catch {
       // Directory might not exist
       console.log('Quarantine directory does not exist');
     }

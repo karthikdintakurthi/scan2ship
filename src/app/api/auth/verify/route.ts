@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
-import { jwtConfig } from '@/lib/jwt-config';
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +34,7 @@ export async function GET(request: NextRequest) {
         decoded = jwt.verify(token, process.env.JWT_SECRET!, {
           algorithms: ['HS256']
         }) as any;
-      } catch (error2) {
+      } catch {
         // Strategy 3: Try with old hardcoded values for backward compatibility
         try {
           decoded = jwt.verify(token, process.env.JWT_SECRET!, {
@@ -43,7 +42,7 @@ export async function GET(request: NextRequest) {
             audience: 'vanitha-logistics-users',
             algorithms: ['HS256']
           }) as any;
-        } catch (error3) {
+        } catch {
           return NextResponse.json(
             { error: 'Invalid token' },
             { status: 401 }

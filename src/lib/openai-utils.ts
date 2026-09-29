@@ -67,12 +67,12 @@ export async function handleOpenAIResponse(response: Response): Promise<OpenAIRe
         // Determine if error is retryable
         retryable = isRetryableError(statusCode, errorType, errorCode);
       }
-    } catch (parseError) {
+    } catch {
       // If we can't parse the error response, use the response text
       try {
         const errorText = await response.text();
         errorMessage = `OpenAI API error: ${errorText}`;
-      } catch (textError) {
+      } catch {
         errorMessage = `OpenAI API error: Unable to read error response (Status: ${statusCode})`;
       }
     }
@@ -86,7 +86,7 @@ export async function handleOpenAIResponse(response: Response): Promise<OpenAIRe
   try {
     const data: OpenAIResponse = await response.json();
     return data;
-  } catch (parseError) {
+  } catch {
     throw new OpenAIError(
       'Failed to parse OpenAI API response',
       500,
@@ -212,7 +212,7 @@ export function extractJSONFromResponse(content: string): any {
   // If no JSON object found, try parsing the entire content
   try {
     return JSON.parse(cleanedContent);
-  } catch (parseError) {
+  } catch {
     throw new Error(`No valid JSON found in OpenAI response. Content: ${cleanedContent.substring(0, 200)}...`);
   }
 }
