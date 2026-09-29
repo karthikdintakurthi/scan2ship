@@ -104,6 +104,23 @@ describe('getLiveTracking', () => {
     expect(new URL(fetchMock.mock.calls[0][0]).searchParams.get('waybill')).toBe('29260010951532');
   });
 
+  it('refuses an allowed order paired with a different waybill, without calling Delhivery', async () => {
+    expect(await getLiveTracking(actor(), { orderId: 182933, waybill: 'AWB-B' })).toMatchObject({ ok: false, status: 400, error: expect.stringMatching(/does not belong to this order/) });
+    expect(await getLiveTracking(actor(), { orderId: 182933, waybill: 'AWB-NORTH' })).toMatchObject({ ok: false, status: 400 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts an order ID with its own waybill', async () => {
+    expect(await getLiveTracking(actor(), { orderId: 182933, waybill: '29260010951532' })).toMatchObject({ ok: true });
+  });
+
+  it('refuses tracking data Delhivery returned for another waybill', async () => {
+    const other = delhiveryShipment();
+    other.ShipmentData[0].Shipment.AWB = 'SOMETHING-ELSE';
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => other });
+    expect(await getLiveTracking(actor(), { orderId: 182933 })).toMatchObject({ ok: false, status: 502 });
+  });
+
   it("never tracks another tenant's waybill", async () => {
     expect(await getLiveTracking(actor(), { waybill: 'AWB-B' })).toMatchObject({ ok: false, status: 404 });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -163,6 +180,11 @@ describe('track_shipment_live (MCP)', () => {
     expect(live).toMatchObject({ source: 'delhivery_live', currentStatus: 'In Transit', totalEvents: 40 });
     expect(live.recentEvents).toHaveLength(25);
     expect(live.recentEvents[0].status).toBe('Scan 39');
+  });
+
+  it('rejects an order ID combined with a waybill from elsewhere', async () => {
+    await expect(executeMcpTool(principal(), 'track_shipment_live', { orderId: 182933, trackingId: 'AWB-B' })).rejects.toMatchObject({ code: 'invalid_params' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('reports a missing order as not found', async () => {

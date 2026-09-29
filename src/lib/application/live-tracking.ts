@@ -114,7 +114,13 @@ export async function getLiveTracking(
     return { ok: false, status: 404, error: 'Order not found' };
   }
 
-  const trackingWaybill = waybill || order.delhivery_waybill_number || order.tracking_id;
+  // Only ever track the authorized order's own waybill. A supplied waybill must
+  // be that order's; otherwise an allowed order could vouch for any AWB.
+  const orderWaybills = [order.delhivery_waybill_number, order.tracking_id].filter((value): value is string => Boolean(value));
+  if (waybill && !orderWaybills.includes(waybill)) {
+    return { ok: false, status: 400, error: 'The waybill does not belong to this order' };
+  }
+  const trackingWaybill = waybill || orderWaybills[0];
   if (!trackingWaybill) {
     return { ok: false, status: 404, error: 'This order has no waybill yet' };
   }
@@ -129,6 +135,10 @@ export async function getLiveTracking(
 
   const live = await fetchDelhiveryTracking(trackingWaybill, apiKey);
   if (!live.ok) return live;
+  if (live.tracking.waybill !== trackingWaybill) {
+    // Never pass on data for a shipment other than the one requested
+    return { ok: false, status: 502, error: 'Delhivery returned tracking for a different waybill' };
+  }
   return {
     ok: true,
     order: { id: order.id, courierService: order.courier_service, pickupLocation: order.pickup_location },
