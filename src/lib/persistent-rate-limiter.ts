@@ -9,8 +9,9 @@ import { createHash } from 'crypto';
 
 // Rate limiting configuration
 const rateLimitConfig = {
-  // Password sign-in and registration: strict, to slow password guessing
-  auth: { windowMs: 15 * 60 * 1000, maxRequests: 5 },
+  // Sign-in attempts per IP. Loose enough for a team behind one office IP;
+  // per-account guessing is limited separately by failed attempts per email.
+  auth: { windowMs: 15 * 60 * 1000, maxRequests: 40 },
   // Token refresh: needs a 256-bit random token, so guessing is not a concern;
   // kept separate so refreshes never use up the sign-in allowance
   session: { windowMs: 15 * 60 * 1000, maxRequests: 60 },
@@ -225,5 +226,46 @@ export async function resetRateLimit(
   } catch (error) {
     console.error('❌ Error resetting rate limit:', error);
     return false;
+  }
+}
+
+/** Failed sign-ins allowed per email address within the window. */
+export const LOGIN_FAILURES = { windowMs: 15 * 60 * 1000, maxFailures: 5 };
+
+/** Bucket key for an email. Hashed so the rate-limit table never stores addresses. */
+function loginFailureKey(email: string): string {
+  return `login-fail:${createHash('sha256').update(email.trim().toLowerCase()).digest('hex').slice(0, 32)}`;
+}
+
+/**
+ * Whether sign-in for this email is paused after too many failed attempts.
+ * Read-only; fails open (not locked) if the store is unavailable.
+ */
+export async function loginLockStatus(email: string): Promise<{ locked: boolean; retryAfterSeconds: number }> {
+  try {
+    const row = await prisma.rate_limits.findUnique({ where: { key: loginFailureKey(email) } });
+    if (!row) return { locked: false, retryAfterSeconds: 0 };
+    const resetAt = row.windowStart.getTime() + LOGIN_FAILURES.windowMs;
+    if (resetAt <= Date.now() || row.count < LOGIN_FAILURES.maxFailures) {
+      return { locked: false, retryAfterSeconds: 0 };
+    }
+    return { locked: true, retryAfterSeconds: Math.ceil((resetAt - Date.now()) / 1000) };
+  } catch (error) {
+    console.error('❌ Login lock check failed:', error instanceof Error ? error.message : String(error));
+    return { locked: false, retryAfterSeconds: 0 };
+  }
+}
+
+/** Count a failed sign-in against the email. */
+export async function recordLoginFailure(email: string): Promise<void> {
+  await consumeFixedWindow(loginFailureKey(email), LOGIN_FAILURES.windowMs, LOGIN_FAILURES.maxFailures);
+}
+
+/** A successful sign-in clears earlier failures, so a few typos do not linger. */
+export async function clearLoginFailures(email: string): Promise<void> {
+  try {
+    await prisma.rate_limits.deleteMany({ where: { key: loginFailureKey(email) } });
+  } catch (error) {
+    console.error('❌ Could not clear login failures:', error instanceof Error ? error.message : String(error));
   }
 }

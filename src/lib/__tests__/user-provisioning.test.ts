@@ -228,10 +228,10 @@ describe('POST /api/auth/register-user', () => {
     expect(prisma.users.findUnique).not.toHaveBeenCalled();
   });
 
-  it('uses the stricter auth rate limit', async () => {
+  it('uses the per-user API rate limit (registration needs a signed-in admin)', async () => {
     actAs('client_admin');
     await registerUser(signedRequest(NEW_USER));
-    expect((applySecurityMiddleware as jest.Mock).mock.calls[0][2]).toMatchObject({ rateLimit: 'auth' });
+    expect((applySecurityMiddleware as jest.Mock).mock.calls[0][2]).toMatchObject({ rateLimit: 'api' });
   });
 
   it('returns 500 when user creation fails', async () => {

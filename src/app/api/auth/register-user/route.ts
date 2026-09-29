@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const securityResponse = await applySecurityMiddleware(
       request,
       new NextResponse(),
-      { rateLimit: 'auth', cors: true, securityHeaders: true }
+      { rateLimit: 'api', cors: true, securityHeaders: true }
     );
 
     if (securityResponse) {

@@ -123,11 +123,15 @@ describe('request validation', () => {
 });
 
 describe('authentication failures', () => {
+  const failureKey = () => (prisma.rate_limits.upsert as jest.Mock).mock.calls[0]?.[0].where.key;
+
   async function expectRejected(body: unknown, error = 'Invalid email or password') {
     const response = await login(loginRequest(body));
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error });
-    expect(prisma.writeCalls()).toEqual([]);
+    // The only write is the failed-attempt counter; no session is created
+    expect(prisma.writeCalls()).toEqual(['rate_limits.upsert']);
+    expect(failureKey()).toMatch(/^login-fail:[0-9a-f]{32}$/);
   }
 
   it('rejects an unknown email without checking a password', async () => {
@@ -141,15 +145,6 @@ describe('authentication failures', () => {
     await expectRejected(VALID);
   });
 
-  it('rejects a user whose client is inactive or missing', async () => {
-    (prisma.users.findFirst as jest.Mock).mockResolvedValue({ ...USER, clients: { ...USER.clients, isActive: false } });
-    await expectRejected(VALID, 'Client account is inactive');
-
-    (prisma.users.findFirst as jest.Mock).mockResolvedValue({ ...USER, clients: null });
-    await expectRejected(VALID, 'Client account is inactive');
-    expect(bcrypt.compare).not.toHaveBeenCalled();
-  });
-
   it('rejects a user with no password set', async () => {
     (prisma.users.findFirst as jest.Mock).mockResolvedValue({ ...USER, password: null });
     await expectRejected(VALID);
@@ -160,6 +155,59 @@ describe('authentication failures', () => {
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
     await expectRejected({ ...VALID, password: 'wrong-password' });
     expect(bcrypt.compare).toHaveBeenCalledWith('wrong-password', USER.password);
+  });
+
+  it('reports an inactive client only after the password is proven', async () => {
+    (prisma.users.findFirst as jest.Mock).mockResolvedValue({ ...USER, clients: { ...USER.clients, isActive: false } });
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    await expectRejected(VALID);
+
+    jest.clearAllMocks();
+    (prisma.users.findFirst as jest.Mock).mockResolvedValue({ ...USER, clients: null });
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    const response = await login(loginRequest(VALID));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Client account is inactive' });
+    expect(prisma.sessions.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('failed attempts per email', () => {
+  const lockRow = (count: number, startedMsAgo = 60_000) => ({ key: 'k', count, windowStart: new Date(Date.now() - startedMsAgo) });
+
+  it('pauses sign-in for an email after 5 failures in 15 minutes, without checking the password', async () => {
+    (prisma.rate_limits.findUnique as jest.Mock).mockResolvedValue(lockRow(5));
+    const response = await login(loginRequest(VALID));
+    expect(response.status).toBe(429);
+    expect((await response.json()).error).toMatch(/^Too many failed sign-in attempts/);
+    expect(prisma.users.findFirst).not.toHaveBeenCalled();
+    expect(bcrypt.compare).not.toHaveBeenCalled();
+  });
+
+  it('allows sign-in below the limit and once the window has passed', async () => {
+    (prisma.rate_limits.findUnique as jest.Mock).mockResolvedValue(lockRow(4));
+    expect((await login(loginRequest(VALID))).status).toBe(200);
+    (prisma.rate_limits.findUnique as jest.Mock).mockResolvedValue(lockRow(9, 16 * 60_000));
+    expect((await login(loginRequest(VALID))).status).toBe(200);
+  });
+
+  it('keys failures by email regardless of case, and never stores the address', async () => {
+    (prisma.users.findFirst as jest.Mock).mockResolvedValue(null);
+    await login(loginRequest({ email: 'USER@Client-A.test', password: 'x' }));
+    await login(loginRequest({ email: 'user@client-a.test', password: 'x' }));
+    const [[first], [second]] = (prisma.rate_limits.upsert as jest.Mock).mock.calls;
+    expect(first.where.key).toBe(second.where.key);
+    expect(first.where.key).not.toContain('client-a');
+  });
+
+  it('clears earlier failures after a successful sign-in', async () => {
+    await login(loginRequest(VALID));
+    expect(prisma.rate_limits.deleteMany).toHaveBeenCalledWith({ where: { key: expect.stringMatching(/^login-fail:/) } });
+  });
+
+  it('uses the per-IP sign-in limit for all attempts', async () => {
+    await login(loginRequest(VALID));
+    expect(applySecurityMiddleware).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ rateLimit: 'auth' }));
   });
 });
 

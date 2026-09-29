@@ -5,6 +5,7 @@ import {
   InputValidator 
 } from '@/lib/security-middleware';
 import { securityConfig } from '@/lib/security-config';
+import { clearLoginFailures, loginLockStatus, recordLoginFailure } from '@/lib/persistent-rate-limiter';
 import { newRefreshToken, SESSION_TTL_MS, signSessionToken } from '@/lib/session-tokens';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -48,12 +49,28 @@ export async function POST(request: NextRequest) {
     if (typeof body.password !== 'string' || body.password.length === 0) {
       return NextResponse.json({ error: 'Password is required' }, { status: 400 });
     }
-    if (body.password.length > securityConfig.password.maxLength) {
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
-    }
 
     const email = emailValidation.value!;
     const password: string = body.password;
+
+    // Too many failed attempts for this email: pause sign-in for it. This limits
+    // password guessing per account without penalising other users on the same IP.
+    const lock = await loginLockStatus(email);
+    if (lock.locked) {
+      return NextResponse.json(
+        { error: `Too many failed sign-in attempts. Please try again in ${Math.ceil(lock.retryAfterSeconds / 60)} minute(s).` },
+        { status: 429, headers: { 'Retry-After': String(lock.retryAfterSeconds) } }
+      );
+    }
+
+    const rejectCredentials = async () => {
+      await recordLoginFailure(email);
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+    };
+
+    if (password.length > securityConfig.password.maxLength) {
+      return rejectCredentials();
+    }
 
     // Find user with client information. Emails are stored lower-case, but older
     // accounts may have been saved as typed, so match without regard to case.
@@ -67,14 +84,16 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    if (!user || !user.isActive) {
-      return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
-      );
+    if (!user || !user.isActive || !user.password) {
+      return rejectCredentials();
     }
 
-    // Check if user's client is active
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return rejectCredentials();
+    }
+
+    // Only reveal the account's status once the password is proven
     if (!user.clients || !user.clients.isActive) {
       return NextResponse.json(
         { error: 'Client account is inactive' },
@@ -82,22 +101,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify password with bcrypt
-    if (!user.password) {
-      return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
-      );
-    }
-    
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    
-    if (!isPasswordValid) {
-      return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
-      );
-    }
+    await clearLoginFailures(email);
 
     // Generate JWT token using secure configuration
     if (!process.env.JWT_SECRET) {
