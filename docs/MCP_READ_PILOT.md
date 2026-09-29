@@ -53,3 +53,26 @@ Writes (`prepare_shipment` / `commit_shipment`) are not in this pilot.
 ## Kill switch
 
 Set `MCP_ENABLED=false` or remove the tenant from `MCP_TENANT_ALLOWLIST`. Existing access tokens fail on the next call because each request re-checks the grant, user, tenant, and allowlist.
+
+## Deployment (beta)
+
+`https://beta.scan2ship.in` is the Vercel **Preview** deployment of branch `feature/mcp-implementation` in the `scan2ship` project. The `MCP_*` variables are scoped to Preview on that branch only. Preview `DATABASE_URL` is the beta Railway database; it applies to every preview branch of the project, not only this one.
+
+The beta database was created from the committed migrations (all 39; `prisma migrate diff` against `schema.prisma` is empty) and loaded with the 2026-09-13 local production copy. It holds real customer data and live Delhivery and Catalog keys.
+
+## Acceptance results (2026-09-29)
+
+| Check | Result |
+|---|---|
+| Discovery: protected-resource and authorization-server metadata | Pass |
+| Unauthenticated call returns 401 with `WWW-Authenticate` resource metadata | Pass |
+| Dynamic client registration with Claude web callbacks and a localhost callback | Pass |
+| Claude (web/desktop custom connector): connect, consent, read tools | Pass |
+| Claude Code (`claude mcp add --transport http`): connect, read tools | Pass (reported by owner) |
+| Another tenant's order ID and tracking number return `not_found` | Pass |
+| Revoke in `/settings/connections`, next call denied | Pending: needs a signed-in session |
+| Access-token expiry (15 min) and refresh | Pending: needs a connected client left idle past expiry |
+
+## Role ceiling
+
+Granted scopes are limited by the connecting user's role at consent and again on every call (`scopesAllowedForUser`), so a demoted user loses scopes without reconnecting. Child users do not receive `credits:read`, matching the website, which has no wallet for them. Users with an unrecognised role are rejected.
