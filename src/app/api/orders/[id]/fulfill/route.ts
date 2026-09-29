@@ -4,6 +4,7 @@ import { delhiveryService } from '@/lib/delhivery';
 import { WebhookService } from '@/lib/webhook-service';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { findAccessibleOrder, parseOrderId } from '@/lib/application/policy';
+import { CreditService, InsufficientCreditsError } from '@/lib/credit-service';
 
 interface FulfillResponse {
   success: boolean;
@@ -76,13 +77,30 @@ export async function POST(
       }, { status: 400 });
     }
 
-    console.log(`📦 [FULFILL_ORDER] Order details:`, {
-      id: order.id,
-      referenceNumber: order.reference_number,
-      courierService: order.courier_service,
-      name: order.name,
-      address: order.address
-    });
+    let billing: { didCharge: boolean; transactionId: string };
+    try {
+      billing = await CreditService.chargeOrderBookingIfNeeded(order.clientId, authResult.user!.id, order.id);
+    } catch (creditError) {
+      if (creditError instanceof InsufficientCreditsError) {
+        return NextResponse.json({
+          success: false,
+          message: 'Insufficient credits',
+          error: 'Fulfillment requires 1 credit'
+        }, { status: 402 });
+      }
+      throw creditError;
+    }
+
+    const refundIfCharged = async (reason: string) => {
+      if (!billing.didCharge) return;
+      try {
+        await CreditService.refundCredits(order.clientId, CreditService.getCreditCost('ORDER'), `Refund: ${reason}`, 'ORDER', authResult.user!.id, order.id);
+      } catch (refundError) {
+        console.error('❌ [FULFILL_ORDER] Credit refund failed; reconcile manually:', { transactionId: billing.transactionId, refundError });
+      }
+    };
+
+    console.log(`📦 [FULFILL_ORDER] Fulfilling order ${orderId}`);
 
     // Call Delhivery API to create waybill
     console.log(`🚚 [FULFILL_ORDER] Calling Delhivery API for order ${orderId}...`);
@@ -104,6 +122,8 @@ export async function POST(
         }
       });
 
+      await refundIfCharged('Delhivery booking failed');
+
       return NextResponse.json({
         success: false,
         message: 'Failed to create waybill',
@@ -124,6 +144,8 @@ export async function POST(
           updated_at: new Date()
         }
       });
+
+      await refundIfCharged('Delhivery booking failed');
 
       return NextResponse.json({
         success: false,

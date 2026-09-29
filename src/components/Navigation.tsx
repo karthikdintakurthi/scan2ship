@@ -181,6 +181,15 @@ export default function Navigation() {
                         >
                           My Profile
                         </Link>
+                        {currentUser?.role !== 'master_admin' && (
+                          <Link
+                            href="/settings/connections"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setIsUserMenuOpen(false)}
+                          >
+                            AI connections
+                          </Link>
+                        )}
                         <button
                           onClick={() => {
                             setIsUserMenuOpen(false);
@@ -267,6 +276,15 @@ export default function Navigation() {
                 >
                   My Profile
                 </Link>
+                {currentUser?.role !== 'master_admin' && (
+                  <Link
+                    href="/settings/connections"
+                    className="block w-full text-center bg-gray-100 text-gray-800 px-3 py-1 rounded-md text-xs font-medium hover:bg-gray-200"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    AI connections
+                  </Link>
+                )}
                 <button
                   onClick={handleLogout}
                   className="w-full bg-red-600 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"

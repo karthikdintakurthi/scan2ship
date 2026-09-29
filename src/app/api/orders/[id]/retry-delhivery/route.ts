@@ -4,12 +4,14 @@ import { delhiveryService } from '@/lib/delhivery'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { findAccessibleOrder, parseOrderId } from '@/lib/application/policy';
+import { CreditService, InsufficientCreditsError } from '@/lib/credit-service';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   let accessibleOrderId: number | undefined
+  let refundIfCharged: ((reason: string) => Promise<void>) | undefined
   try {
     // Apply security middleware
     const securityResponse = await applySecurityMiddleware(
@@ -58,6 +60,26 @@ export async function POST(
     if (order.delhivery_retry_count >= 3) {
       return NextResponse.json({ error: 'Maximum retry attempts reached' }, { status: 400 })
     }
+
+    let billing: { didCharge: boolean; transactionId: string };
+    try {
+      billing = await CreditService.chargeOrderBookingIfNeeded(order.clientId, authResult.user!.id, order.id);
+    } catch (creditError) {
+      if (creditError instanceof InsufficientCreditsError) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
+      throw creditError;
+    }
+
+    const refundIfChargedForOrder = async (reason: string) => {
+      if (!billing.didCharge) return;
+      try {
+        await CreditService.refundCredits(order.clientId, CreditService.getCreditCost('ORDER'), `Refund: ${reason}`, 'ORDER', authResult.user!.id, order.id);
+      } catch (refundError) {
+        console.error('❌ [RETRY_DELHIVERY] Credit refund failed; reconcile manually:', { transactionId: billing.transactionId, refundError });
+      }
+    };
+    refundIfCharged = refundIfChargedForOrder;
 
     console.log(`Retrying Delhivery order creation for order ID: ${orderId}`)
     console.log(`🔍 [RETRY_DELHIVERY] Order belongs to client: ${order.clientId}`)
@@ -167,6 +189,8 @@ export async function POST(
         },
       })
 
+      await refundIfChargedForOrder('Delhivery booking failed');
+
       return NextResponse.json({
         error: 'Failed to create Delhivery order',
         details: delhiveryResponse.error,
@@ -188,6 +212,8 @@ export async function POST(
         },
       })
     }
+
+    await refundIfCharged?.('Delhivery booking failed');
 
     return NextResponse.json({
       error: 'Failed to retry Delhivery order',

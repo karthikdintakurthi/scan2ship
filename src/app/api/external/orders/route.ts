@@ -135,9 +135,13 @@ export async function POST(request: NextRequest) {
 
     let order: Awaited<ReturnType<typeof prisma.orders.create>>;
     try {
+      const fields = pickCreatableOrderFields(orderData).fields as Prisma.ordersUncheckedCreateInput;
+      if (typeof orderData.courier_service === 'string' && orderData.courier_service.toLowerCase() === 'delhivery') {
+        delete (fields as { tracking_id?: unknown }).tracking_id;
+      }
       order = await prisma.orders.create({
         data: {
-          ...(pickCreatableOrderFields(orderData).fields as Prisma.ordersUncheckedCreateInput),
+          ...fields,
           clientId: apiKey.clientId,
           created_at: new Date(),
           updated_at: new Date()

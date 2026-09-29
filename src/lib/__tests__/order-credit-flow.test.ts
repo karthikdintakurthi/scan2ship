@@ -335,6 +335,13 @@ describe('order creation field allowlist', () => {
     }
   });
 
+  it('POST /api/orders ignores caller-supplied tracking ids on Delhivery bookings', async () => {
+    await createOrderRoute(order({ tracking_id: 'AWB-HIJACK', waybill: 'AWB-HIJACK', delhivery_waybill_number: 'AWB-HIJACK' }));
+    const data = created();
+    expect(data.tracking_id).toBeNull();
+    expect(data).not.toHaveProperty('delhivery_waybill_number');
+  });
+
   it('POST /api/external/orders ignores fields the server controls and uses the key tenant', async () => {
     (authenticateApiKey as jest.Mock).mockResolvedValue({ clientId: 'client-a', permissions: ['orders:write'] });
 

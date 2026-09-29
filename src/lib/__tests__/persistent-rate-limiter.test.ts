@@ -113,10 +113,56 @@ describe('tracking rate limit', () => {
   });
 });
 
-describe('other rate limits', () => {
-  it('still key signed-in callers by token prefix', async () => {
-    await rateLimit(request({ authorization: 'Bearer aaaaaaaaaaaaaaaaaaaa', 'x-real-ip': '203.0.113.9' }), 'api');
-    expect(keysUsed()).toEqual(['api:user:aaaaaaaa']);
+describe('signed-in and auth rate limits', () => {
+  const upsert = () => prisma.rate_limits.upsert as jest.Mock;
+
+  function jwtFor(userId: string) {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ userId })).toString('base64url');
+    return `${header}.${payload}.sig`;
+  }
+
+  beforeEach(() => {
+    upsert().mockResolvedValue({ key: 'k', count: 1, windowStart: new Date() });
+  });
+
+  function upsertKeys() {
+    return upsert().mock.calls.map(([args]) => args.where.key);
+  }
+
+  it('keys signed-in API callers by JWT userId, not the shared header prefix', async () => {
+    const tokenA = jwtFor('user-a');
+    const tokenB = jwtFor('user-b');
+    expect(tokenA.slice(0, 8)).toBe(tokenB.slice(0, 8));
+
+    await rateLimit(request({ authorization: `Bearer ${tokenA}`, 'x-real-ip': '203.0.113.9' }), 'api');
+    await rateLimit(request({ authorization: `Bearer ${tokenB}`, 'x-real-ip': '203.0.113.9' }), 'api');
+
+    expect(upsertKeys()).toEqual(['api:user:user-a', 'api:user:user-b']);
+  });
+
+  it('keys API keys by a hash of the full token, not a prefix', async () => {
+    await rateLimit(request({ authorization: 'Bearer s2s_live_aaaaaaaaaaaa', 'x-real-ip': '203.0.113.9' }), 'api');
+    await rateLimit(request({ authorization: 'Bearer s2s_live_bbbbbbbbbbbb', 'x-real-ip': '203.0.113.9' }), 'api');
+    const keys = upsertKeys();
+    expect(keys[0]).toMatch(/^api:key:[a-f0-9]{16}$/);
+    expect(keys[1]).toMatch(/^api:key:[a-f0-9]{16}$/);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
+  it('keys auth (login) by IP so brute force is per caller', async () => {
+    await rateLimit(request({ 'x-real-ip': '198.51.100.9' }), 'auth');
+    expect(upsertKeys()).toEqual(['auth:ip:198.51.100.9']);
+  });
+
+  it('uses the atomic limiter for api traffic', async () => {
+    upsert().mockResolvedValue({ key: 'api:user:user-a', count: 100, windowStart: new Date() });
+    const allowed = await rateLimit(request({ authorization: `Bearer ${jwtFor('user-a')}` }), 'api');
+    expect(allowed).toMatchObject({ allowed: true, remaining: 0 });
+
+    upsert().mockResolvedValue({ key: 'api:user:user-a', count: 101, windowStart: new Date() });
+    const blocked = await rateLimit(request({ authorization: `Bearer ${jwtFor('user-a')}` }), 'api');
+    expect(blocked.allowed).toBe(false);
   });
 });
 

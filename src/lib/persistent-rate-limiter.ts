@@ -5,13 +5,14 @@
 
 import { prisma } from './prisma';
 import { NextRequest } from 'next/server';
+import { createHash } from 'crypto';
 
 // Rate limiting configuration
 const rateLimitConfig = {
   auth: { windowMs: 15 * 60 * 1000, maxRequests: 5 },
   api: { windowMs: 15 * 60 * 1000, maxRequests: 100 },
   upload: { windowMs: 15 * 60 * 1000, maxRequests: 10 },
-  webhook: { windowMs: 60 * 1000, maxRequests: 20 },
+  webhook: { windowMs: 60 * 1000, maxRequests: 120 },
   // Unauthenticated phone-number lookups; always keyed by IP
   tracking: { windowMs: 15 * 60 * 1000, maxRequests: 10 }
 };
@@ -23,35 +24,53 @@ interface RateLimitResult {
   resetTime?: number;
 }
 
+function bearerToken(request: NextRequest): string | null {
+  const header = request.headers.get('authorization');
+  if (!header?.startsWith('Bearer ')) return null;
+  const token = header.slice(7).trim();
+  return token || null;
+}
+
+/**
+ * Read userId/sub from a JWT payload without verifying the signature. Used only
+ * to pick a rate-limit bucket; authorization still happens separately.
+ */
+function jwtSubject(token: string): string | null {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as {
+      userId?: unknown;
+      sub?: unknown;
+    };
+    const id = payload.userId ?? payload.sub;
+    return typeof id === 'string' && id.length > 0 && id.length <= 128 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+function tokenFingerprint(token: string): string {
+  return createHash('sha256').update(token).digest('hex').slice(0, 16);
+}
+
 /**
  * Get client identifier for rate limiting
  */
 function getClientIdentifier(request: NextRequest, type: keyof typeof rateLimitConfig): string {
-  // Public endpoints must not let a caller pick its own bucket with an arbitrary token
-  if (type === 'tracking') {
+  // Public and auth endpoints must not let a caller pick its bucket with a token
+  if (type === 'tracking' || type === 'auth' || type === 'webhook') {
     return `ip:${getClientIp(request)}`;
   }
 
-  // Try to get user ID from JWT token first
-  const authHeader = request.headers.get('authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.substring(7);
-      // Simple token check without full JWT verification
-      if (token.length > 10) {
-        return `user:${token.substring(0, 8)}`;
-      }
-    } catch (error) {
-      // Fall back to IP address
-    }
+  const token = bearerToken(request);
+  if (token) {
+    const userId = jwtSubject(token);
+    if (userId) return `user:${userId}`;
+    return `key:${tokenFingerprint(token)}`;
   }
-  
-  // Fall back to IP address
-  const forwarded = request.headers.get('x-forwarded-for');
-  const realIp = request.headers.get('x-real-ip');
-  const ip = forwarded || realIp || 'unknown';
-  
-  return `ip:${ip}`;
+
+  return `ip:${getClientIp(request)}`;
 }
 
 /**
@@ -63,24 +82,6 @@ export function getClientIp(request: NextRequest): string {
   if (realIp) return realIp;
   const firstForwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   return firstForwarded || 'unknown';
-}
-
-/**
- * Clean up expired rate limit entries
- */
-async function cleanupExpiredEntries(): Promise<void> {
-  try {
-    const now = new Date();
-    await prisma.rate_limits.deleteMany({
-      where: {
-        expiresAt: {
-          lt: now
-        }
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error cleaning up expired rate limit entries:', error);
-  }
 }
 
 /**
@@ -136,104 +137,8 @@ export async function rateLimit(
   type: keyof typeof rateLimitConfig = 'api'
 ): Promise<RateLimitResult> {
   const config = rateLimitConfig[type];
-
-  // The shared path below resets its window on every request, so it never blocks.
-  // Tracking uses the corrected limiter; other tiers keep their current behavior
-  // until their bucket keys are fixed (all JWTs share the same 8-character prefix).
-  if (type === 'tracking') {
-    return consumeFixedWindow(`${type}:${getClientIdentifier(request, type)}`, config.windowMs, config.maxRequests);
-  }
-  const now = new Date();
-  const windowStart = new Date(now.getTime() - config.windowMs);
-  
-  // Get client identifier
-  const clientId = getClientIdentifier(request, type);
-  const key = `${type}:${clientId}`;
-  
-  try {
-    // Clean up expired entries periodically (10% chance)
-    if (Math.random() < 0.1) {
-      await cleanupExpiredEntries();
-    }
-    
-    // Get current rate limit data
-    const existing = await prisma.rate_limits.findFirst({
-      where: { key }
-    });
-    
-    if (!existing) {
-      // Create new entry
-      await prisma.rate_limits.create({
-        data: {
-          id: `rate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          key,
-          count: 1,
-          windowStart,
-          expiresAt: new Date(now.getTime() + config.windowMs),
-          updatedAt: new Date()
-        }
-      });
-      
-      return { 
-        allowed: true, 
-        remaining: config.maxRequests - 1,
-        resetTime: now.getTime() + config.windowMs
-      };
-    }
-    
-    // Check if window has expired
-    if (existing.windowStart < windowStart) {
-      // Reset window
-      await prisma.rate_limits.update({
-        where: { id: existing.id },
-        data: {
-          count: 1,
-          windowStart,
-          expiresAt: new Date(now.getTime() + config.windowMs),
-          updatedAt: new Date()
-        }
-      });
-      
-      return { 
-        allowed: true, 
-        remaining: config.maxRequests - 1,
-        resetTime: now.getTime() + config.windowMs
-      };
-    }
-    
-    // Check if limit exceeded
-    if (existing.count >= config.maxRequests) {
-      const resetTime = existing.expiresAt.getTime();
-      const timeUntilReset = Math.ceil((resetTime - now.getTime()) / 1000);
-      
-      return {
-        allowed: false,
-        message: `Too many requests. Please try again in ${timeUntilReset} seconds.`,
-        remaining: 0,
-        resetTime
-      };
-    }
-    
-    // Increment count
-    await prisma.rate_limits.update({
-      where: { id: existing.id },
-      data: {
-        count: existing.count + 1,
-        updatedAt: new Date()
-      }
-    });
-    
-    return { 
-      allowed: true, 
-      remaining: config.maxRequests - existing.count - 1,
-      resetTime: existing.expiresAt.getTime()
-    };
-    
-  } catch (error) {
-    console.error('❌ Rate limiting error:', error);
-    // Fail open - allow request if rate limiting fails
-    return { allowed: true };
-  }
+  const key = `${type}:${getClientIdentifier(request, type)}`;
+  return consumeFixedWindow(key, config.windowMs, config.maxRequests);
 }
 
 /**

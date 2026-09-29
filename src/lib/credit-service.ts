@@ -258,6 +258,33 @@ export class CreditService {
   }
 
   /**
+   * Charge one ORDER credit for a shipment booking unless this order was
+   * already billed (create-order, a previous fulfill, or retry).
+   */
+  static async chargeOrderBookingIfNeeded(
+    clientId: string,
+    userId: string | undefined,
+    orderId: number
+  ): Promise<{ didCharge: boolean; transactionId: string }> {
+    const existing = await prisma.credit_transactions.findFirst({
+      where: { clientId, orderId, type: 'DEDUCT', feature: 'ORDER' },
+      select: { id: true },
+    });
+    if (existing) {
+      return { didCharge: false, transactionId: existing.id };
+    }
+    const charge = await this.deductCredits(
+      clientId,
+      this.getCreditCost('ORDER'),
+      'Shipment booking',
+      'ORDER',
+      userId,
+      orderId
+    );
+    return { didCharge: true, transactionId: charge.transactionId };
+  }
+
+  /**
    * Link a charge made before its order existed to the order.
    */
   static async attachOrderToTransaction(transactionId: string, orderId: number): Promise<void> {

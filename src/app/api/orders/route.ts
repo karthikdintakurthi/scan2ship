@@ -135,7 +135,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isDelhivery =
+      typeof orderData.courier_service === 'string' && orderData.courier_service.toLowerCase() === 'delhivery';
     const { fields: creatableFields, ignored: ignoredFields } = pickCreatableOrderFields(orderData);
+    if (isDelhivery) {
+      delete creatableFields.tracking_id;
+    }
     if (ignoredFields.length > 0) {
       console.log('📝 [API_ORDERS_POST] Ignoring fields that cannot be set on create:', ignoredFields.join(', '));
     }
@@ -147,7 +152,8 @@ export async function POST(request: NextRequest) {
       weight: parseFloat(orderData.weight) || 0,
       total_items: parseInt(orderData.total_items) || 1,
       cod_amount: orderData.cod_amount ? parseFloat(orderData.cod_amount) : null,
-      tracking_id: orderData.waybill || orderData.tracking_id || null, // Map waybill to tracking_id
+      // Delhivery waybills come from the carrier, not the caller
+      tracking_id: isDelhivery ? null : (orderData.waybill || orderData.tracking_id || null),
       reference_number: referenceNumber,
       clientId: client.id,
       created_at: new Date(),

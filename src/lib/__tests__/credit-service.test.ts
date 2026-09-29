@@ -142,6 +142,30 @@ describe('CreditService.attachOrderToTransaction', () => {
   });
 });
 
+describe('CreditService.chargeOrderBookingIfNeeded', () => {
+  it('does not deduct when the order already has an ORDER debit', async () => {
+    (ledger.findFirst as jest.Mock).mockResolvedValue({ id: 'txn-old' });
+
+    const result = await CreditService.chargeOrderBookingIfNeeded('client-a', 'user-1', 7);
+
+    expect(result).toEqual({ didCharge: false, transactionId: 'txn-old' });
+    expect(credits.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('deducts and records the order when no debit exists', async () => {
+    (ledger.findFirst as jest.Mock).mockResolvedValue(null);
+    (credits.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (credits.findUniqueOrThrow as jest.Mock).mockResolvedValue({ clientId: 'client-a', balance: 9 });
+
+    const result = await CreditService.chargeOrderBookingIfNeeded('client-a', 'user-1', 7);
+
+    expect(result.didCharge).toBe(true);
+    expect(ledger.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ type: 'DEDUCT', feature: 'ORDER', orderId: 7, userId: 'user-1' }),
+    });
+  });
+});
+
 describe('InsufficientCreditsError', () => {
   it('carries the required amount and a stable message', () => {
     const error = new InsufficientCreditsError(3);

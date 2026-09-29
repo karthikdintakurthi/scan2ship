@@ -25,6 +25,19 @@ jest.mock('@/lib/delhivery', () => ({
 jest.mock('@/lib/pickup-location-config', () => ({ getDelhiveryApiKey: jest.fn() }));
 jest.mock('@/lib/cross-app-auth', () => ({ getCatalogApiKey: jest.fn() }));
 jest.mock('@/lib/webhook-service', () => ({ WebhookService: { triggerWebhooks: jest.fn() } }));
+jest.mock('@/lib/credit-service', () => ({
+  CreditService: {
+    getCreditCost: () => 1,
+    chargeOrderBookingIfNeeded: jest.fn().mockResolvedValue({ didCharge: false, transactionId: 'txn-existing' }),
+    refundCredits: jest.fn(),
+  },
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {
+    constructor(public readonly required: number) {
+      super('Insufficient credits');
+      this.name = 'InsufficientCreditsError';
+    }
+  },
+}));
 
 import { prisma } from '@/lib/prisma';
 import { delhiveryService } from '@/lib/delhivery';

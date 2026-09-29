@@ -68,12 +68,12 @@ describe('POST /api/webhooks/delhivery', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true });
     expect((prisma.orders.findMany as jest.Mock).mock.calls[0][0].where).toEqual({
-      tracking_id: 'AWB-1',
       courier_service: { equals: 'delhivery', mode: 'insensitive' },
+      OR: [{ tracking_id: 'AWB-1' }, { delhivery_waybill_number: 'AWB-1' }],
     });
     expect(prisma.orders.updateMany).toHaveBeenCalledWith({
       where: { id: 10, clientId: 'client-a' },
-      data: { delhivery_api_status: 'shipped', updated_at: expect.any(Date) },
+      data: { delhivery_api_status: 'shipped', tracking_status: expect.any(String), updated_at: expect.any(Date) },
     });
   });
 
@@ -84,6 +84,14 @@ describe('POST /api/webhooks/delhivery', () => {
 
     expect(response.status).toBe(409);
     expect(prisma.orders.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('matches a stored Delhivery waybill as well as tracking_id', async () => {
+    await deliver(SHIPPED);
+    expect((prisma.orders.findMany as jest.Mock).mock.calls[0][0].where.OR).toEqual([
+      { tracking_id: 'AWB-1' },
+      { delhivery_waybill_number: 'AWB-1' },
+    ]);
   });
 
   it('returns 404 when no Delhivery order has the waybill', async () => {

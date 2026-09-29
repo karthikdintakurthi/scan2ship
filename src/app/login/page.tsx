@@ -2,23 +2,35 @@
 
 import SaaSLogin from '@/components/SaaSLogin';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
 
-export default function LoginPage() {
+function safeReturnTo(value: string | null): string | null {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
+  if (value.startsWith('/oauth/authorize') || value === '/settings/connections' || value.startsWith('/settings/connections?')) {
+    return value;
+  }
+  return null;
+}
+
+function LoginInner() {
   const { currentUser, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const params = useSearchParams();
+  const returnTo = safeReturnTo(params.get('returnTo'));
 
   // If already authenticated, redirect appropriately
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      if (currentUser.role === 'client_admin' || currentUser.role === 'super_admin' || currentUser.role === 'master_admin') {
+      if (returnTo) {
+        router.push(returnTo);
+      } else if (currentUser.role === 'client_admin' || currentUser.role === 'super_admin' || currentUser.role === 'master_admin') {
         router.push('/admin');
       } else {
         router.push('/');
       }
     }
-  }, [isAuthenticated, currentUser, router]);
+  }, [isAuthenticated, currentUser, router, returnTo]);
 
   const handleLoginSuccess = () => {
     // The useEffect above will handle the redirect
@@ -49,4 +61,12 @@ export default function LoginPage() {
   }
 
   return <SaaSLogin onLoginSuccess={handleLoginSuccess} />;
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<p className="p-8 text-gray-600">Loading…</p>}>
+      <LoginInner />
+    </Suspense>
+  );
 }

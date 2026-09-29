@@ -193,6 +193,7 @@ model clients {
   sub_groups            sub_groups[]
   users                 users[]
   webhooks              webhooks[]
+  mcp_grants            mcp_grants[]
 }
 
 model courier_services {
@@ -354,6 +355,9 @@ model orders {
 
   @@index([clientId, mobile, created_at(sort: Desc)], map: "orders_clientId_mobile_created_at_idx")
   @@index([clientId, reseller_mobile, created_at(sort: Desc)], map: "orders_clientId_reseller_mobile_created_at_idx")
+  @@index([clientId, created_at(sort: Desc)], map: "orders_clientId_created_at_idx")
+  @@index([clientId, tracking_id], map: "orders_clientId_tracking_id_idx")
+  @@index([clientId, reference_number], map: "orders_clientId_reference_number_idx")
 }
 
 model pickup_locations {
@@ -520,6 +524,7 @@ model users {
   clients                clients                   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   parentUser             users?                    @relation("UserHierarchy", fields: [parentUserId], references: [id])
   childUsers             users[]                   @relation("UserHierarchy")
+  mcp_grants             mcp_grants[]
 
   @@unique([email, clientId])
   @@index([parentUserId])
@@ -617,4 +622,68 @@ model cross_app_mappings {
 
   @@index([catalogClientId])
   @@index([isActive])
+}
+
+/// OAuth client that an AI assistant registers (or is pre-registered) to
+/// connect to the Scan2Ship MCP resource. Distinct from SaaS `clients`.
+model mcp_oauth_clients {
+  id                       String      @id
+  name                     String
+  redirectUris             String[]
+  tokenEndpointAuthMethod  String      @default("none")
+  createdAt                DateTime    @default(now())
+  grants                   mcp_grants[]
+}
+
+/// One user-approved connection of one assistant to one tenant.
+model mcp_grants {
+  id            String    @id
+  tenantId      String
+  userId        String
+  oauthClientId String
+  scopes        String[]
+  policyVersion Int       @default(1)
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime
+  lastUsedAt    DateTime?
+  clients       clients   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users         users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  oauthClient   mcp_oauth_clients @relation(fields: [oauthClientId], references: [id], onDelete: Cascade)
+  codes         mcp_authorization_codes[]
+  refreshTokens mcp_refresh_tokens[]
+
+  @@index([tenantId, userId])
+  @@index([userId])
+  @@index([oauthClientId])
+}
+
+model mcp_authorization_codes {
+  id            String    @id
+  grantId       String
+  codeHash      String    @unique
+  codeChallenge String
+  redirectUri   String
+  resource      String
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  grant         mcp_grants @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+model mcp_refresh_tokens {
+  id           String    @id
+  grantId      String
+  tokenHash    String    @unique
+  familyId     String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  createdAt    DateTime  @default(now())
+  grant        mcp_grants @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId])
+  @@index([familyId])
 }

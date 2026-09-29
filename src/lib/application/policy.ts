@@ -45,3 +45,23 @@ export async function findAccessibleOrder<T extends OrderQueryArgs>(
   const order = await prisma.orders.findFirst({ ...(args as OrderQueryArgs), where });
   return order as Prisma.ordersGetPayload<T> | null;
 }
+
+/**
+ * Pickup locations the user may see. Child users are limited to assigned
+ * locations; everyone else in the tenant sees the tenant's locations.
+ */
+export async function pickupAccessWhere(user: AuthenticatedUser): Promise<Prisma.pickup_locationsWhereInput> {
+  const tenantScope: Prisma.pickup_locationsWhereInput = { clientId: user.clientId };
+  if (user.role !== UserRole.CHILD_USER) {
+    return tenantScope;
+  }
+
+  const assigned = await prisma.user_pickup_locations.findMany({
+    where: { userId: user.id },
+    select: { pickupLocationId: true },
+  });
+  if (assigned.length === 0) {
+    return { ...tenantScope, id: { in: [] } };
+  }
+  return { ...tenantScope, id: { in: assigned.map((row) => row.pickupLocationId) } };
+}
