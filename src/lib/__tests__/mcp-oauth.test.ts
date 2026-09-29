@@ -17,6 +17,7 @@ import { isAllowedRedirectUri, parseRequestedScopes } from '@/lib/mcp/oauth';
 import { sha256S256 } from '@/lib/mcp/crypto';
 import { mcpIssuer, mcpResourceUrl } from '@/lib/mcp/config';
 import type { createPrismaMock } from '@/test-utils/prisma-mock';
+import { UserRole } from '@/lib/auth-middleware';
 
 const prisma = realPrisma as unknown as ReturnType<typeof createPrismaMock>;
 
@@ -56,7 +57,14 @@ describe('MCP OAuth helpers', () => {
   });
 
   it('intersects requested scopes with the read-pilot set', () => {
-    expect(parseRequestedScopes('orders:read shipments:create')).toEqual(['orders:read']);
+    expect(parseRequestedScopes('orders:read shipments:create', { role: UserRole.USER })).toEqual(['orders:read']);
+  });
+
+  it('caps requested scopes by role', () => {
+    expect(parseRequestedScopes('orders:read credits:read', { role: UserRole.CHILD_USER })).toEqual(['orders:read']);
+    expect(parseRequestedScopes(null, { role: UserRole.CHILD_USER })).not.toContain('credits:read');
+    expect(parseRequestedScopes(null, { role: UserRole.USER })).toContain('credits:read');
+    expect(parseRequestedScopes('orders:read', { role: 'unknown' as UserRole })).toEqual([]);
   });
 
   it('computes S256 challenges', () => {
@@ -113,5 +121,34 @@ describe('MCP access tokens', () => {
       headers: { authorization: `Bearer ${token}` },
     });
     await expect(authenticateMcpRequest(request)).rejects.toMatchObject({ code: 'tenant_not_allowed' });
+  });
+
+  function tokenRequest(scopes: string[]) {
+    const token = signMcpAccessToken({
+      userId: 'user-a',
+      tenantId: 'client-a',
+      grantId: 'grant-a',
+      oauthClientId: 'app-1',
+      scopes: scopes as never,
+    });
+    return new Request('http://localhost:3000/api/mcp', { headers: { authorization: `Bearer ${token}` } });
+  }
+
+  it('drops scopes the user role no longer allows on every call', async () => {
+    (prisma.mcp_grants.findUnique as jest.Mock).mockResolvedValue(grantRow({ scopes: ['orders:read', 'credits:read'] }));
+    const request = tokenRequest(['orders:read', 'credits:read']);
+    await expect(authenticateMcpRequest(request)).resolves.toMatchObject({ scopes: ['orders:read', 'credits:read'] });
+
+    const demoted = grantRow({ scopes: ['orders:read', 'credits:read'] });
+    demoted.users = { ...demoted.users, role: 'child_user' };
+    (prisma.mcp_grants.findUnique as jest.Mock).mockResolvedValue(demoted);
+    await expect(authenticateMcpRequest(request)).resolves.toMatchObject({ scopes: ['orders:read'], role: 'child_user' });
+  });
+
+  it('rejects a grant whose user has an unknown role', async () => {
+    const odd = grantRow();
+    odd.users = { ...odd.users, role: 'legacy_role' };
+    (prisma.mcp_grants.findUnique as jest.Mock).mockResolvedValue(odd);
+    await expect(authenticateMcpRequest(tokenRequest(['orders:read']))).rejects.toMatchObject({ code: 'invalid_token' });
   });
 });

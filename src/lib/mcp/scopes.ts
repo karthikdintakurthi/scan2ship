@@ -1,3 +1,6 @@
+import type { AuthenticatedUser } from '@/lib/auth-middleware';
+import { can, type Action } from '@/lib/application/permissions';
+
 export const MCP_SCOPES = [
   'orders:read',
   'tracking:read',
@@ -18,7 +21,23 @@ export const MCP_READ_SCOPES: McpScope[] = [
   'credits:read',
 ];
 
-export const MCP_POLICY_VERSION = 1;
+export const MCP_POLICY_VERSION = 2;
+
+/** The tenant action a user must hold for a scope to be granted or used. */
+export const SCOPE_ACTION: Record<McpScope, Action> = {
+  'orders:read': 'orders:read',
+  'tracking:read': 'orders:read',
+  'shipping:quote': 'shipping:quote',
+  'settings:read': 'settings:read',
+  'credits:read': 'credits:read',
+  'customers:read': 'customers:read',
+  'labels:read': 'labels:read',
+};
+
+/** A scope never grants more than the connecting user's role allows. */
+export function scopesAllowedForUser(scopes: readonly McpScope[], user: Pick<AuthenticatedUser, 'role'>): McpScope[] {
+  return scopes.filter((scope) => can(user, SCOPE_ACTION[scope]));
+}
 
 const SCOPE_SET = new Set<string>(MCP_SCOPES);
 

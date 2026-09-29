@@ -14,8 +14,10 @@ import {
   MCP_READ_SCOPES,
   intersectScopes,
   parseScopeString,
+  scopesAllowedForUser,
   type McpScope,
 } from './scopes';
+import type { AuthenticatedUser } from '@/lib/auth-middleware';
 import { logMcpEvent } from './audit';
 
 const LOCALHOST_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -99,7 +101,8 @@ export async function createAuthorizationCode(input: {
   scopes: McpScope[];
   resource: string;
 }) {
-  const scopes = intersectScopes(input.scopes.length ? input.scopes : MCP_DEFAULT_SCOPES, MCP_READ_SCOPES);
+  // Defaults are applied when parsing the request; an empty list here means nothing is permitted.
+  const scopes = intersectScopes(input.scopes, MCP_READ_SCOPES);
   if (scopes.length === 0) {
     throw new McpAuthError('insufficient_scope', 'No permitted scopes requested', 400);
   }
@@ -285,7 +288,8 @@ export async function listGrantsForUser(userId: string, tenantId: string) {
   });
 }
 
-export function parseRequestedScopes(scope: string | null): McpScope[] {
+/** Requested scopes (or the defaults), limited to the pilot's read scopes and the user's role. */
+export function parseRequestedScopes(scope: string | null, user: Pick<AuthenticatedUser, 'role'>): McpScope[] {
   const parsed = parseScopeString(scope);
-  return intersectScopes(parsed.length ? parsed : MCP_DEFAULT_SCOPES, MCP_READ_SCOPES);
+  return scopesAllowedForUser(intersectScopes(parsed.length ? parsed : MCP_DEFAULT_SCOPES, MCP_READ_SCOPES), user);
 }

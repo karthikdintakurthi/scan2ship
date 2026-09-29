@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { authenticateApiKey, hasPermission } from '@/lib/api-key-auth';
+import { forbiddenUnless } from '@/lib/application/permissions';
 
 export async function GET(request: NextRequest) {
   try {
@@ -141,6 +142,11 @@ export async function POST(request: NextRequest) {
 
     if (authResult.user) {
       // JWT authentication successful
+      const forbidden = forbiddenUnless(authResult.user, 'settings:write');
+      if (forbidden) {
+        securityHeaders(forbidden);
+        return forbidden;
+      }
       clientId = authResult.user.clientId;
       console.log(`🔐 [API_COURIER_SERVICES_POST] JWT authentication successful for client: ${clientId}`);
     } else {

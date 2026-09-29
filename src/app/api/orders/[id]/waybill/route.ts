@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { findAccessibleOrder, parseOrderId } from '@/lib/application/policy';
 import jwt from 'jsonwebtoken'
 import bwipjs from '@bwip-js/node'
 import { generateThermalLabelHTML, createThermalLabelData } from '@/lib/thermal-label-generator'
@@ -9,7 +10,6 @@ import { generateA5LabelHTML, createA5LabelData } from '@/lib/a5-label-generator
 import { generateR4LabelHTML, createR4LabelData } from '@/lib/4r-label-generator'
 import { INDIA_POST_CUSTOMER_ID_KEY, indiaPostCustomerIdHeadingHtml, isIndiaPostCourier } from '@/lib/india-post-customer-id'
 
-const prisma = new PrismaClient()
 
 // Authentication handled by centralized middleware
 
@@ -302,7 +302,10 @@ export async function GET(
     const auth = { user: authResult.user!, client: authResult.user!.client };
 
     const { id } = await params
-    const orderId = parseInt(id)
+    const orderId = parseOrderId(id)
+    if (orderId === null) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
     
     // Check for print format query parameters
     const url = new URL(request.url)
@@ -310,9 +313,9 @@ export async function GET(
     const isA5 = url.searchParams.get('a5') === 'true'
     const isR4 = url.searchParams.get('r4') === 'true'
     
-    // Get order details with client information and logo config
-    const order = await prisma.orders.findUnique({
-      where: { id: orderId },
+    // Get order details with client information and logo config. Applies tenant and
+    // child-user sub-group rules; missing and inaccessible orders both return 404.
+    const order = await findAccessibleOrder(auth.user, orderId, {
       include: {
         clients: {
           include: {
@@ -324,11 +327,6 @@ export async function GET(
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-    }
-
-    // Check if order belongs to authenticated user's client
-    if (order.clientId !== auth.client.id) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
     // Generate barcode only if there's a valid tracking_id (not reference_number)

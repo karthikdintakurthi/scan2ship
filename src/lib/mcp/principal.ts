@@ -26,10 +26,12 @@ export function userFromGrant(row: {
     subscriptionStatus: string;
     subscriptionExpiresAt: Date | null;
   };
-}): AuthenticatedUser {
-  const role = (Object.values(UserRole) as string[]).includes(row.role)
-    ? (row.role as UserRole)
-    : UserRole.CHILD_USER;
+}): AuthenticatedUser | null {
+  // Unknown roles get no access rather than a default role.
+  if (!(Object.values(UserRole) as string[]).includes(row.role)) {
+    return null;
+  }
+  const role = row.role as UserRole;
 
   return {
     id: row.id,
@@ -45,6 +47,6 @@ export function userFromGrant(row: {
       subscriptionStatus: row.clients.subscriptionStatus,
       subscriptionExpiresAt: row.clients.subscriptionExpiresAt,
     },
-    permissions: ROLE_PERMISSIONS[role] ?? ROLE_PERMISSIONS[UserRole.CHILD_USER],
+    permissions: ROLE_PERMISSIONS[role],
   };
 }

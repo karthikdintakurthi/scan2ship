@@ -6,6 +6,7 @@ import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { safeDatabaseQuery } from '@/lib/database-health-check';
+import { forbiddenUnless } from '@/lib/application/permissions';
 
 // PUT method for updating logo URL
 export async function PUT(request: NextRequest) {
@@ -33,6 +34,12 @@ export async function PUT(request: NextRequest) {
     if (authResult.response) {
       securityHeaders(authResult.response);
       return authResult.response;
+    }
+
+    const forbidden = forbiddenUnless(authResult.user!, 'settings:write');
+    if (forbidden) {
+      securityHeaders(forbidden);
+      return forbidden;
     }
 
     const { client } = authResult.user!;
@@ -202,6 +209,12 @@ export async function POST(request: NextRequest) {
     if (authResult.response) {
       securityHeaders(authResult.response);
       return authResult.response;
+    }
+
+    const forbidden = forbiddenUnless(authResult.user!, 'settings:write');
+    if (forbidden) {
+      securityHeaders(forbidden);
+      return forbidden;
     }
 
     const { client } = authResult.user!;
@@ -591,6 +604,12 @@ export async function DELETE(request: NextRequest) {
     if (authResult.response) {
       securityHeaders(authResult.response);
       return authResult.response;
+    }
+
+    const forbidden = forbiddenUnless(authResult.user!, 'settings:write');
+    if (forbidden) {
+      securityHeaders(forbidden);
+      return forbidden;
     }
 
     const { client } = authResult.user!;

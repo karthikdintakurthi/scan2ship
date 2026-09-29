@@ -13,7 +13,7 @@ import {
 import { sha256Hex } from './crypto';
 import { McpAuthError } from './errors';
 import { userFromGrant, type McpPrincipal } from './principal';
-import { hasScope, isMcpScope, parseScopeString, type McpScope } from './scopes';
+import { hasScope, isMcpScope, parseScopeString, scopesAllowedForUser, type McpScope } from './scopes';
 
 type AccessClaims = {
   sub: string;
@@ -108,7 +108,16 @@ export async function authenticateMcpRequest(request: Request): Promise<McpPrinc
     throw new McpAuthError('invalid_token', 'Grant is not active');
   }
 
-  const scopes = parseScopeString(claims.scope).filter((scope) => grant.scopes.includes(scope));
+  const user = userFromGrant(grant.users);
+  if (!user) {
+    throw new McpAuthError('invalid_token', 'Grant is not active');
+  }
+
+  // Re-apply the role ceiling on every call so a demoted user loses scopes immediately.
+  const scopes = scopesAllowedForUser(
+    parseScopeString(claims.scope).filter((scope) => grant.scopes.includes(scope)),
+    user
+  );
   return {
     requestId: claims.jti,
     tenantId: grant.tenantId,
@@ -116,8 +125,8 @@ export async function authenticateMcpRequest(request: Request): Promise<McpPrinc
     grantId: grant.id,
     oauthClientId: grant.oauthClientId,
     scopes,
-    role: userFromGrant(grant.users).role,
-    user: userFromGrant(grant.users),
+    role: user.role,
+    user,
   };
 }
 

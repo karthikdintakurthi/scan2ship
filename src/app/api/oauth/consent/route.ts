@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     where: { id: user.clientId },
     select: { companyName: true, name: true },
   });
-  const scopes = parseRequestedScopes(params.get('scope'));
+  const scopes = parseRequestedScopes(params.get('scope'), user);
   return NextResponse.json({
     clientName: client.name,
     tenantName: tenant?.companyName || tenant?.name || user.clientId,
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     oauthClientId: client.id,
     redirectUri,
     codeChallenge,
-    scopes: parseRequestedScopes(typeof body.scope === 'string' ? body.scope : null),
+    scopes: parseRequestedScopes(typeof body.scope === 'string' ? body.scope : null, user),
     resource,
   });
 

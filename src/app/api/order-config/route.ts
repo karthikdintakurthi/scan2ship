@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel, getAuthenticatedUser } from '@/lib/auth-middleware';
+import { forbiddenUnless } from '@/lib/application/permissions';
 import { safeDatabaseQuery } from '@/lib/database-health-check';
 
 export async function GET(request: NextRequest) {
@@ -229,9 +230,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { user, client } = auth;
+    const { client } = auth;
+    const forbidden = forbiddenUnless(auth, 'settings:write');
+    if (forbidden) return forbidden;
+
     const body = await request.json();
-    
+
     console.log(`📝 [API_ORDER_CONFIG_PUT] Updating order config for client: ${client.companyName}`, body);
     console.log(`🔍 [API_ORDER_CONFIG_PUT] Body keys:`, Object.keys(body));
     console.log(`🔍 [API_ORDER_CONFIG_PUT] Has printmode:`, body.hasOwnProperty('printmode'));
