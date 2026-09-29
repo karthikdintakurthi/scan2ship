@@ -90,6 +90,21 @@ describe('cancelling a shipment', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it.each([
+    ['status: false', { status: false, remark: 'Shipment already manifested' }, /already manifested/],
+    ['an empty body', {}, /did not confirm/],
+    ['a string status other than true', { status: 'Failure' }, /did not confirm/],
+    ['a different waybill', { status: true, waybill: 'AWB-OTHER' }, /did not confirm/],
+  ])('does not count a 200 with %s as cancelled', async (_case, body, message) => {
+    fetchMock.mockResolvedValue(reply(200, body));
+    await expect(service.cancelOrder('AWB-1', 'main', 'client-a')).resolves.toEqual({ success: false, error: expect.stringMatching(message) });
+  });
+
+  it('counts an explicit status: true for the waybill as cancelled', async () => {
+    fetchMock.mockResolvedValue(reply(200, { status: true, waybill: 'AWB-1', remark: 'Shipment has been cancelled.' }));
+    await expect(service.cancelOrder('AWB-1', 'main', 'client-a')).resolves.toMatchObject({ success: true });
+  });
+
   it('does not retry a rejection', async () => {
     fetchMock.mockResolvedValue(reply(400, { error: 'not cancellable' }));
     await expect(service.cancelOrder('AWB-1', 'main', 'client-a')).resolves.toMatchObject({ success: false });

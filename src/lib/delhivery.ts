@@ -528,6 +528,21 @@ export class DelhiveryService {
         { retry: true }
       );
       
+      // A 2xx reply is not a cancellation: Delhivery answers { status: false, remark }
+      // when it refuses, so only an explicit status: true for this waybill counts
+      const reply = (response ?? {}) as { status?: unknown; waybill?: unknown; remark?: unknown; error?: unknown };
+      const confirmed =
+        (reply.status === true || String(reply.status).toLowerCase() === 'true') &&
+        (reply.waybill === undefined || reply.waybill === null || String(reply.waybill) === waybill);
+      if (!confirmed) {
+        const reason = [reply.remark, reply.error].find((value) => typeof value === 'string' && value);
+        console.error('❌ [DELHIVERY_CANCEL] Delhivery did not confirm the cancellation:', response);
+        return {
+          success: false,
+          error: `Delhivery did not confirm the cancellation${reason ? `: ${reason}` : ''}`
+        };
+      }
+
       console.log('✅ [DELHIVERY_CANCEL] Order cancelled successfully in Delhivery:', response);
       
       return {
