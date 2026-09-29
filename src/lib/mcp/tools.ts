@@ -23,6 +23,7 @@ import {
 import { listShippingOptions, quoteShipping } from '@/lib/application/shipping';
 import { createShipment, getShipmentOperation, prepareShipment } from '@/lib/application/shipments';
 import { preparePickup, schedulePickup } from '@/lib/application/pickup-operations';
+import { getLiveTracking } from '@/lib/application/live-tracking';
 import { consumeMcpQuota, touchGrant } from './auth';
 import { logMcpEvent } from './audit';
 import { McpAuthError, McpToolError } from './errors';
@@ -58,7 +59,13 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   },
   {
     name: 'get_tracking_status',
-    description: 'Return the saved tracking status for a tenant-owned shipment. Does not refresh the carrier.',
+    description: 'Return the tracking status saved in Scan2Ship for a shipment. It can be out of date; for the latest Delhivery status and scans, use track_shipment_live.',
+    scope: 'tracking:read',
+  },
+  {
+    name: 'track_shipment_live',
+    description:
+      'Fetch the latest tracking for a Delhivery shipment directly from Delhivery (current status, location, and recent scans), by orderId or waybill. Use this when the saved status from get_tracking_status may be out of date. Other couriers are not supported.',
     scope: 'tracking:read',
   },
   {
@@ -163,6 +170,10 @@ function summaryFor(name: string, data: unknown): string {
     if (op.status === 'succeeded') return `Order ${op.orderId} created.`;
     return `Shipment ${op.status}${op.error ? `: ${op.error}` : ''}.`;
   }
+  if (name === 'track_shipment_live' && data && typeof data === 'object' && 'currentStatus' in data) {
+    const live = data as { waybill: string; currentStatus: string; currentLocation: string; currentStatusTime: string | null };
+    return `${live.waybill}: ${live.currentStatus} at ${live.currentLocation}${live.currentStatusTime ? ` (${live.currentStatusTime})` : ''}.`;
+  }
   if (name === 'get_credit_balance' && data && typeof data === 'object' && 'balance' in data) {
     return `Credit balance: ${(data as { balance: number }).balance}.`;
   }
@@ -201,6 +212,31 @@ export async function executeMcpTool(
       case 'get_tracking_status': {
         const input = getTrackingStatusInputSchema.parse(rawArgs ?? {});
         structured = await getTrackingStatus(principal.user, input);
+        break;
+      }
+      case 'track_shipment_live': {
+        const input = getTrackingStatusInputSchema.parse(rawArgs ?? {});
+        const live = await getLiveTracking(principal.user, { orderId: input.orderId, waybill: input.trackingId });
+        if (!live.ok) {
+          throw new McpToolError(live.status === 404 ? 'not_found' : 'invalid_params', live.error);
+        }
+        const events = [...live.tracking.tracking_events].reverse();
+        structured = {
+          orderId: live.order.id,
+          waybill: live.tracking.waybill,
+          source: 'delhivery_live',
+          currentStatus: live.tracking.current_status,
+          currentStatusDescription: live.tracking.current_status_description,
+          currentLocation: live.tracking.current_location,
+          currentStatusTime: live.tracking.current_status_time,
+          origin: live.tracking.origin,
+          destination: live.tracking.destination,
+          pickupDate: live.tracking.pickup_date,
+          expectedDeliveryDate: live.tracking.expected_delivery_date,
+          deliveredDate: live.tracking.delivered_date,
+          recentEvents: events.slice(0, 25),
+          totalEvents: events.length,
+        };
         break;
       }
       case 'list_shipping_options':

@@ -39,6 +39,7 @@ export async function getAccountContext(user: AuthenticatedUser, scopes: readonl
       searchOrders: scopes.includes('orders:read'),
       getOrder: scopes.includes('orders:read'),
       getTrackingStatus: scopes.includes('tracking:read'),
+      trackShipmentLive: scopes.includes('tracking:read'),
       listShippingOptions: scopes.includes('settings:read'),
       quoteShipping: scopes.includes('shipping:quote'),
       getCreditBalance: scopes.includes('credits:read'),

@@ -41,14 +41,15 @@ PKCE `S256` is required. Access tokens last 15 minutes and are bound to audience
 | `get_account_context` | `settings:read` |
 | `search_orders` | `orders:read` |
 | `get_order` | `orders:read` |
-| `get_tracking_status` | `tracking:read` |
+| `get_tracking_status` | `tracking:read` (saved status) |
+| `track_shipment_live` | `tracking:read` (live from Delhivery) |
 | `list_shipping_options` | `settings:read` |
 | `quote_shipping` | `shipping:quote` |
 | `get_credit_balance` | `credits:read` |
 | `get_customer_order_history` | `customers:read` (optional) |
 | `get_shipping_label` | `labels:read` (optional) |
 
-`quote_shipping` returns `configured_estimate` from the tenant rate table, not a live carrier quote. Tracking reads persisted status and does not refresh Delhivery. `get_order` omits street address unless `customers:read` was granted (not in the default set).
+`quote_shipping` returns `configured_estimate` from the tenant rate table, not a live carrier quote. `get_tracking_status` reads the status saved in Scan2Ship. `track_shipment_live` asks Delhivery for the current status and recent scans (up to 25, newest first), using the order's own pickup-location key, through the same code as the website's tracking view (`getLiveTracking` in `src/lib/application/live-tracking.ts`). It changes nothing, and it supports Delhivery shipments only. `get_order` omits street address unless `customers:read` was granted (not in the default set).
 
 `customers:read` and `labels:read` are opt-in: they appear unticked on the approval page and are granted only if the user ticks them, even when the assistant requests them. A connection is only shown the tools its scopes allow.
 

@@ -23,6 +23,10 @@ const TOOL_INPUT: Record<string, z.ZodTypeAny> = {
     orderId: z.number().int().positive().optional(),
     trackingId: z.string().max(80).optional(),
   }),
+  track_shipment_live: z.object({
+    orderId: z.number().int().positive().optional(),
+    trackingId: z.string().max(80).optional().describe('Delhivery waybill number'),
+  }),
   list_shipping_options: emptySchema,
   quote_shipping: z.object({
     weightGrams: z.number().positive().max(50000),
@@ -103,7 +107,8 @@ function annotationsFor(tool: McpToolDefinition) {
       return { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true };
     case 'status':
     default:
-      return READ_ANNOTATIONS;
+      // Live tracking reads from Delhivery, outside Scan2Ship
+      return tool.name === 'track_shipment_live' ? { ...READ_ANNOTATIONS, openWorldHint: true } : READ_ANNOTATIONS;
   }
 }
 
