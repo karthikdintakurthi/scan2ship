@@ -66,7 +66,13 @@ export async function POST(request: NextRequest) {
       });
     } else {
       response = NextResponse.json(
-        { error: 'Failed to schedule pickup with any location', details: outcome.errors },
+        {
+          // Some pickups may have reached Delhivery: say so rather than inviting a retry
+          error: outcome.errors.some((row) => row.outcome === 'unknown')
+            ? 'Delhivery did not confirm the pickup. Check with Delhivery before requesting it again'
+            : 'Failed to schedule pickup with any location',
+          details: outcome.errors,
+        },
         { status: 400 }
       );
     }

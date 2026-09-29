@@ -214,15 +214,29 @@ export async function schedulePickup(principal: McpPrincipal, previewId: string)
     pickupRequestId: row.pickup_request_id,
     delhiveryRequestId: row.delhivery_request_id,
   }));
-  const failed = outcome.errors.map((row) => ({ pickupLocation: row.pickup_location, error: row.error }));
-  const status = failed.length === 0 ? 'succeeded' : scheduled.length > 0 ? 'partially_succeeded' : 'failed';
+  const failed = outcome.errors
+    .filter((row) => row.outcome !== 'unknown')
+    .map((row) => ({ pickupLocation: row.pickup_location, error: row.error }));
+  // Delhivery may have scheduled these: never report them as failed, which invites a retry
+  const uncertain = outcome.errors
+    .filter((row) => row.outcome === 'unknown')
+    .map((row) => ({ pickupLocation: row.pickup_location, error: row.error, delhiveryRequestId: row.delhivery_request_id ?? null }));
+  const status =
+    uncertain.length > 0
+      ? 'reconciliation_required'
+      : failed.length === 0
+        ? 'succeeded'
+        : scheduled.length > 0
+          ? 'partially_succeeded'
+          : 'failed';
 
+  const problems = [...uncertain, ...failed];
   const updated = await prisma.shipment_operations.update({
     where: { id: operation.id },
     data: {
       status,
-      result: { date: payload.pickupDate, time: payload.pickupTime, scheduled, failed },
-      error: failed.length > 0 ? failed.map((row) => `${row.pickupLocation}: ${row.error}`).join('; ') : null,
+      result: { date: payload.pickupDate, time: payload.pickupTime, scheduled, failed, uncertain },
+      error: problems.length > 0 ? problems.map((row) => `${row.pickupLocation}: ${row.error}`).join('; ') : null,
     },
   });
   return operationView(updated);

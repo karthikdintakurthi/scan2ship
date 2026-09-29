@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import type { AuthenticatedUser } from '@/lib/auth-middleware';
 
 const DELHIVERY_PICKUP_URL = 'https://track.delhivery.com/fm/request/new/';
+const DELHIVERY_PICKUP_TIMEOUT_MS = 20_000;
 
 export type PickupRequestInput = {
   pickupDate: string;
@@ -23,6 +24,13 @@ export type PickupLocationFailure = {
   error: string;
   status: 'failed';
   delhivery_status?: number;
+  /**
+   * 'unknown' when Delhivery may have scheduled the pickup (no clear answer, or
+   * accepted but not recorded here): check with Delhivery before requesting again.
+   */
+  outcome?: 'unknown';
+  /** Delhivery's ID when it accepted the pickup but Scan2Ship could not record it. */
+  delhivery_request_id?: string | null;
 };
 
 export type PickupRequestResult =
@@ -95,8 +103,12 @@ export async function requestPickups(user: AuthenticatedUser, input: PickupReque
       continue;
     }
 
+    const unknown = (error: string, extra: Partial<PickupLocationFailure> = {}) =>
+      errors.push({ pickup_location: location.label, error, status: 'failed', outcome: 'unknown', ...extra });
+
+    let response: Response;
     try {
-      const response = await fetch(DELHIVERY_PICKUP_URL, {
+      response = await fetch(DELHIVERY_PICKUP_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Token ${location.delhiveryApiKey}` },
         body: JSON.stringify({
@@ -105,32 +117,46 @@ export async function requestPickups(user: AuthenticatedUser, input: PickupReque
           pickup_location: location.value,
           expected_package_count: expectedPackageCount,
         }),
+        signal: AbortSignal.timeout(DELHIVERY_PICKUP_TIMEOUT_MS),
       });
+    } catch (error) {
+      // The request may have reached Delhivery before the connection failed
+      console.error(`❌ [PICKUP_REQUEST] Delhivery call failed for ${location.label}:`, error instanceof Error ? error.message : String(error));
+      unknown(`Delhivery did not answer (${error instanceof Error ? error.message : 'unknown error'}); the pickup may or may not have been requested`);
+      continue;
+    }
 
-      let result: DelhiveryPickupResponse;
-      try {
-        const parsed: unknown = await response.json();
-        // Delhivery occasionally answers with a bare string
-        result = typeof parsed === 'string' ? { message: parsed } : ((parsed ?? {}) as DelhiveryPickupResponse);
-      } catch {
-        result = { error: 'Invalid JSON response from Delhivery API' };
-      }
+    let result: DelhiveryPickupResponse | null;
+    try {
+      const parsed: unknown = await response.json();
+      // Delhivery occasionally answers with a bare string
+      result = typeof parsed === 'string' ? { message: parsed } : ((parsed ?? {}) as DelhiveryPickupResponse);
+    } catch {
+      result = null;
+    }
 
-      // Success is either success: true, or 201 with a pickup_id and no error
-      const succeeded =
-        response.ok && (result.success === true || (response.status === 201 && result.pickup_id && !result.error));
+    if (response.status >= 500 || (response.ok && !result)) {
+      unknown(`Delhivery answered unclearly (HTTP ${response.status}); the pickup may or may not have been requested`, {
+        delhivery_status: response.status,
+      });
+      continue;
+    }
+    const reply = result ?? { error: 'Invalid JSON response from Delhivery API' };
 
-      if (!succeeded) {
-        errors.push({
-          pickup_location: location.label,
-          error: delhiveryErrorMessage(result),
-          status: 'failed',
-          delhivery_status: response.status,
-        });
-        continue;
-      }
+    // Success is either success: true, or 201 with a pickup_id and no error
+    const succeeded = response.ok && (reply.success === true || (response.status === 201 && reply.pickup_id && !reply.error));
+    if (!succeeded) {
+      errors.push({
+        pickup_location: location.label,
+        error: delhiveryErrorMessage(reply),
+        status: 'failed',
+        delhivery_status: response.status,
+      });
+      continue;
+    }
 
-      const delhiveryRequestId = result.request_id || (result.pickup_id ? String(result.pickup_id) : null);
+    const delhiveryRequestId = reply.request_id || (reply.pickup_id ? String(reply.pickup_id) : null);
+    try {
       const saved = await prisma.pickup_requests.create({
         data: {
           id: `pickup-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
@@ -157,11 +183,10 @@ export async function requestPickups(user: AuthenticatedUser, input: PickupReque
         status: 'success',
       });
     } catch (error) {
-      console.error(`❌ [PICKUP_REQUEST] Delhivery call failed for ${location.label}:`, error instanceof Error ? error.message : String(error));
-      errors.push({
-        pickup_location: location.label,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        status: 'failed',
+      // Delhivery has the pickup; only our record of it is missing
+      console.error(`❌ [PICKUP_REQUEST] Delhivery accepted pickup ${delhiveryRequestId} for ${location.label} but it could not be saved:`, error);
+      unknown(`Delhivery accepted the pickup${delhiveryRequestId ? ` (ID ${delhiveryRequestId})` : ''} but Scan2Ship could not record it`, {
+        delhivery_request_id: delhiveryRequestId,
       });
     }
   }

@@ -169,6 +169,13 @@ describe('POST /api/pickup-request', () => {
     expect((await response.json()).error).toBe('Failed to schedule pickup with any location');
   });
 
+  it('does not call an uncertain pickup a failure', async () => {
+    fetchMock.mockImplementation(async () => { throw new Error('timeout'); });
+    const response = await pickupRoute(signedRequest(body));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: expect.stringMatching(/did not confirm/), details: [{ outcome: 'unknown' }, { outcome: 'unknown' }] });
+  });
+
   it('requires the date, time, and package count', async () => {
     const response = await pickupRoute(signedRequest({ ...body, pickup_date: '' }));
     expect(response.status).toBe(400);
@@ -224,10 +231,47 @@ describe('MCP pickups', () => {
     expect(await schedulePickup(principal(), previewId)).toMatchObject({ status: 'partially_succeeded', error: 'Branch: Closed today' });
   });
 
-  it('reports a Delhivery network error for one location as failed', async () => {
+  it('treats a Delhivery network error as uncertain, not failed', async () => {
     fetchMock.mockImplementationOnce(async () => { throw new Error('socket hang up'); });
     const { previewId } = await preparePickup(principal(), INPUT);
-    expect(await schedulePickup(principal(), previewId)).toMatchObject({ status: 'failed', error: 'Main Warehouse: socket hang up' });
+    expect(await schedulePickup(principal(), previewId)).toMatchObject({
+      status: 'reconciliation_required',
+      result: { failed: [], uncertain: [{ pickupLocation: 'Main Warehouse', error: expect.stringMatching(/socket hang up.*may or may not/) }] },
+      note: expect.stringMatching(/do not request a duplicate pickup/),
+    });
+  });
+
+  it.each([
+    ['a 5xx reply', () => delhiveryReply(502, { error: 'Bad gateway' })],
+    ['an unreadable success reply', () => ({ ...delhiveryReply(201, null), json: async () => { throw new SyntaxError('bad json'); } })],
+  ])('treats %s as uncertain', async (_case, reply) => {
+    fetchMock.mockResolvedValueOnce(reply());
+    const { previewId } = await preparePickup(principal(), INPUT);
+    expect(await schedulePickup(principal(), previewId)).toMatchObject({ status: 'reconciliation_required' });
+  });
+
+  it('keeps the Delhivery pickup ID when the pickup was accepted but could not be recorded', async () => {
+    (prisma.pickup_requests.create as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+    const { previewId } = await preparePickup(principal(), INPUT);
+    expect(await schedulePickup(principal(), previewId)).toMatchObject({
+      status: 'reconciliation_required',
+      result: { scheduled: [], uncertain: [{ pickupLocation: 'Main Warehouse', delhiveryRequestId: '555', error: expect.stringMatching(/accepted the pickup \(ID 555\)/) }] },
+    });
+  });
+
+  it('keeps per-location IDs when one location is uncertain and another scheduled', async () => {
+    fetchMock.mockResolvedValueOnce(delhiveryReply(201, { pickup_id: 1 })).mockImplementationOnce(async () => { throw new Error('timeout'); });
+    const { previewId } = await preparePickup(principal(), { ...INPUT, pickupLocations: ['Main Warehouse', 'Branch'] });
+    expect(await schedulePickup(principal(), previewId)).toMatchObject({
+      status: 'reconciliation_required',
+      result: { scheduled: [{ pickupLocation: 'Main Warehouse', delhiveryRequestId: '1' }], uncertain: [{ pickupLocation: 'Branch' }] },
+    });
+  });
+
+  it('still reports a Delhivery rejection as a definite failure', async () => {
+    fetchMock.mockResolvedValueOnce(delhiveryReply(400, { error: 'Closed today' }));
+    const { previewId } = await preparePickup(principal(), INPUT);
+    expect(await schedulePickup(principal(), previewId)).toMatchObject({ status: 'failed', result: { uncertain: [] } });
   });
 
   it('marks an unexpected failure mid-booking for reconciliation, not retry', async () => {
