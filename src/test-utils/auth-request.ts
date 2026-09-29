@@ -47,10 +47,21 @@ export function signedRequest(
 }
 
 /** Stand-in for next/server; the global Jest setup replaces Response with a stub that lacks static json(). */
+function responseHeaders() {
+  const values = new Map<string, string>();
+  return {
+    set: (name: string, value: string) => void values.set(name.toLowerCase(), value),
+    get: (name: string) => values.get(name.toLowerCase()) ?? null,
+    has: (name: string) => values.has(name.toLowerCase()),
+    delete: (name: string) => void values.delete(name.toLowerCase()),
+  };
+}
+
 export const nextServerMock = {
   NextResponse: class {
+    headers = responseHeaders();
     static json(body: unknown, init?: { status?: number }) {
-      return { status: init?.status ?? 200, json: async () => body };
+      return { status: init?.status ?? 200, json: async () => body, headers: responseHeaders() };
     }
   },
 };

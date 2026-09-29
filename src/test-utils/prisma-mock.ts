@@ -34,18 +34,28 @@ export function createPrismaMock() {
         .map(([method]) => `${modelName}.${method}`)
     );
 
+  const clientMethods = new Map<string, jest.Mock>();
+  const clientMethod = (name: string) => {
+    if (!clientMethods.has(name)) {
+      clientMethods.set(
+        name,
+        name === '$transaction'
+          ? jest.fn(async (work: unknown) =>
+              typeof work === 'function' ? work(client) : Promise.all(work as Promise<unknown>[])
+            )
+          : jest.fn(async () => defaultResult(name))
+      );
+    }
+    return clientMethods.get(name)!;
+  };
+
   const client: any = new Proxy(
     {},
     {
       get: (_target, name) => {
         if (typeof name !== 'string' || name === 'then' || name === '__esModule') return undefined;
         if (name === 'writeCalls') return writeCalls;
-        if (name === '$transaction') {
-          return jest.fn(async (work: unknown) =>
-            typeof work === 'function' ? work(client) : Promise.all(work as Promise<unknown>[])
-          );
-        }
-        if (name.startsWith('$')) return jest.fn(async () => defaultResult(name));
+        if (name.startsWith('$')) return clientMethod(name);
         return model(name);
       },
     }

@@ -12,7 +12,9 @@ const rateLimitConfig = {
   auth: { windowMs: 15 * 60 * 1000, maxRequests: 5 },
   api: { windowMs: 15 * 60 * 1000, maxRequests: 100 },
   upload: { windowMs: 15 * 60 * 1000, maxRequests: 10 },
-  webhook: { windowMs: 60 * 1000, maxRequests: 20 }
+  webhook: { windowMs: 60 * 1000, maxRequests: 20 },
+  // Unauthenticated phone-number lookups; always keyed by IP
+  tracking: { windowMs: 15 * 60 * 1000, maxRequests: 10 }
 };
 
 /**

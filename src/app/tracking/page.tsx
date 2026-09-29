@@ -4,22 +4,12 @@ import { useState } from 'react'
 
 interface Order {
   id: number
-  name: string
-  mobile: string
-  reseller_mobile?: string | null
+  name: string // masked by the API, e.g. "A*** K***"
   search_type?: 'customer' | 'reseller'
   tracking_id: string | null
+  tracking_status?: string | null
   courier_service: string
   created_at: string
-  package_value: number
-  weight: number
-  total_items: number
-  address: string
-  city: string
-  state: string
-  pincode: string
-  is_cod: boolean
-  cod_amount: number | null
 }
 
 interface ClientOrders {

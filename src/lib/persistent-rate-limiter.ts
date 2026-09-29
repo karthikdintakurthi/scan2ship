@@ -11,7 +11,9 @@ const rateLimitConfig = {
   auth: { windowMs: 15 * 60 * 1000, maxRequests: 5 },
   api: { windowMs: 15 * 60 * 1000, maxRequests: 100 },
   upload: { windowMs: 15 * 60 * 1000, maxRequests: 10 },
-  webhook: { windowMs: 60 * 1000, maxRequests: 20 }
+  webhook: { windowMs: 60 * 1000, maxRequests: 20 },
+  // Unauthenticated phone-number lookups; always keyed by IP
+  tracking: { windowMs: 15 * 60 * 1000, maxRequests: 10 }
 };
 
 interface RateLimitResult {
@@ -24,7 +26,12 @@ interface RateLimitResult {
 /**
  * Get client identifier for rate limiting
  */
-function getClientIdentifier(request: NextRequest): string {
+function getClientIdentifier(request: NextRequest, type: keyof typeof rateLimitConfig): string {
+  // Public endpoints must not let a caller pick its own bucket with an arbitrary token
+  if (type === 'tracking') {
+    return `ip:${getClientIp(request)}`;
+  }
+
   // Try to get user ID from JWT token first
   const authHeader = request.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -48,6 +55,17 @@ function getClientIdentifier(request: NextRequest): string {
 }
 
 /**
+ * The client IP as set by the hosting proxy: x-real-ip, else the first
+ * x-forwarded-for entry (later entries are proxies).
+ */
+export function getClientIp(request: NextRequest): string {
+  const realIp = request.headers.get('x-real-ip')?.trim();
+  if (realIp) return realIp;
+  const firstForwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return firstForwarded || 'unknown';
+}
+
+/**
  * Clean up expired rate limit entries
  */
 async function cleanupExpiredEntries(): Promise<void> {
@@ -66,6 +84,51 @@ async function cleanupExpiredEntries(): Promise<void> {
 }
 
 /**
+ * Fixed-window limit with one atomic increment per request. Fails open if the
+ * store is unavailable, like rateLimit below.
+ */
+export async function consumeFixedWindow(key: string, windowMs: number, maxRequests: number): Promise<RateLimitResult> {
+  const now = new Date();
+  try {
+    const row = await prisma.rate_limits.upsert({
+      where: { key },
+      create: {
+        id: `rate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        key,
+        count: 1,
+        windowStart: now,
+        expiresAt: new Date(now.getTime() + windowMs),
+        updatedAt: now
+      },
+      update: { count: { increment: 1 }, updatedAt: now }
+    });
+
+    if (row.windowStart.getTime() + windowMs <= now.getTime()) {
+      // Window over: start a new one. Conditional so concurrent requests reset it once.
+      await prisma.rate_limits.updateMany({
+        where: { key, windowStart: row.windowStart },
+        data: { count: 1, windowStart: now, expiresAt: new Date(now.getTime() + windowMs), updatedAt: now }
+      });
+      return { allowed: true, remaining: maxRequests - 1, resetTime: now.getTime() + windowMs };
+    }
+
+    const resetTime = row.windowStart.getTime() + windowMs;
+    if (row.count > maxRequests) {
+      return {
+        allowed: false,
+        message: `Too many requests. Please try again in ${Math.ceil((resetTime - now.getTime()) / 1000)} seconds.`,
+        remaining: 0,
+        resetTime
+      };
+    }
+    return { allowed: true, remaining: maxRequests - row.count, resetTime };
+  } catch (error) {
+    console.error('❌ Fixed-window rate limit error:', error);
+    return { allowed: true, remaining: maxRequests, resetTime: now.getTime() + windowMs };
+  }
+}
+
+/**
  * Persistent rate limiting
  */
 export async function rateLimit(
@@ -73,11 +136,18 @@ export async function rateLimit(
   type: keyof typeof rateLimitConfig = 'api'
 ): Promise<RateLimitResult> {
   const config = rateLimitConfig[type];
+
+  // The shared path below resets its window on every request, so it never blocks.
+  // Tracking uses the corrected limiter; other tiers keep their current behavior
+  // until their bucket keys are fixed (all JWTs share the same 8-character prefix).
+  if (type === 'tracking') {
+    return consumeFixedWindow(`${type}:${getClientIdentifier(request, type)}`, config.windowMs, config.maxRequests);
+  }
   const now = new Date();
   const windowStart = new Date(now.getTime() - config.windowMs);
   
   // Get client identifier
-  const clientId = getClientIdentifier(request);
+  const clientId = getClientIdentifier(request, type);
   const key = `${type}:${clientId}`;
   
   try {
@@ -174,7 +244,7 @@ export async function getRateLimitStatus(
   type: keyof typeof rateLimitConfig = 'api'
 ): Promise<{ count: number; limit: number; remaining: number; resetTime: number }> {
   const config = rateLimitConfig[type];
-  const clientId = getClientIdentifier(request);
+  const clientId = getClientIdentifier(request, type);
   const key = `${type}:${clientId}`;
   
   try {

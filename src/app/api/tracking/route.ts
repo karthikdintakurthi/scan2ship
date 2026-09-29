@@ -1,118 +1,109 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
+import { maskMobile, maskName, normalizeIndianMobile } from '@/lib/application/public-tracking';
 
+const MAX_ORDERS = 50;
+
+interface TrackingRow {
+  id: number;
+  clientId: string;
+  name: string;
+  courier_service: string;
+  tracking_id: string | null;
+  tracking_status: string | null;
+  created_at: Date;
+  client_name: string | null;
+  client_company_name: string | null;
+  search_type: 'customer' | 'reseller';
+}
+
+/**
+ * Public shipment lookup by phone number. Anyone who knows a number can call
+ * it, so it returns only what a recipient needs to follow a parcel: masked
+ * name, courier, tracking number, status, and date. It is rate limited by IP.
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { mobile } = await request.json();
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'tracking', cors: true, securityHeaders: true }
+    );
 
-    // Validate mobile number
-    if (!mobile) {
+    if (securityResponse) {
+      securityHeaders(securityResponse);
+      return securityResponse;
+    }
+
+    const { mobile } = (await request.json()) ?? {};
+
+    if (!mobile || typeof mobile !== 'string') {
       return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 });
     }
 
-    // Clean and validate mobile number format
-    const cleanMobile = mobile.replace(/\D/g, '');
-    
-    // Handle different mobile number formats
-    let searchMobile = cleanMobile;
-    if (cleanMobile.length === 12 && cleanMobile.startsWith('91')) {
-      searchMobile = cleanMobile.substring(2);
-    } else if (cleanMobile.length === 13 && cleanMobile.startsWith('91')) {
-      searchMobile = cleanMobile.substring(3);
-    }
-
-    // Validate mobile number format (should be 10 digits starting with 6-9)
-    if (searchMobile.length !== 10 || !/^[6-9]\d{9}$/.test(searchMobile)) {
-      return NextResponse.json({ 
-        error: 'Please enter a valid 10-digit mobile number' 
+    const searchMobile = normalizeIndianMobile(mobile);
+    if (!searchMobile) {
+      return NextResponse.json({
+        error: 'Please enter a valid 10-digit mobile number'
       }, { status: 400 });
     }
 
-    console.log('🔍 [TRACKING_API] Searching for orders with mobile:', searchMobile);
+    console.log('🔍 [TRACKING_API] Searching for orders with mobile:', maskMobile(searchMobile));
 
-    // Fetch orders grouped by client
-    // Search by both customer mobile and reseller mobile
-    const orders = await prisma.$queryRaw`
-      SELECT 
+    const orders = await prisma.$queryRaw<TrackingRow[]>`
+      SELECT
         o.id,
         o."clientId",
         o.name,
-        o.mobile,
-        o.reseller_mobile,
-        o.address,
-        o.city,
-        o.state,
-        o.pincode,
         o.courier_service,
-        o.package_value,
-        o.weight,
-        o.total_items,
         o.tracking_id,
-        o.reference_number,
-        o.is_cod,
-        o.cod_amount,
+        o.tracking_status,
         o.created_at,
-        c.id as "client_id",
         c.name as "client_name",
         c."companyName" as "client_company_name",
-        CASE 
+        CASE
           WHEN o.mobile = ${searchMobile} THEN 'customer'
-          WHEN o.reseller_mobile = ${searchMobile} THEN 'reseller'
+          ELSE 'reseller'
         END as "search_type"
       FROM orders o
       LEFT JOIN clients c ON o."clientId" = c.id
       WHERE o.mobile = ${searchMobile} OR o.reseller_mobile = ${searchMobile}
       ORDER BY o.created_at DESC
-    ` as any[];
+      LIMIT ${MAX_ORDERS}
+    `;
 
-    console.log(`🔍 [TRACKING_API] Found ${orders.length} orders for mobile: ${searchMobile}`);
-
-    // Group orders by client
-    const ordersByClient = orders.reduce((acc, order) => {
-      const clientId = order.clientId;
-      const clientName = order.client_company_name || order.client_name;
-      
-      if (!acc[clientId]) {
-        acc[clientId] = {
-          clientId,
-          clientName,
+    // Group by seller under an opaque key; internal tenant IDs are not exposed
+    const groups = new Map<string, { clientId: string; clientName: string; orders: unknown[] }>();
+    for (const order of orders) {
+      if (!groups.has(order.clientId)) {
+        groups.set(order.clientId, {
+          clientId: `seller-${groups.size + 1}`,
+          clientName: order.client_company_name || order.client_name || 'Seller',
           orders: []
-        };
+        });
       }
-      
-      acc[clientId].orders.push({
+      groups.get(order.clientId)!.orders.push({
         id: order.id,
-        name: order.name,
-        mobile: order.mobile,
-        reseller_mobile: order.reseller_mobile,
+        name: maskName(order.name),
         search_type: order.search_type,
         tracking_id: order.tracking_id,
+        tracking_status: order.tracking_status,
         courier_service: order.courier_service,
-        created_at: order.created_at,
-        package_value: order.package_value,
-        weight: order.weight,
-        total_items: order.total_items,
-        address: order.address,
-        city: order.city,
-        state: order.state,
-        pincode: order.pincode,
-        is_cod: order.is_cod,
-        cod_amount: order.cod_amount
+        created_at: order.created_at
       });
-      
-      return acc;
-    }, {} as Record<string, any>);
+    }
 
-    const groupedOrders = Object.values(ordersByClient);
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: {
-        mobile: searchMobile,
+        mobile: maskMobile(searchMobile),
         totalOrders: orders.length,
-        ordersByClient: groupedOrders
+        ordersByClient: [...groups.values()]
       }
     });
+    securityHeaders(response);
+    return response;
 
   } catch (error) {
     console.error('❌ [TRACKING_API] Error fetching orders:', error);
