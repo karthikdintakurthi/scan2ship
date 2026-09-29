@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { authenticatedGet } from '@/lib/api-client';
+import { authenticatedGet, authenticatedPost } from '@/lib/api-client';
 
 interface ClientCredits {
   balance: number;
@@ -63,6 +63,17 @@ interface OrderTransaction {
   createdAt: string;
 }
 
+interface PendingRecharge {
+  id: string;
+  clientId: string;
+  amount: number;
+  transactionRef: string;
+  utrNumber: string | null;
+  createdAt: string;
+  clients?: { companyName: string } | null;
+  requestedBy?: { email: string } | null;
+}
+
 export default function AdminCreditsPage() {
   const { currentUser } = useAuth();
   const router = useRouter();
@@ -93,6 +104,12 @@ export default function AdminCreditsPage() {
   const [orderTransactions, setOrderTransactions] = useState<OrderTransaction[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState('');
+
+  // Submitted UPI payments awaiting review
+  const [pendingRecharges, setPendingRecharges] = useState<PendingRecharge[]>([]);
+  const [reviewingRechargeId, setReviewingRechargeId] = useState<string | null>(null);
+  const [rechargeReviewError, setRechargeReviewError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Check if user is admin or master admin
   useEffect(() => {
@@ -130,10 +147,44 @@ export default function AdminCreditsPage() {
       }
     };
 
+    const fetchPendingRecharges = async () => {
+      try {
+        const response = await authenticatedGet('/api/admin/credits/recharge-requests?status=pending');
+        if (response.ok) {
+          const data = await response.json();
+          setPendingRecharges(data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching pending recharge requests:', error);
+      }
+    };
+
     if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'master_admin')) {
       fetchClientsWithCredits();
+      fetchPendingRecharges();
     }
-  }, [currentUser, router]);
+  }, [currentUser, router, refreshKey]);
+
+  const reviewRecharge = async (rechargeId: string, action: 'approve' | 'reject') => {
+    const note = action === 'reject' ? window.prompt('Reason for rejecting this payment (shown to the client):') : undefined;
+    if (action === 'reject' && note === null) return;
+
+    setReviewingRechargeId(rechargeId);
+    setRechargeReviewError('');
+    try {
+      const response = await authenticatedPost(`/api/admin/credits/recharge-requests/${rechargeId}`, { action, note });
+      if (!response.ok) {
+        const data = await response.json();
+        setRechargeReviewError(data.error || 'Failed to review payment');
+      }
+      setRefreshKey((key) => key + 1);
+    } catch (error) {
+      console.error('Error reviewing recharge request:', error);
+      setRechargeReviewError('Failed to review payment');
+    } finally {
+      setReviewingRechargeId(null);
+    }
+  };
 
   // Filter and sort clients
   const filteredAndSortedClients = clients
@@ -526,6 +577,48 @@ export default function AdminCreditsPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Pending UPI payments */}
+      {(pendingRecharges.length > 0 || rechargeReviewError) && (
+        <div className="bg-white shadow rounded-lg mb-8">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">Payments Awaiting Verification ({pendingRecharges.length})</h2>
+            <p className="text-sm text-gray-500">Check each UTR against the bank statement before approving. Approving adds the credits.</p>
+            {rechargeReviewError && <p className="text-sm text-red-600 mt-2">{rechargeReviewError}</p>}
+          </div>
+          <ul className="divide-y divide-gray-200">
+            {pendingRecharges.map((recharge) => (
+              <li key={recharge.id} className="px-6 py-4 flex items-center justify-between">
+                <div className="text-sm">
+                  <p className="font-medium text-gray-900">
+                    {recharge.clients?.companyName || recharge.clientId} · ₹{recharge.amount.toLocaleString()}
+                  </p>
+                  <p className="text-gray-500">
+                    Ref {recharge.transactionRef}{recharge.utrNumber ? ` · UTR ${recharge.utrNumber}` : ' · no UTR'}
+                    {recharge.requestedBy ? ` · by ${recharge.requestedBy.email}` : ''} · {new Date(recharge.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => reviewRecharge(recharge.id, 'approve')}
+                    disabled={reviewingRechargeId === recharge.id}
+                    className="px-3 py-1 text-sm rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => reviewRecharge(recharge.id, 'reject')}
+                    disabled={reviewingRechargeId === recharge.id}
+                    className="px-3 py-1 text-sm rounded border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

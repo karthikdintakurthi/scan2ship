@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { ClientCreditCostsService } from './client-credit-costs-service';
 
@@ -95,46 +96,65 @@ export class CreditService {
   ): Promise<ClientCredits> {
     assertPositiveCreditAmount(amount);
     try {
-      return await prisma.$transaction(async (tx) => {
-        // Single atomic increment so concurrent additions are never lost
-        const updatedCredits = await tx.client_credits.upsert({
-          where: { clientId },
-          create: {
-            id: `credits-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            clientId,
-            balance: amount,
-            totalAdded: amount,
-            totalUsed: 0,
-            updatedAt: new Date()
-          },
-          update: {
-            balance: { increment: amount },
-            totalAdded: { increment: amount },
-            updatedAt: new Date()
-          }
-        });
-
-        await tx.credit_transactions.create({
-          data: {
-            id: newTransactionId(),
-            clientId,
-            clientName: clientName || 'Unknown Client',
-            userId,
-            type: 'ADD',
-            amount,
-            balance: updatedCredits.balance,
-            description,
-            feature: 'MANUAL',
-            createdAt: new Date()
-          }
-        });
-
-        return updatedCredits;
-      });
+      const { credits } = await prisma.$transaction((tx) =>
+        CreditService.addCreditsInTransaction(tx, clientId, amount, description, { userId, clientName })
+      );
+      return credits;
     } catch (error) {
       console.error('Error adding credits:', error);
       throw new Error('Failed to add credits');
     }
+  }
+
+  /**
+   * Add credits as part of a caller's transaction, e.g. approving a recharge
+   * request, so the approval and the balance change commit together.
+   */
+  static async addCreditsInTransaction(
+    tx: Prisma.TransactionClient,
+    clientId: string,
+    amount: number,
+    description: string,
+    { userId, clientName, utrNumber }: { userId?: string; clientName?: string; utrNumber?: string | null } = {}
+  ): Promise<{ credits: ClientCredits; transactionId: string }> {
+    assertPositiveCreditAmount(amount);
+
+    // Single atomic increment so concurrent additions are never lost
+    const credits = await tx.client_credits.upsert({
+      where: { clientId },
+      create: {
+        id: `credits-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        clientId,
+        balance: amount,
+        totalAdded: amount,
+        totalUsed: 0,
+        updatedAt: new Date()
+      },
+      update: {
+        balance: { increment: amount },
+        totalAdded: { increment: amount },
+        updatedAt: new Date()
+      }
+    });
+
+    const transactionId = newTransactionId();
+    await tx.credit_transactions.create({
+      data: {
+        id: transactionId,
+        clientId,
+        clientName: clientName || 'Unknown Client',
+        userId,
+        type: 'ADD',
+        amount,
+        balance: credits.balance,
+        description,
+        feature: 'MANUAL',
+        utrNumber: utrNumber ?? undefined,
+        createdAt: new Date()
+      }
+    });
+
+    return { credits, transactionId };
   }
 
   /**

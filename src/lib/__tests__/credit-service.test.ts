@@ -98,6 +98,25 @@ describe('CreditService.addCredits', () => {
   });
 });
 
+describe('CreditService.addCreditsInTransaction', () => {
+  it("uses the caller's transaction and works without optional details", async () => {
+    const tx = { client_credits: { upsert: jest.fn().mockResolvedValue({ balance: 5 }) }, credit_transactions: { create: jest.fn() } };
+
+    const result = await CreditService.addCreditsInTransaction(tx as never, 'client-a', 5, 'Recharge');
+
+    expect(tx.credit_transactions.create.mock.calls[0][0].data).toMatchObject({ type: 'ADD', amount: 5, clientName: 'Unknown Client', userId: undefined });
+    expect(tx.credit_transactions.create.mock.calls[0][0].data.utrNumber).toBeUndefined();
+    expect(result).toEqual({ credits: { balance: 5 }, transactionId: expect.stringMatching(/^txn-/) });
+    expect(credits.upsert).not.toHaveBeenCalled();
+  });
+
+  it('records the UTR on the ledger entry when given', async () => {
+    const tx = { client_credits: { upsert: jest.fn().mockResolvedValue({ balance: 5 }) }, credit_transactions: { create: jest.fn() } };
+    await CreditService.addCreditsInTransaction(tx as never, 'client-a', 5, 'Recharge', { utrNumber: '123456789012', userId: 'admin' });
+    expect(tx.credit_transactions.create.mock.calls[0][0].data).toMatchObject({ utrNumber: '123456789012', userId: 'admin' });
+  });
+});
+
 describe('CreditService.refundCredits', () => {
   it('returns the credits, reverses the usage count, and records a REFUND entry', async () => {
     (credits.update as jest.Mock).mockResolvedValue({ clientId: 'client-a', balance: 10 });

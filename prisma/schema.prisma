@@ -178,6 +178,7 @@ model clients {
   client_order_configs  client_order_configs?
   courier_services      courier_services[]
   credit_transactions   credit_transactions[]
+  credit_recharge_requests credit_recharge_requests[]
   cross_app_mappings    cross_app_mappings?
   order_analytics       order_analytics[]
   orders                orders[]
@@ -230,6 +231,31 @@ model credit_transactions {
   orders             orders?  @relation(fields: [orderId], references: [id])
   users              users?   @relation(fields: [userId], references: [id])
 }
+/// A tenant's claim that it paid for credits. Credits are added only when a
+/// platform admin approves it; a UTR can back at most one request.
+model credit_recharge_requests {
+  id                  String    @id
+  clientId            String
+  requestedById       String?
+  amount              Int
+  transactionRef      String
+  utrNumber           String?   @unique
+  paymentDetails      Json?
+  status              String    @default("pending")
+  reviewedById        String?
+  reviewedAt          DateTime?
+  reviewNote          String?
+  creditTransactionId String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  clients             clients   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  requestedBy         users?    @relation("RechargeRequester", fields: [requestedById], references: [id])
+  reviewedBy          users?    @relation("RechargeReviewer", fields: [reviewedById], references: [id])
+
+  @@unique([clientId, transactionRef])
+  @@index([status, createdAt])
+}
+
 
 model csrf_tokens {
   id        String   @id
@@ -479,6 +505,8 @@ model users {
   parentUserId           String?
   analytics_events       analytics_events[]
   credit_transactions    credit_transactions[]
+  requestedRecharges     credit_recharge_requests[] @relation("RechargeRequester")
+  reviewedRecharges      credit_recharge_requests[] @relation("RechargeReviewer")
   order_analytics        order_analytics[]
   createdOrders          orders[]                  @relation("OrderCreator")
   pickup_requests        pickup_requests[]

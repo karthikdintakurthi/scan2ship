@@ -44,6 +44,16 @@ interface ClientCredits {
   updatedAt: Date;
 }
 
+interface RechargeRequest {
+  id: string;
+  amount: number;
+  transactionRef: string;
+  utrNumber: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewNote: string | null;
+  createdAt: string;
+}
+
 export default function CreditsPage() {
   const { currentUser } = useAuth();
   const [credits, setCredits] = useState<ClientCredits | null>(null);
@@ -54,11 +64,13 @@ export default function CreditsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [rechargeRequests, setRechargeRequests] = useState<RechargeRequest[]>([]);
 
   useEffect(() => {
     if (currentUser) {
       fetchCredits();
       fetchTransactions();
+      fetchRechargeRequests();
     }
   }, [currentUser, page]);
 
@@ -86,6 +98,20 @@ export default function CreditsPage() {
     } catch (error) {
       console.error('Error fetching credits:', error);
       setError('Failed to fetch credits');
+    }
+  };
+
+  const fetchRechargeRequests = async () => {
+    try {
+      const response = await fetch('/api/credits/recharge-requests', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setRechargeRequests(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching recharge requests:', error);
     }
   };
 
@@ -131,10 +157,8 @@ export default function CreditsPage() {
   };
 
   const handleRechargeSuccess = () => {
-    // Refresh credits after successful recharge
-    fetchCredits();
-    fetchTransactions();
-    setSuccessMessage('Credits recharged successfully!');
+    fetchRechargeRequests();
+    setSuccessMessage('Payment submitted. Credits will be added after an administrator verifies it.');
     setTimeout(() => setSuccessMessage(''), 5000); // Clear after 5 seconds
   };
 
@@ -280,6 +304,35 @@ export default function CreditsPage() {
             </div>
           </div>
         </div>
+
+        {/* Submitted payments awaiting or after review */}
+        {rechargeRequests.length > 0 && (
+          <div className="bg-white rounded-lg shadow mb-8">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-medium text-gray-900">Submitted Payments</h2>
+            </div>
+            <ul className="divide-y divide-gray-200">
+              {rechargeRequests.map((recharge) => (
+                <li key={recharge.id} className="px-6 py-3 flex items-center justify-between text-sm">
+                  <div>
+                    <p className="font-medium text-gray-900">₹{recharge.amount.toLocaleString()} · {recharge.transactionRef}</p>
+                    <p className="text-gray-500">
+                      {recharge.utrNumber ? `UTR ${recharge.utrNumber} · ` : ''}{new Date(recharge.createdAt).toLocaleString()}
+                      {recharge.reviewNote ? ` · ${recharge.reviewNote}` : ''}
+                    </p>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                    recharge.status === 'approved' ? 'bg-green-100 text-green-800'
+                      : recharge.status === 'rejected' ? 'bg-red-100 text-red-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {recharge.status === 'pending' ? 'Awaiting verification' : recharge.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Transactions */}
         <div className="bg-white rounded-lg shadow">
