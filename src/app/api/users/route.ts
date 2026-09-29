@@ -4,6 +4,7 @@ import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middlew
 import { authorizeUser, UserRole, PermissionLevel, canManageUsers, canCreateChildUsers } from '@/lib/auth-middleware';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { normalizeEmail } from '@/lib/email';
 
 export async function GET(request: NextRequest) {
   try {
@@ -231,13 +232,13 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { 
-      email, 
       name, 
       password, 
       role = 'child_user', 
       subGroupIds = [], 
       pickupLocationIds = [] 
     } = body;
+    const email = normalizeEmail(body.email);
 
     // Validate required fields
     if (!email || !name) {

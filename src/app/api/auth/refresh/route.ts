@@ -1,95 +1,97 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { enhancedJwtConfig } from '@/lib/jwt-config';
+import { applySecurityMiddleware } from '@/lib/security-middleware';
+import {
+  hashRefreshToken,
+  newRefreshToken,
+  SESSION_MAX_AGE_MS,
+  SESSION_TTL_MS,
+  signSessionToken,
+} from '@/lib/session-tokens';
 
+const INVALID = { error: 'Invalid refresh token' };
+
+/**
+ * POST /api/auth/refresh  { refreshToken }
+ *
+ * Exchanges the opaque refresh token issued at login for a new access token
+ * and a new refresh token (the old one stops working). Access tokens (JWTs)
+ * are not accepted here. The session must still be active, not revoked, and
+ * less than SESSION_MAX_AGE_MS old; the user and client must still be active.
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { refreshToken } = await request.json();
+    const securityResponse = await applySecurityMiddleware(request, new NextResponse(), {
+      rateLimit: 'auth',
+      cors: true,
+      securityHeaders: true,
+    });
+    if (securityResponse) {
+      return securityResponse;
+    }
 
+    const body = await request.json().catch(() => null);
+    const refreshToken = body && typeof body.refreshToken === 'string' ? body.refreshToken : '';
     if (!refreshToken) {
-      return NextResponse.json(
-        { error: 'Refresh token is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Refresh token is required' }, { status: 400 });
     }
 
-    // Verify the refresh token
-    let decoded;
-    try {
-      decoded = enhancedJwtConfig.verifyToken(refreshToken);
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid refresh token' },
-        { status: 401 }
-      );
-    }
-
-    // Check if user exists and is active
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        clients: true
-      }
+    const session = await prisma.sessions.findUnique({
+      where: { refreshToken: hashRefreshToken(refreshToken) },
+      include: { users: { include: { clients: true } } },
     });
 
-    if (!user || !user.isActive || !user.clients.isActive) {
-      return NextResponse.json(
-        { error: 'User not found or inactive' },
-        { status: 401 }
-      );
+    const now = Date.now();
+    if (
+      !session ||
+      !session.isActive ||
+      session.revokedAt ||
+      now - session.createdAt.getTime() > SESSION_MAX_AGE_MS
+    ) {
+      return NextResponse.json(INVALID, { status: 401 });
     }
 
-    // Generate new tokens
-    const tokenPayload = {
-      userId: user.id,
-      clientId: user.clientId,
-      email: user.email,
-      role: user.role
-    };
+    const user = session.users;
+    if (!user || !user.isActive || !user.clients?.isActive || user.clientId !== session.clientId) {
+      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 });
+    }
 
-    const newLoginToken = enhancedJwtConfig.generateToken(tokenPayload, 'login');
-    const newRefreshToken = enhancedJwtConfig.generateToken(tokenPayload, 'refresh');
+    const token = signSessionToken(user);
+    const next = newRefreshToken();
+    const expiresAt = new Date(now + SESSION_TTL_MS);
 
-    // Update session in database
-    const session = await prisma.sessions.findFirst({
-      where: {
-        userId: user.id,
-        clientId: user.clientId
-      }
+    // Rotate only if the presented token is still current, so two concurrent
+    // refreshes with the same token cannot both succeed.
+    const rotated = await prisma.sessions.updateMany({
+      where: { id: session.id, refreshToken: session.refreshToken, isActive: true },
+      data: {
+        sessionToken: token,
+        refreshToken: next.hash,
+        role: user.role,
+        expiresAt,
+        lastActivity: new Date(now),
+      },
     });
-
-    if (session) {
-      await prisma.sessions.update({
-        where: { id: session.id },
-        data: {
-          sessionToken: newLoginToken,
-          expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) // 8 hours
-        }
-      });
+    if (rotated.count !== 1) {
+      return NextResponse.json(INVALID, { status: 401 });
     }
 
-    // Return new tokens
-    const { password: _, ...userWithoutPassword } = user;
-    
+    const { password: _password, clients, ...userWithoutPassword } = user;
     return NextResponse.json({
       user: userWithoutPassword,
-      client: user.clients,
+      client: clients,
+      token,
       session: {
-        id: session?.id,
+        id: session.id,
         userId: user.id,
         clientId: user.clientId,
-        token: newLoginToken,
-        refreshToken: newRefreshToken,
-        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000),
-        tokenInfo: enhancedJwtConfig.getTokenInfo(newLoginToken)
-      }
+        token,
+        refreshToken: next.token,
+        expiresAt,
+      },
     });
-
   } catch (error) {
-    console.error('Token refresh error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Token refresh error:', error instanceof Error ? error.message : String(error));
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

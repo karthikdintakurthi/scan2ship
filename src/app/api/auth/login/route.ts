@@ -5,9 +5,9 @@ import {
   InputValidator 
 } from '@/lib/security-middleware';
 import { securityConfig } from '@/lib/security-config';
+import { newRefreshToken, SESSION_TTL_MS, signSessionToken } from '@/lib/session-tokens';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,28 +42,24 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const passwordValidation = InputValidator.validateString(body.password, {
-      required: true,
-      minLength: securityConfig.password.minLength,
-      maxLength: securityConfig.password.maxLength
-    });
-    
-    if (!passwordValidation.valid) {
-      return NextResponse.json(
-        { error: passwordValidation.error },
-        { status: 400 }
-      );
+    // Compare the password exactly as typed: registration hashes it unmodified, so
+    // trimming or stripping characters here would lock some users out. Length policy
+    // is enforced when a password is set, not at login.
+    if (typeof body.password !== 'string' || body.password.length === 0) {
+      return NextResponse.json({ error: 'Password is required' }, { status: 400 });
+    }
+    if (body.password.length > securityConfig.password.maxLength) {
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
-    const { email, password } = {
-      email: emailValidation.value!,
-      password: passwordValidation.value!
-    };
+    const email = emailValidation.value!;
+    const password: string = body.password;
 
-    // Find user with client information
+    // Find user with client information. Emails are stored lower-case, but older
+    // accounts may have been saved as typed, so match without regard to case.
     const user = await prisma.users.findFirst({
       where: { 
-        email: email,
+        email: { equals: email, mode: 'insensitive' },
         isActive: true
       },
       include: {
@@ -112,21 +108,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const loginToken = jwt.sign(
-      {
-        userId: user.id,
-        clientId: user.clientId,
-        email: user.email,
-        role: user.role
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: '8h',
-        issuer: process.env.JWT_ISSUER || 'scan2ship-saas',
-        audience: process.env.JWT_AUDIENCE || 'scan2ship-users',
-        algorithm: 'HS256'
-      }
-    );
+    const loginToken = signSessionToken(user);
+    const refresh = newRefreshToken();
 
     // Revoke existing active sessions for this user (optional - you can limit concurrent sessions)
     // This ensures only one active session per user at a time
@@ -147,7 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new session
-    const sessionExpiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+    const sessionExpiresAt = new Date(Date.now() + SESSION_TTL_MS);
     const now = new Date();
     const session = await prisma.sessions.create({
       data: {
@@ -155,7 +138,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         clientId: user.clientId,
         sessionToken: loginToken,
-        refreshToken: crypto.randomUUID(),
+        refreshToken: refresh.hash,
         ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
         userAgent: request.headers.get('user-agent') || 'unknown',
         role: user.role,
@@ -183,6 +166,7 @@ export async function POST(request: NextRequest) {
       client: user.clients,
       session: {
         token: loginToken,
+        refreshToken: refresh.token,
         expiresAt: session.expiresAt
       }
     });
@@ -202,10 +186,7 @@ export async function POST(request: NextRequest) {
       name: error instanceof Error ? error.name : undefined
     });
     return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error occurred'
-      },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

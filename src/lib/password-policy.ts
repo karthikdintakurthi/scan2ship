@@ -242,25 +242,25 @@ export function generateSecurePassword(
 
   // Add required character types
   if (policy.requireLowercase) {
-    const char = charset.lowercase[Math.floor(Math.random() * charset.lowercase.length)];
+    const char = charset.lowercase[crypto.randomInt(charset.lowercase.length)];
     requiredChars.push(char);
     password += char;
   }
 
   if (policy.requireUppercase) {
-    const char = charset.uppercase[Math.floor(Math.random() * charset.uppercase.length)];
+    const char = charset.uppercase[crypto.randomInt(charset.uppercase.length)];
     requiredChars.push(char);
     password += char;
   }
 
   if (policy.requireNumbers) {
-    const char = charset.numbers[Math.floor(Math.random() * charset.numbers.length)];
+    const char = charset.numbers[crypto.randomInt(charset.numbers.length)];
     requiredChars.push(char);
     password += char;
   }
 
   if (policy.requireSpecialChars) {
-    const char = charset.special[Math.floor(Math.random() * charset.special.length)];
+    const char = charset.special[crypto.randomInt(charset.special.length)];
     requiredChars.push(char);
     password += char;
   }
@@ -270,11 +270,16 @@ export function generateSecurePassword(
   const remainingLength = policy.minLength - requiredChars.length;
 
   for (let i = 0; i < remainingLength; i++) {
-    password += allChars[Math.floor(Math.random() * allChars.length)];
+    password += allChars[crypto.randomInt(allChars.length)];
   }
 
-  // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  // Fisher-Yates shuffle with a secure random source
+  const chars = password.split('');
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
 }
 
 /**

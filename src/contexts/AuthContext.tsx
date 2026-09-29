@@ -148,6 +148,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const removeStoredToken = (): void => {
     safeLocalStorage.removeItem('authToken');
+    safeLocalStorage.removeItem('refreshToken');
+  };
+
+  const setStoredRefreshToken = (token: string | undefined): void => {
+    if (token) safeLocalStorage.setItem('refreshToken', token);
   };
 
   const checkAuth = async (): Promise<boolean> => {
@@ -206,6 +211,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (response.ok) {
         setStoredToken(data.session.token);
+        setStoredRefreshToken(data.session.refreshToken);
         setCurrentUser(data.user);
         setCurrentClient(data.client);
         setCurrentSession(data.session);
@@ -310,20 +316,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const refreshSession = async (): Promise<boolean> => {
     try {
-      const token = getStoredToken();
-      if (!token) {
+      const refreshToken = safeLocalStorage.getItem('refreshToken');
+      if (!refreshToken) {
         return false;
       }
 
       const response = await fetch('/api/auth/refresh', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken })
       });
 
       if (response.ok) {
         const data = await response.json();
-        setStoredToken(data.token);
+        setStoredToken(data.session.token);
+        setStoredRefreshToken(data.session.refreshToken);
         setCurrentSession(data.session);
         return true;
       } else {

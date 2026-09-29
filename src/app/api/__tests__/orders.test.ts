@@ -143,6 +143,13 @@ describe('POST /api/orders', () => {
       expect(CreditService.deductCredits).not.toHaveBeenCalled();
     });
 
+    it('rejects a mobile number sent as a JSON number with 400, not a server error', async () => {
+      actAs('user');
+      const response = await post({ ...VALID_ORDER, mobile: 9876543210 });
+      expect(response.status).toBe(400);
+      expect(prisma.writeCalls()).toEqual([]);
+    });
+
     it.each(['9876543210', '+91 98765 43210', '919876543210', '+91-0-9876543210'])('accepts the mobile number %p', async (mobile) => {
       actAs('user');
       expect((await post({ ...VALID_ORDER, mobile })).status).toBe(200);
@@ -274,6 +281,18 @@ describe('POST /api/orders', () => {
 
   describe('creating a Delhivery order', () => {
     const DELHIVERY_ORDER = { ...VALID_ORDER, courier_service: 'Delhivery' };
+
+    it('returns the waybill and booking status saved after booking, not the pre-booking row', async () => {
+      actAs('user');
+      (prisma.orders.findUnique as jest.Mock).mockImplementation(async ({ where }) => ({
+        id: where.id,
+        reference_number: 'REF',
+        tracking_id: 'AWB-NEW',
+        delhivery_api_status: 'success',
+      }));
+      const body = await (await post(DELHIVERY_ORDER)).json();
+      expect(body.order).toMatchObject({ trackingId: 'AWB-NEW', delhiveryStatus: 'success' });
+    });
 
     it('charges first, books with Delhivery, then stores the waybill on the new order', async () => {
       actAs('user');
@@ -468,7 +487,7 @@ describe('DELETE /api/orders', () => {
     expect(prisma.orders.findMany).not.toHaveBeenCalled();
   });
 
-  it.each([[[1, 'abc']], [[0]], [[-3]]])('rejects invalid order ids %p', async (orderIds) => {
+  it.each([[[1, 'abc']], [[0]], [[-3]], [['12abc']], [[1.5]], [[null]]])('rejects invalid order ids %p', async (orderIds) => {
     actAs('user');
     const response = await del({ orderIds });
     expect(response.status).toBe(400);

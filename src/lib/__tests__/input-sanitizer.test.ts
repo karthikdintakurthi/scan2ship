@@ -1,7 +1,8 @@
 /**
  * Input sanitizer: plain-text sanitization, emails, URLs, file names, JSON,
  * search queries and phone numbers. isomorphic-dompurify is stubbed globally
- * in jest.setup.js, so the allowHTML branch is not exercised here.
+ * in jest.setup.js (it returns its input), so allowHTML tests check only that
+ * DOMPurify is used and its output is not entity-encoded afterwards.
  */
 
 import {
@@ -13,8 +14,18 @@ import {
   sanitizeSearchQuery,
   sanitizePhoneNumber,
 } from '../input-sanitizer';
+import DOMPurify from 'isomorphic-dompurify';
 
 describe('sanitizeString', () => {
+  it('passes allowed HTML through DOMPurify without entity-encoding it afterwards', () => {
+    expect(sanitizeString('<b>bold</b> & <i>it</i>', { allowHTML: true })).toBe('<b>bold</b> & <i>it</i>');
+    expect(DOMPurify.sanitize).toHaveBeenCalled();
+  });
+
+  it('still encodes plain text when HTML is not allowed', () => {
+    expect(sanitizeString('<b>bold</b>')).toBe('&lt;b&gt;bold&lt;&#x2F;b&gt;');
+  });
+
   it('drops script blocks entirely', () => {
     expect(sanitizeString('<script>alert("xss")</script>Hello World')).toBe('Hello World');
     expect(sanitizeString('a<SCRIPT type="x">steal()</SCRIPT>b')).toBe('ab');
@@ -199,6 +210,11 @@ describe('sanitizePhoneNumber', () => {
 
   it('moves a misplaced plus to the front', () => {
     expect(sanitizePhoneNumber('91+9876543210')).toBe('+919876543210');
+  });
+
+  it('keeps only one plus, at the front', () => {
+    expect(sanitizePhoneNumber('+91+98765+43210')).toBe('+919876543210');
+    expect(sanitizePhoneNumber('++919876543210')).toBe('+919876543210');
   });
 
   it('requires 10 to 15 digits', () => {

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import bcrypt from 'bcryptjs';
+import { normalizeEmail } from '@/lib/email';
 
 export async function GET(
   request: NextRequest,
@@ -170,9 +171,9 @@ export async function PUT(
     }
 
     const body = await request.json();
+    const email = normalizeEmail(body.email);
     const { 
       clientId, 
-      email, 
       name, 
       password, 
       role, 

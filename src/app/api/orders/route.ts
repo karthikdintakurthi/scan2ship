@@ -10,6 +10,7 @@ import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middlew
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { WebhookService } from '@/lib/webhook-service';
 import { getCatalogApiKey } from '@/lib/cross-app-auth';
+import { parseOrderId } from '@/lib/application/policy';
 
 const delhiveryService = new DelhiveryService();
 
@@ -60,7 +61,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate mobile number format
-    const validateMobileNumber = (mobile: string): boolean => {
+    const validateMobileNumber = (mobile: unknown): boolean => {
+      // Non-strings (e.g. a JSON number) are rejected rather than crashing below
+      if (typeof mobile !== 'string') return false;
       // Remove any non-digit characters
       const cleanMobile = mobile.replace(/\D/g, '');
       
@@ -431,12 +434,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      // updatedOrder includes the waybill and booking status saved after the carrier call
       order: {
-        id: order.id,
-        orderNumber: `ORDER-${order.id}`,
-        referenceNumber: order.reference_number,
-        trackingId: order.tracking_id,
-        delhiveryStatus: order.delhivery_api_status
+        id: updatedOrder.id,
+        orderNumber: `ORDER-${updatedOrder.id}`,
+        referenceNumber: updatedOrder.reference_number,
+        trackingId: updatedOrder.tracking_id,
+        delhiveryStatus: updatedOrder.delhivery_api_status
       }
     });
 
@@ -745,11 +749,10 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Validate that all order IDs are valid integers
-    const validOrderIds = orderIds.filter(id => {
-      const numId = parseInt(id);
-      return !isNaN(numId) && numId > 0;
-    });
+    // Validate that all order IDs are positive integers ("12abc" and 1.5 are rejected)
+    const validOrderIds = orderIds
+      .map((id: unknown) => parseOrderId(String(id)))
+      .filter((id: number | null): id is number => id !== null);
 
     if (validOrderIds.length !== orderIds.length) {
       return NextResponse.json(
@@ -972,7 +975,7 @@ export async function DELETE(request: NextRequest) {
       
       for (const orderId of validOrderIds) {
         const deletedOrder = await tx.orders.delete({
-          where: { id: parseInt(orderId) }
+          where: { id: orderId }
         });
         deletedOrders.push(deletedOrder);
       }

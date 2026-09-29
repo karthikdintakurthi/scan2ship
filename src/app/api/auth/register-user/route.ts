@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { resolveUserProvisioning } from '@/lib/application/user-provisioning';
+import { normalizeEmail } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +33,8 @@ export async function POST(request: NextRequest) {
     const creator = authResult.user!;
 
     const body = await request.json();
-    const { name, email, password } = body ?? {};
+    const { name, password } = body ?? {};
+    const email = normalizeEmail(body?.email);
 
     if (!name || !email || !password) {
       return NextResponse.json(

@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { normalizeEmail } from '@/lib/email';
 
 const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
+    const body = await request.json();
+    const email = normalizeEmail(body.email);
     const {
       name,
       companyName,
-      email,
       phone,
       address,
       city,
@@ -17,7 +19,7 @@ export async function POST(request: NextRequest) {
       country,
       pincode,
       password
-    } = await request.json();
+    } = body;
 
     // Validate required fields
     if (!name || !companyName || !email || !password) {

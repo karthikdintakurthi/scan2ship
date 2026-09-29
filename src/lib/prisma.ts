@@ -99,6 +99,9 @@ export function getConnectionPoolStatus() {
   };
 }
 
+// One health-check timer per process, however many times initialization is requested
+let healthCheckTimer: ReturnType<typeof setInterval> | null = null;
+
 // Initialize connection pool
 export async function initializeConnectionPool(): Promise<void> {
   try {
@@ -106,9 +109,9 @@ export async function initializeConnectionPool(): Promise<void> {
     await checkDatabaseConnection();
     
     // Set up connection monitoring
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' && !healthCheckTimer) {
       // Monitor connection pool health every 5 minutes
-      setInterval(async () => {
+      healthCheckTimer = setInterval(async () => {
         const isHealthy = await checkDatabaseConnection();
         if (!isHealthy) {
           console.error('🚨 Database connection pool health check failed');

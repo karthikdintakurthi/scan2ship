@@ -290,22 +290,26 @@ export function validatePassword(
  * Generate a secure random password
  */
 export function generateSecurePassword(length: number = 20): string {
-  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
-  let password = '';
-  
-  // Ensure at least one character from each required category
-  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];
-  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
-  password += '0123456789'[Math.floor(Math.random() * 10)];
-  password += '!@#$%^&*()_+-=[]{}|;:,.<>?'[Math.floor(Math.random() * 32)];
-  
-  // Fill the rest with random characters
-  for (let i = 4; i < length; i++) {
-    password += charset[Math.floor(Math.random() * charset.length)];
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+  const special = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+  const charset = upper + lower + digits + special;
+  // crypto.randomInt is uniform and cryptographically secure, unlike Math.random.
+  const pick = (chars: string) => chars[crypto.randomInt(chars.length)];
+
+  // At least one character from each category, the rest from the full set.
+  const chars = [pick(upper), pick(lower), pick(digits), pick(special)];
+  while (chars.length < Math.max(length, 4)) {
+    chars.push(pick(charset));
   }
-  
-  // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+
+  // Fisher-Yates shuffle so the category characters are not always first.
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
 }
 
 /**

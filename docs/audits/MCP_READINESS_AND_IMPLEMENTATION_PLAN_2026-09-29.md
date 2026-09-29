@@ -305,7 +305,7 @@ Each PR is independently shippable and carries route-level tests. Ordered by exp
 - **Real bugs fixed while clearing type errors.** Examples: the client name and slug were always `undefined` in about 15 routes (the auth select omitted them); the first `GET /api/order-config` for a new client returned 500 (a `const` was reassigned); creating a `client_order_configs` row always failed (it set `enableThermalPrint`, which is not in the schema); refresh wrote a `sessions.token` column that does not exist; webhook log writes got a string `orderId`; the order form saved `true` as the courier; the DTDC auto-fill button sent `?courier=[object Object]`; product search could not cancel a debounced search; database-security health actions called functions that do not exist; and file-cleanup threw when quarantine or backup was enabled.
 - **Removed.** `orders/route-new.ts` (never served) plus five unused routes that were broken or unsafe: `test-admin` (lists every client), `orders/[id]/shipping-label` (commented out), `admin/clients/[id]/update-password` and `auth/change-password` (both wrote columns that do not exist), and `upload` (its table does not exist). Thirteen handlers now take `params` as a Promise, as Next 15 requires.
 - **Scripts.** `scripts/` is no longer ignored. `backup-prod-db.sh` and `deploy-migration-with-backup.sh` are tracked; neither contains credentials. The npm scripts that pointed at 20 missing files were removed, including `prestart`, which made `npm start` fail. `db:backup` now runs `backup-prod-db.sh`, which repairs `db:migrate:dev` and `db:migrate:deploy`. `backups/` stays ignored.
-- **Suspected bugs, not yet fixed.** Found while rewriting tests; the first four were verified against the code:
+- **Bugs found while rewriting tests (all fixed afterwards; see below):**
   1. `auth/refresh` accepts any valid JWT, including a login token, as a refresh token. It never checks it against `sessions.refreshToken`, and it ignores `sessions.isActive`, so revoked sessions can still refresh.
   2. Login trims and strips the password (`InputValidator.validateString`) before comparing it, while registration hashes the raw password.
   3. `generateSecurePassword` indexes a 26-character set with `Math.random() * 32`, so about 19% of generated passwords contain the text "undefined". It also uses `Math.random` rather than a CSPRNG.
@@ -315,6 +315,18 @@ Each PR is independently shippable and carries route-level tests. Ordered by exp
   7. Bulk order DELETE passes unparsed IDs to Prisma (500 instead of 400); a numeric `mobile` on create throws (500).
   8. `input-sanitizer`: `allowHTML` still entity-encodes, and phone cleanup keeps extra `+` signs.
   9. `database-security` `initialize` adds another health-check interval on every call.
+
+### Auth and data bug fixes (2026-09-29)
+
+All nine bugs listed above are fixed, with tests.
+
+- **Refresh tokens.** Login issues an opaque refresh token and stores only its SHA-256 hash on the session. `POST /api/auth/refresh` accepts only that token, never a JWT. It requires an active, unrevoked session that is less than 7 days old, and an active user and client in the same tenant. It rotates both tokens, and a conditional update stops two concurrent refreshes with one token from both succeeding. Login and refresh sign access tokens through one helper (`src/lib/session-tokens.ts`), matching what `getAuthenticatedUser` verifies. Before this, refresh signed with `jwtSecretManager`. The web client never received a refresh token and called the route with `GET`, so refresh had never worked; `AuthContext` now stores the token and `POST`s it. Sessions created before this change cannot refresh; their users sign in again when the 8-hour access token expires, as before.
+- **Login.** The password is compared exactly as typed; length policy applies when a password is set, not at login. The email match ignores case, and every route that creates or edits a user stores the email trimmed and lower-cased (`src/lib/email.ts`). Beta data had no mixed-case or case-duplicate emails. A 500 no longer returns the internal error message.
+- **Password generation** uses `crypto.randomInt` and a Fisher-Yates shuffle in both generators. It always returns the requested length with every character class.
+- **Orders.** The create response returns the saved waybill and booking status. Bulk delete rejects non-integer IDs with 400, and a non-string `mobile` gets 400 instead of a 500.
+- **Sanitizer.** `allowHTML` output is no longer entity-encoded, and phone numbers keep at most one leading `+`.
+- **Health checks.** Only one database health-check timer runs per process.
+- **Still open.** `getAuthenticatedUser` does not check the session, so revoking a session (at the next login) does not end an access token already issued; it expires within 8 hours. Closing that means checking `sessions.sessionToken` on each request and adding a server-side logout.
 
 ### Phase 1–3 outline
 

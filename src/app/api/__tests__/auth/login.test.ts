@@ -17,6 +17,7 @@ import { prisma as realPrisma } from '@/lib/prisma';
 import { applySecurityMiddleware } from '@/lib/security-middleware';
 import type { createPrismaMock } from '@/test-utils/prisma-mock';
 import { POST as login } from '@/app/api/auth/login/route';
+import { hashRefreshToken } from '@/lib/session-tokens';
 
 const jwt = jest.requireActual('jsonwebtoken');
 const prisma = realPrisma as unknown as ReturnType<typeof createPrismaMock>;
@@ -86,9 +87,8 @@ describe('request validation', () => {
     ['missing email', { password: 'correct-password' }, 'This field is required'],
     ['malformed email', { email: 'not-an-email', password: 'correct-password' }, 'Invalid email format'],
     ['non-string email', { email: ['a@b.co'], password: 'correct-password' }, 'Value must be a string'],
-    ['missing password', { email: USER.email }, 'This field is required'],
-    ['short password', { email: USER.email, password: 'short' }, 'Minimum length is 8 characters'],
-    ['overlong password', { email: USER.email, password: 'x'.repeat(129) }, 'Maximum length is 128 characters'],
+    ['missing password', { email: USER.email }, 'Password is required'],
+    ['non-string password', { email: USER.email, password: 12345678 }, 'Password is required'],
   ])('rejects a %s with 400', async (_case, body, error) => {
     const response = await login(loginRequest(body));
     expect(response.status).toBe(400);
@@ -97,11 +97,28 @@ describe('request validation', () => {
     expect(bcrypt.compare).not.toHaveBeenCalled();
   });
 
-  it('looks the user up by lower-cased email among active users only', async () => {
+  it('looks the user up by email without regard to case, among active users only', async () => {
     await login(loginRequest({ email: 'USER@Client-A.test', password: 'correct-password' }));
     expect(prisma.users.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { email: 'user@client-a.test', isActive: true } })
+      expect.objectContaining({ where: { email: { equals: 'user@client-a.test', mode: 'insensitive' }, isActive: true } })
     );
+  });
+
+  it('compares the password exactly as typed, without trimming or stripping', async () => {
+    const typed = '  pass onload=word javascript:\t ';
+    await login(loginRequest({ email: USER.email, password: typed }));
+    expect(bcrypt.compare).toHaveBeenCalledWith(typed, USER.password);
+  });
+
+  it('accepts passwords shorter than the current policy, which applies when a password is set', async () => {
+    await login(loginRequest({ email: USER.email, password: 'short' }));
+    expect(bcrypt.compare).toHaveBeenCalledWith('short', USER.password);
+  });
+
+  it('rejects an overlong password as a failed login without checking it', async () => {
+    const response = await login(loginRequest({ email: USER.email, password: 'x'.repeat(129) }));
+    expect(response.status).toBe(401);
+    expect(bcrypt.compare).not.toHaveBeenCalled();
   });
 });
 
@@ -190,7 +207,11 @@ describe('successful login', () => {
       role: USER.role,
       isActive: true,
     });
-    expect(data.refreshToken).not.toBe(body.session.token);
+    // The browser gets an opaque refresh token; the session stores only its hash
+    expect(body.session.refreshToken).toEqual(expect.any(String));
+    expect(body.session.refreshToken.length).toBeGreaterThanOrEqual(40);
+    expect(data.refreshToken).toBe(hashRefreshToken(body.session.refreshToken));
+    expect(data.refreshToken).not.toContain(body.session.refreshToken);
     expect(new Date(body.session.expiresAt).getTime()).toBe(data.expiresAt.getTime());
   });
 
@@ -226,6 +247,7 @@ describe('server errors', () => {
     (prisma.users.findFirst as jest.Mock).mockRejectedValue(new Error('connection refused'));
     const response = await login(loginRequest(VALID));
     expect(response.status).toBe(500);
-    expect((await response.json()).error).toBe('Internal server error');
+    // Internal error details are logged, not returned
+    expect(await response.json()).toEqual({ error: 'Internal server error' });
   });
 });

@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { resolveUserProvisioning } from '@/lib/application/user-provisioning';
+import { normalizeEmail } from '@/lib/email';
 
 const prisma = new PrismaClient();
 
@@ -116,6 +117,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ [API_ADMIN_USERS_POST] Authentication successful for:', auth.user.email);
 
     const userData = await request.json();
+    userData.email = normalizeEmail(userData.email);
     console.log('📝 [API_ADMIN_USERS_POST] User data received:', { 
       name: userData.name, 
       email: userData.email, 

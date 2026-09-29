@@ -145,19 +145,28 @@ describe('validatePassword with every rule enabled', () => {
 describe('generateSecurePassword', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it('builds a password of the requested length with every character class', () => {
-    jest.spyOn(Math, 'random').mockReturnValue(0.3);
-    const password = generateSecurePassword(24);
-    expect(password).toHaveLength(24);
-    expect(password).toMatch(/[A-Z]/);
-    expect(password).toMatch(/[a-z]/);
-    expect(password).toMatch(/[0-9]/);
-    expect(password).toMatch(/[^A-Za-z0-9]/);
+  it('builds passwords of the requested length with every character class, every time', () => {
+    // The old generator indexed a 26-character set with a random number up to 32,
+    // so roughly one in five passwords contained the text "undefined".
+    for (let i = 0; i < 500; i++) {
+      const password = generateSecurePassword(24);
+      expect(password).toHaveLength(24);
+      expect(password).not.toContain('undefined');
+      expect(password).toMatch(/[A-Z]/);
+      expect(password).toMatch(/[a-z]/);
+      expect(password).toMatch(/[0-9]/);
+      expect(password).toMatch(/[^A-Za-z0-9]/);
+    }
   });
 
   it('defaults to 20 characters', () => {
-    jest.spyOn(Math, 'random').mockReturnValue(0.1);
     expect(generateSecurePassword()).toHaveLength(20);
+  });
+
+  it('uses a cryptographic random source, not Math.random', () => {
+    const random = jest.spyOn(Math, 'random');
+    generateSecurePassword(32);
+    expect(random).not.toHaveBeenCalled();
   });
 });
 

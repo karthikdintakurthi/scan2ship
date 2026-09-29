@@ -191,6 +191,13 @@ describe('successful registration', () => {
     });
   });
 
+  it('stores the email lower-cased and trimmed, the form login looks up', async () => {
+    actAs('client_admin');
+    await registerUser(signedRequest({ ...NEW_USER, email: '  New@Client-A.TEST ' }));
+    expect(prisma.users.findFirst).toHaveBeenCalledWith({ where: { email: NEW_USER.email, clientId: 'client-a' } });
+    expect(createdUsers()).toEqual([expect.objectContaining({ email: NEW_USER.email })]);
+  });
+
   it('never stores or returns the plain-text password or its hash', async () => {
     actAs('client_admin');
     const body = await (await registerUser(signedRequest(NEW_USER))).json();

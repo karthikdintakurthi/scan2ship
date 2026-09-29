@@ -72,14 +72,17 @@ export function sanitizeString(
     });
   }
 
-  // Encode HTML entities
-  sanitized = sanitized
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
+  // Encode HTML entities for plain text. With allowHTML, DOMPurify's output is
+  // the permitted HTML itself; encoding it would turn every tag into text.
+  if (!allowHTML) {
+    sanitized = sanitized
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;')
+      .replace(/\//g, '&#x2F;');
+  }
 
   // Limit length
   if (maxLength && sanitized.length > maxLength) {
@@ -283,12 +286,9 @@ export function sanitizePhoneNumber(phone: string): string {
   // Remove all non-digit characters except + at the beginning
   let sanitized = phone.replace(/[^\d+]/g, '');
   
-  // Ensure + is only at the beginning
+  // Keep at most one +, and only at the beginning
   if (sanitized.includes('+')) {
-    const plusIndex = sanitized.indexOf('+');
-    if (plusIndex > 0) {
-      sanitized = '+' + sanitized.replace(/\+/g, '');
-    }
+    sanitized = '+' + sanitized.replace(/\+/g, '');
   }
   
   // Basic validation - should be 10-15 digits
