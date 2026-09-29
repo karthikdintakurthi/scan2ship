@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { DelhiveryService } from '@/lib/delhivery';
 import { generateReferenceNumber, formatReferenceNumber, generateReferenceNumberWithPrefix, formatReferenceNumberWithPrefix } from '@/lib/reference-number';
 import AnalyticsService from '@/lib/analytics-service';
-import { CreditService } from '@/lib/credit-service';
+import { CreditService, InsufficientCreditsError, type CreditCharge } from '@/lib/credit-service';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { WebhookService } from '@/lib/webhook-service';
@@ -47,16 +47,7 @@ export async function POST(request: NextRequest) {
 
     console.log('📦 [API_ORDERS_POST] Creating order for client ID:', client.id);
 
-    // Check if client has sufficient credits for order creation
     const orderCreditCost = CreditService.getCreditCost('ORDER');
-    const hasSufficientCredits = await CreditService.hasSufficientCredits(client.id, orderCreditCost);
-    
-    if (!hasSufficientCredits) {
-      return NextResponse.json({ 
-        error: 'Insufficient credits',
-        details: `Order creation requires ${orderCreditCost} credits. Please contact your administrator to add more credits.`
-      }, { status: 402 });
-    }
 
     // Validate required fields
     const requiredFields = ['name', 'mobile', 'address', 'city', 'state', 'country', 'pincode', 'courier_service', 'pickup_location', 'package_value', 'weight', 'total_items'];
@@ -186,6 +177,28 @@ export async function POST(request: NextRequest) {
     // Log the processed data for debugging
     console.log('🔍 [API_ORDERS_POST] Processed order data:', processedOrderData);
 
+    // Take the credit before booking so a shipment is never booked unpaid; refund it if the order is not created
+    let charge: CreditCharge;
+    try {
+      charge = await CreditService.deductCredits(client.id, orderCreditCost, 'Order creation', 'ORDER', user.id);
+    } catch (creditError) {
+      if (creditError instanceof InsufficientCreditsError) {
+        return NextResponse.json({
+          error: 'Insufficient credits',
+          details: `Order creation requires ${orderCreditCost} credits. Please contact your administrator to add more credits.`
+        }, { status: 402 });
+      }
+      throw creditError;
+    }
+
+    const refundCharge = async (reason: string) => {
+      try {
+        await CreditService.refundCredits(client.id, orderCreditCost, `Refund: ${reason}`, 'ORDER', user.id);
+      } catch (refundError) {
+        console.error('❌ [API_ORDERS_POST] Credit refund failed; reconcile manually:', { transactionId: charge.transactionId, refundError });
+      }
+    };
+
     // Handle Delhivery API call first if courier service is Delhivery (case-insensitive) and skip_tracking is not enabled
     let delhiveryResponse = null;
     if (orderData.courier_service && typeof orderData.courier_service === 'string' && orderData.courier_service.toLowerCase() === 'delhivery' && !orderData.skip_tracking) {
@@ -206,6 +219,7 @@ export async function POST(request: NextRequest) {
         
         if (!delhiveryResponse.success) {
           console.log('❌ [API_ORDERS_POST] Delhivery API failed, not creating order');
+          await refundCharge('Delhivery booking failed');
           return NextResponse.json({
             success: false,
             error: 'Delhivery API failed',
@@ -222,6 +236,7 @@ export async function POST(request: NextRequest) {
           stack: error instanceof Error ? error.stack : undefined
         });
         
+        await refundCharge('Delhivery booking failed');
         return NextResponse.json({
           success: false,
           error: 'Delhivery API failed',
@@ -245,37 +260,69 @@ export async function POST(request: NextRequest) {
       tracking_status: processedOrderData.tracking_id ? null : 'pending'
     };
     
-    const order = await prisma.orders.create({
-      data: orderDataToCreate
-    });
-
-    console.log('✅ [API_ORDERS_POST] Order created successfully:', order.id);
-
-    // Update order with Delhivery data if available
-    if (delhiveryResponse && delhiveryResponse.success) {
-      await prisma.orders.update({
-        where: { id: order.id },
-        data: {
-          delhivery_waybill_number: delhiveryResponse.waybill_number,
-          delhivery_order_id: delhiveryResponse.order_id,
-          delhivery_api_status: 'success',
-          tracking_status: 'manifested',
-          tracking_id: delhiveryResponse.waybill_number,
-          last_delhivery_attempt: new Date()
-        }
+    let order: Awaited<ReturnType<typeof prisma.orders.create>> | undefined;
+    try {
+      order = await prisma.orders.create({
+        data: orderDataToCreate
       });
-      
-      console.log('✅ [API_ORDERS_POST] Delhivery data updated in order');
+
+      console.log('✅ [API_ORDERS_POST] Order created successfully:', order.id);
+
+      // Update order with Delhivery data if available
+      if (delhiveryResponse && delhiveryResponse.success) {
+        await prisma.orders.update({
+          where: { id: order.id },
+          data: {
+            delhivery_waybill_number: delhiveryResponse.waybill_number,
+            delhivery_order_id: delhiveryResponse.order_id,
+            delhivery_api_status: 'success',
+            tracking_status: 'manifested',
+            tracking_id: delhiveryResponse.waybill_number,
+            last_delhivery_attempt: new Date()
+          }
+        });
+
+        console.log('✅ [API_ORDERS_POST] Delhivery data updated in order');
+      }
+    } catch (saveError) {
+      console.error('❌ [API_ORDERS_POST] Failed to save order:', saveError);
+
+      if (!order && delhiveryResponse?.success && delhiveryResponse.waybill_number) {
+        // Do not leave a live waybill with no order row
+        const cancelResult = await delhiveryService.cancelOrder(
+          delhiveryResponse.waybill_number,
+          processedOrderData.pickup_location,
+          client.id
+        );
+        if (!cancelResult.success) {
+          console.error('❌ [API_ORDERS_POST] Waybill cancellation failed; reconcile manually:', {
+            waybill: delhiveryResponse.waybill_number,
+            error: cancelResult.error
+          });
+        }
+      }
+
+      if (!order) {
+        await refundCharge('order could not be saved');
+        return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
+      }
+
+      // The order and any waybill exist and remain charged; only saving carrier details failed
+      const createdOrderId = order.id;
+      await CreditService.attachOrderToTransaction(charge.transactionId, createdOrderId).catch((ledgerError) =>
+        console.error('❌ [API_ORDERS_POST] Could not link credit charge to order:', { transactionId: charge.transactionId, orderId: createdOrderId, ledgerError })
+      );
+      return NextResponse.json({
+        error: 'Order was created but its carrier details could not be saved',
+        orderId: createdOrderId,
+        waybill: delhiveryResponse?.waybill_number
+      }, { status: 500 });
     }
 
-    // Deduct credits for order creation
     try {
-      await CreditService.deductOrderCredits(client.id, user.id, order.id);
-      console.log('💳 [API_ORDERS_POST] Credits deducted for order creation:', orderCreditCost);
-    } catch (creditError) {
-      console.error('❌ [API_ORDERS_POST] Failed to deduct credits:', creditError);
-      // Note: We don't fail the order creation if credit deduction fails
-      // The order is already created, but we log the error
+      await CreditService.attachOrderToTransaction(charge.transactionId, order.id);
+    } catch (ledgerError) {
+      console.error('❌ [API_ORDERS_POST] Could not link credit charge to order:', { transactionId: charge.transactionId, orderId: order.id, ledgerError });
     }
 
     // Track order creation analytics

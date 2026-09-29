@@ -5,7 +5,7 @@ export interface CreditTransaction {
   id: string;
   clientId: string;
   userId?: string;
-  type: 'ADD' | 'DEDUCT' | 'RESET';
+  type: 'ADD' | 'DEDUCT' | 'RESET' | 'REFUND';
   amount: number;
   balance: number;
   description: string;
@@ -22,6 +22,27 @@ export interface ClientCredits {
   totalUsed: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface CreditCharge extends ClientCredits {
+  transactionId: string;
+}
+
+export class InsufficientCreditsError extends Error {
+  constructor(public readonly required: number) {
+    super('Insufficient credits');
+    this.name = 'InsufficientCreditsError';
+  }
+}
+
+function assertPositiveCreditAmount(amount: number) {
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    throw new Error(`Credit amount must be a positive integer, got ${amount}`);
+  }
+}
+
+function newTransactionId() {
+  return `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 // Credit costs for different features
@@ -72,40 +93,30 @@ export class CreditService {
     userId?: string,
     clientName?: string
   ): Promise<ClientCredits> {
+    assertPositiveCreditAmount(amount);
     try {
-      const result = await prisma.$transaction(async (tx) => {
-        // Get or create client credits
-        let credits = await tx.client_credits.findUnique({
-          where: { clientId }
-        });
-
-        if (!credits) {
-          credits = await tx.client_credits.create({
-            data: {
-              id: `credits-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              clientId,
-              balance: 0,
-              totalAdded: 0,
-              totalUsed: 0,
-              updatedAt: new Date()
-            }
-          });
-        }
-
-        // Update credits
-        const updatedCredits = await tx.client_credits.update({
+      return await prisma.$transaction(async (tx) => {
+        // Single atomic increment so concurrent additions are never lost
+        const updatedCredits = await tx.client_credits.upsert({
           where: { clientId },
-          data: {
-            balance: credits.balance + amount,
-            totalAdded: credits.totalAdded + amount,
+          create: {
+            id: `credits-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            clientId,
+            balance: amount,
+            totalAdded: amount,
+            totalUsed: 0,
+            updatedAt: new Date()
+          },
+          update: {
+            balance: { increment: amount },
+            totalAdded: { increment: amount },
             updatedAt: new Date()
           }
         });
 
-        // Create transaction record
         await tx.credit_transactions.create({
           data: {
-            id: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: newTransactionId(),
             clientId,
             clientName: clientName || 'Unknown Client',
             userId,
@@ -120,8 +131,6 @@ export class CreditService {
 
         return updatedCredits;
       });
-
-      return result;
     } catch (error) {
       console.error('Error adding credits:', error);
       throw new Error('Failed to add credits');
@@ -129,7 +138,8 @@ export class CreditService {
   }
 
   /**
-   * Deduct credits from client
+   * Deduct credits from client. Throws InsufficientCreditsError when the
+   * balance is too low; the check and the decrement are one conditional update.
    */
   static async deductCredits(
     clientId: string,
@@ -139,36 +149,30 @@ export class CreditService {
     userId?: string,
     orderId?: number,
     clientName?: string
-  ): Promise<ClientCredits> {
+  ): Promise<CreditCharge> {
+    assertPositiveCreditAmount(amount);
     try {
-      const result = await prisma.$transaction(async (tx) => {
-        // Get client credits
-        const credits = await tx.client_credits.findUnique({
-          where: { clientId }
-        });
-
-        if (!credits) {
-          throw new Error('Client credits not found');
-        }
-
-        if (credits.balance < amount) {
-          throw new Error('Insufficient credits');
-        }
-
-        // Update credits
-        const updatedCredits = await tx.client_credits.update({
-          where: { clientId },
+      return await prisma.$transaction(async (tx) => {
+        const { count } = await tx.client_credits.updateMany({
+          where: { clientId, balance: { gte: amount } },
           data: {
-            balance: credits.balance - amount,
-            totalUsed: credits.totalUsed + amount,
+            balance: { decrement: amount },
+            totalUsed: { increment: amount },
             updatedAt: new Date()
           }
         });
 
-        // Create transaction record
+        if (count === 0) {
+          throw new InsufficientCreditsError(amount);
+        }
+
+        // Row is locked by the update above until commit, so this reads our own result
+        const updatedCredits = await tx.client_credits.findUniqueOrThrow({ where: { clientId } });
+        const transactionId = newTransactionId();
+
         await tx.credit_transactions.create({
           data: {
-            id: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: transactionId,
             clientId,
             clientName: clientName || 'Unknown Client',
             userId,
@@ -182,14 +186,65 @@ export class CreditService {
           }
         });
 
-        return updatedCredits;
+        return { ...updatedCredits, transactionId };
       });
-
-      return result;
     } catch (error) {
+      if (error instanceof InsufficientCreditsError) throw error;
       console.error('Error deducting credits:', error);
       throw new Error('Failed to deduct credits');
     }
+  }
+
+  /**
+   * Return credits taken by a charge whose work did not complete.
+   */
+  static async refundCredits(
+    clientId: string,
+    amount: number,
+    description: string,
+    feature: keyof typeof CREDIT_COSTS,
+    userId?: string,
+    orderId?: number
+  ): Promise<ClientCredits> {
+    assertPositiveCreditAmount(amount);
+    return prisma.$transaction(async (tx) => {
+      const updatedCredits = await tx.client_credits.update({
+        where: { clientId },
+        data: {
+          balance: { increment: amount },
+          totalUsed: { decrement: amount },
+          updatedAt: new Date()
+        }
+      });
+
+      await tx.credit_transactions.create({
+        data: {
+          id: newTransactionId(),
+          clientId,
+          clientName: 'Unknown Client',
+          userId,
+          type: 'REFUND',
+          amount,
+          balance: updatedCredits.balance,
+          description,
+          feature,
+          orderId,
+          createdAt: new Date()
+        }
+      });
+
+      return updatedCredits;
+    });
+  }
+
+  /**
+   * Link a charge made before its order existed to the order.
+   */
+  static async attachOrderToTransaction(transactionId: string, orderId: number): Promise<void> {
+    await prisma.credit_transactions.update({
+      where: { id: transactionId },
+      data: { orderId }
+    });
   }
 
   /**

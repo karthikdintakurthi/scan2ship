@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateApiKey, hasPermission } from '@/lib/api-key-auth';
+import { CreditService, InsufficientCreditsError, type CreditCharge } from '@/lib/credit-service';
 
 // GET /api/external/orders - Get orders using API key authentication
 export async function GET(request: NextRequest) {
@@ -119,49 +120,35 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Check client credits
-    const clientCredits = await prisma.client_credits.findUnique({
-      where: { clientId: apiKey.clientId }
-    });
-
-    if (!clientCredits || clientCredits.balance < 1) {
-      return NextResponse.json({ 
-        error: 'Insufficient credits' 
-      }, { status: 402 });
+    // Take the credit first with a conditional decrement; refund it if the order is not created
+    let charge: CreditCharge;
+    try {
+      charge = await CreditService.deductCredits(apiKey.clientId, CreditService.getCreditCost('ORDER'), 'Order creation via API', 'ORDER');
+    } catch (creditError) {
+      if (creditError instanceof InsufficientCreditsError) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
+      throw creditError;
     }
 
-    // Create order
-    const order = await prisma.orders.create({
-      data: {
-        ...orderData,
-        clientId: apiKey.clientId,
-        created_at: new Date(),
-        updated_at: new Date()
-      }
-    });
+    let order: Awaited<ReturnType<typeof prisma.orders.create>>;
+    try {
+      order = await prisma.orders.create({
+        data: {
+          ...orderData,
+          clientId: apiKey.clientId,
+          created_at: new Date(),
+          updated_at: new Date()
+        }
+      });
+    } catch (createError) {
+      await CreditService.refundCredits(apiKey.clientId, CreditService.getCreditCost('ORDER'), 'Refund: API order could not be saved', 'ORDER')
+        .catch((refundError) => console.error('External orders refund failed; reconcile manually:', { transactionId: charge.transactionId, refundError }));
+      throw createError;
+    }
 
-    // Deduct credit
-    await prisma.client_credits.update({
-      where: { clientId: apiKey.clientId },
-      data: { 
-        balance: { decrement: 1 },
-        totalUsed: { increment: 1 }
-      }
-    });
-
-    // Create credit transaction record
-    await prisma.credit_transactions.create({
-      data: {
-        id: crypto.randomUUID(),
-        clientId: apiKey.clientId,
-        type: 'debit',
-        amount: 1,
-        balance: clientCredits.balance - 1,
-        description: 'Order creation via API',
-        feature: 'ORDER',
-        orderId: order.id
-      }
-    });
+    await CreditService.attachOrderToTransaction(charge.transactionId, order.id)
+      .catch((ledgerError) => console.error('External orders: could not link credit charge to order:', { transactionId: charge.transactionId, orderId: order.id, ledgerError }));
 
     return NextResponse.json({
       success: true,
