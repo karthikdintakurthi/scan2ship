@@ -22,7 +22,7 @@ const INVALID = { error: 'Invalid refresh token' };
 export async function POST(request: NextRequest) {
   try {
     const securityResponse = await applySecurityMiddleware(request, new NextResponse(), {
-      rateLimit: 'auth',
+      rateLimit: 'session',
       cors: true,
       securityHeaders: true,
     });

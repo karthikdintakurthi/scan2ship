@@ -17,6 +17,7 @@ jest.mock('@/lib/security-middleware', () => ({
 import bcrypt from 'bcryptjs';
 import { prisma as realPrisma } from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-middleware';
+import { applySecurityMiddleware } from '@/lib/security-middleware';
 import { signSessionToken } from '@/lib/session-tokens';
 import { authUserRow, liveSessionFor, signedRequest, TEST_USER_ID } from '@/test-utils/auth-request';
 import type { createPrismaMock } from '@/test-utils/prisma-mock';
@@ -98,6 +99,8 @@ describe('POST /api/auth/logout', () => {
   it("ends only the presented token's session", async () => {
     const response = await logout(requestWith('token-on-this-device'));
     expect(response.status).toBe(200);
+    // Uses the ordinary per-user limit, not the strict sign-in limit
+    expect(applySecurityMiddleware).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ rateLimit: 'api' }));
     expect(prisma.sessions.updateMany).toHaveBeenCalledWith({
       where: { sessionToken: 'token-on-this-device', isActive: true },
       data: { isActive: false, revokedAt: expect.any(Date) },

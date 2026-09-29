@@ -9,7 +9,11 @@ import { createHash } from 'crypto';
 
 // Rate limiting configuration
 const rateLimitConfig = {
+  // Password sign-in and registration: strict, to slow password guessing
   auth: { windowMs: 15 * 60 * 1000, maxRequests: 5 },
+  // Token refresh: needs a 256-bit random token, so guessing is not a concern;
+  // kept separate so refreshes never use up the sign-in allowance
+  session: { windowMs: 15 * 60 * 1000, maxRequests: 60 },
   api: { windowMs: 15 * 60 * 1000, maxRequests: 100 },
   upload: { windowMs: 15 * 60 * 1000, maxRequests: 10 },
   webhook: { windowMs: 60 * 1000, maxRequests: 120 },
@@ -59,7 +63,7 @@ function tokenFingerprint(token: string): string {
  */
 function getClientIdentifier(request: NextRequest, type: keyof typeof rateLimitConfig): string {
   // Public and auth endpoints must not let a caller pick its bucket with a token
-  if (type === 'tracking' || type === 'auth' || type === 'webhook') {
+  if (type === 'tracking' || type === 'auth' || type === 'session' || type === 'webhook') {
     return `ip:${getClientIp(request)}`;
   }
 

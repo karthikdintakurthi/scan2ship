@@ -8,7 +8,11 @@ import { rateLimit as persistentRateLimit } from './persistent-rate-limiter';
 
 // Rate limiting configuration (for reference)
 const rateLimitConfig = {
+  // Password sign-in and registration: strict, to slow password guessing
   auth: { windowMs: 15 * 60 * 1000, maxRequests: 5 },
+  // Token refresh: needs a 256-bit random token, so guessing is not a concern;
+  // kept separate so refreshes never use up the sign-in allowance
+  session: { windowMs: 15 * 60 * 1000, maxRequests: 60 },
   api: { windowMs: 15 * 60 * 1000, maxRequests: 100 },
   upload: { windowMs: 15 * 60 * 1000, maxRequests: 10 },
   webhook: { windowMs: 60 * 1000, maxRequests: 20 },

@@ -12,7 +12,8 @@ import { applySecurityMiddleware } from '@/lib/security-middleware';
  */
 export async function POST(request: NextRequest) {
   const securityResponse = await applySecurityMiddleware(request, new NextResponse(), {
-    rateLimit: 'auth',
+    // Logout must never be blocked by, or use up, the sign-in limit
+    rateLimit: 'api',
     cors: true,
     securityHeaders: true,
   });

@@ -76,7 +76,7 @@ describe('request validation', () => {
     const limited = { status: 429, json: async () => ({ error: 'Too many requests' }) };
     (applySecurityMiddleware as jest.Mock).mockResolvedValueOnce(limited);
     expect(await refresh(refreshRequest({ refreshToken: REFRESH_TOKEN }))).toBe(limited);
-    expect(applySecurityMiddleware).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ rateLimit: 'auth' }));
+    expect(applySecurityMiddleware).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ rateLimit: 'session' }));
     expect(findSession()).not.toHaveBeenCalled();
   });
 

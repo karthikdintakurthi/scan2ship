@@ -176,3 +176,26 @@ describe('consumeFixedWindow', () => {
     expect(result).toEqual({ allowed: true, remaining: 2, resetTime: windowStart.getTime() + 60_000 });
   });
 });
+
+describe('sign-in and session limits', () => {
+  const upsert = () => prisma.rate_limits.upsert as jest.Mock;
+  const keys = () => upsert().mock.calls.map(([args]) => args.where.key);
+
+  beforeEach(() => {
+    upsert().mockResolvedValue({ key: 'k', count: 1, windowStart: new Date() });
+  });
+
+  it('counts token refreshes in their own per-IP bucket, never against sign-in', async () => {
+    const ip = { 'x-real-ip': '203.0.113.9' };
+    await rateLimit(request(ip), 'auth');
+    await rateLimit(request({ ...ip, authorization: 'Bearer aaaaaaaaaaaaaaaaaaaa' }), 'session');
+    expect(keys()).toEqual(['auth:ip:203.0.113.9', 'session:ip:203.0.113.9']);
+  });
+
+  it('allows 60 refreshes per window', async () => {
+    upsert().mockResolvedValue({ key: 'k', count: 60, windowStart: new Date() });
+    expect((await rateLimit(request({ 'x-real-ip': '1.1.1.1' }), 'session')).allowed).toBe(true);
+    upsert().mockResolvedValue({ key: 'k', count: 61, windowStart: new Date() });
+    expect((await rateLimit(request({ 'x-real-ip': '1.1.1.1' }), 'session')).allowed).toBe(false);
+  });
+});
