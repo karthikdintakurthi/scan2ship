@@ -12,11 +12,13 @@ Switch the whole site into maintenance without a redeploy, even when the databas
 
 In every mode, static files, `/maintenance`, and `/api/maintenance/status` keep working. Carrier webhooks and cron jobs (`/api/webhooks/*`, `/api/cron/*`) keep running unless `pauseBackground` is `true`.
 
-## Switching it (Vercel Edge Config)
+## Switching it (Vercel Global Config)
 
-One-time setup: Vercel project → **Storage** → **Create Edge Config** → connect it to the project. This sets `EDGE_CONFIG`; redeploy once.
+Vercel renamed Edge Config to **Global Config** (2026); the code uses `@vercel/global-config`, which reads `GLOBAL_CONFIG` and falls back to `EDGE_CONFIG`.
 
-Then edit the store's items. There is no redeploy; changes apply within seconds.
+One-time setup: open the project in Vercel → **Storage** → **Create Storage** → **Global Config** → **Continue** → name the store (for example `scan2ship-maintenance`) → **Create**. Connecting it to the project creates the `GLOBAL_CONFIG` environment variable. Scope that variable to the environments that should obey the switch (for beta: Preview, branch `feature/mcp-implementation`), then redeploy once. The Hobby plan allows one store.
+
+Then edit the store's **Items**. There is no redeploy.
 
 ```json
 { "maintenance": { "mode": "full", "message": "Upgrading Scan2Ship", "until": "2026-10-01T18:30:00Z" } }
@@ -30,9 +32,9 @@ Then edit the store's items. There is no redeploy; changes apply within seconds.
 | `banner` | Advance notice shown at the bottom of the app while `mode` is `off`, e.g. "Scheduled maintenance tonight 11 PM – 12 AM IST" |
 | `pauseBackground` | `true` also pauses webhooks and cron |
 
-To end maintenance, set `mode` to `off` (or delete the key). If Edge Config cannot be read, the site stays up.
+To end maintenance, set `mode` to `off` (or delete the key). Changes reach every region within about 10 seconds. If Global Config cannot be read, the site stays up.
 
-Without Edge Config, set `MAINTENANCE_MODE`, `MAINTENANCE_MESSAGE`, and `MAINTENANCE_UNTIL` as environment variables and redeploy.
+Without a connected store, set `MAINTENANCE_MODE`, `MAINTENANCE_MESSAGE`, and `MAINTENANCE_UNTIL` as environment variables and redeploy.
 
 ## Using the site during maintenance
 

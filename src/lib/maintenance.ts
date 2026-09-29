@@ -1,16 +1,17 @@
 /**
- * Maintenance mode. The switch lives in Vercel Edge Config (key "maintenance")
+ * Maintenance mode. The switch lives in Vercel Global Config (formerly Edge
+ * Config), key "maintenance",
  * so it can be flipped in seconds without a redeploy and without the database,
- * which may itself be what is under maintenance. Without Edge Config it falls
- * back to the MAINTENANCE_MODE environment variable.
+ * which may itself be what is under maintenance. Without a connected store it
+ * falls back to the MAINTENANCE_MODE environment variable.
  *
  * Edge-safe: used by src/middleware.ts, so no Prisma or Node-only imports.
  *
- * Edge Config value, e.g.:
+ * Global Config value, e.g.:
  *   { "mode": "read_only", "message": "Upgrading the database", "until": "2026-10-01T18:30:00Z" }
  *   { "mode": "off", "banner": "Scheduled maintenance tonight 11 PM - 12 AM IST" }
  */
-import { get } from '@vercel/edge-config';
+import { get } from '@vercel/global-config';
 
 export type MaintenanceMode = 'off' | 'read_only' | 'full';
 
@@ -62,11 +63,12 @@ export function parseMaintenance(raw: unknown): MaintenanceState {
 /** Current state. Never throws: if the setting cannot be read, the site stays up. */
 export async function readMaintenance(): Promise<MaintenanceState> {
   try {
-    if (process.env.EDGE_CONFIG) {
+    // Connecting a store sets GLOBAL_CONFIG (older connections: EDGE_CONFIG); the SDK reads either
+    if (process.env.GLOBAL_CONFIG || process.env.EDGE_CONFIG) {
       return parseMaintenance(await get('maintenance'));
     }
   } catch (error) {
-    console.error('⚠️ [MAINTENANCE] Could not read Edge Config; treating as off:', error instanceof Error ? error.message : String(error));
+    console.error('⚠️ [MAINTENANCE] Could not read Global Config; treating as off:', error instanceof Error ? error.message : String(error));
     return MAINTENANCE_OFF;
   }
   return parseMaintenance({

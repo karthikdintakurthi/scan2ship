@@ -1,11 +1,11 @@
 /**
  * @jest-environment node
  *
- * Maintenance mode: the switch (Edge Config, else env), the per-request
+ * Maintenance mode: the switch (Global Config, else env), the per-request
  * decision, the middleware (bypass cookie, redirects, 503s), the status
  * endpoint, and MCP pausing its write tools in read-only mode.
  */
-jest.mock('@vercel/edge-config', () => ({ get: jest.fn() }));
+jest.mock('@vercel/global-config', () => ({ get: jest.fn() }));
 
 // Minimal next/server stand-in: the middleware only needs these behaviours
 jest.mock('next/server', () => {
@@ -32,7 +32,7 @@ jest.mock('next/server', () => {
   };
 });
 
-import { get as edgeGet } from '@vercel/edge-config';
+import { get as edgeGet } from '@vercel/global-config';
 import {
   BYPASS_COOKIE,
   decideMaintenance,
@@ -81,13 +81,14 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env.EDGE_CONFIG = 'https://edge-config.vercel.com/ecfg_test?token=t';
+  process.env.GLOBAL_CONFIG = 'https://global-config.vercel.com/ecfg_test?token=t';
+  delete process.env.EDGE_CONFIG;
   process.env.MAINTENANCE_BYPASS_SECRET = SECRET;
   delete process.env.MAINTENANCE_MODE;
 });
 
 describe('reading the switch', () => {
-  it('reads Edge Config and ignores unknown modes', async () => {
+  it('reads Global Config and ignores unknown modes', async () => {
     edge.mockResolvedValue({ mode: 'read_only', message: 'DB upgrade', until: '2026-10-01T18:30:00Z' });
     expect(await readMaintenance()).toMatchObject({ mode: 'read_only', message: 'DB upgrade', until: '2026-10-01T18:30:00Z' });
     expect(parseMaintenance({ mode: 'FULL' }).mode).toBe('off');
@@ -95,14 +96,21 @@ describe('reading the switch', () => {
     expect(parseMaintenance({ mode: 'full', until: 'not a date' }).until).toBeNull();
   });
 
-  it('keeps the site up if Edge Config cannot be read', async () => {
+  it('keeps the site up if Global Config cannot be read', async () => {
     edge.mockRejectedValue(new Error('network'));
     jest.spyOn(console, 'error').mockImplementation(() => {});
     expect((await readMaintenance()).mode).toBe('off');
   });
 
-  it('falls back to MAINTENANCE_MODE without Edge Config', async () => {
-    delete process.env.EDGE_CONFIG;
+  it('also reads a store connected before the rename (EDGE_CONFIG)', async () => {
+    delete process.env.GLOBAL_CONFIG;
+    process.env.EDGE_CONFIG = 'https://edge-config.vercel.com/ecfg_old?token=t';
+    edge.mockResolvedValue({ mode: 'full' });
+    expect((await readMaintenance()).mode).toBe('full');
+  });
+
+  it('falls back to MAINTENANCE_MODE without a connected store', async () => {
+    delete process.env.GLOBAL_CONFIG;
     process.env.MAINTENANCE_MODE = 'full';
     expect((await readMaintenance()).mode).toBe('full');
     expect(edge).not.toHaveBeenCalled();
