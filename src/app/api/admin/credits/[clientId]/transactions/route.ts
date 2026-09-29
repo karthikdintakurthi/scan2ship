@@ -24,7 +24,7 @@ export async function GET(
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.SUPER_ADMIN,
       requiredPermissions: [PermissionLevel.READ],
       requireActiveUser: true,
       requireActiveClient: true

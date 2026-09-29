@@ -513,7 +513,7 @@ describe('Admin Users API', () => {
 
       // Assert
       expect(authorizeUser).toHaveBeenCalledWith(mockRequest, {
-        requiredRole: UserRole.ADMIN,
+        requiredRole: UserRole.SUPER_ADMIN,
         requiredPermissions: [PermissionLevel.READ],
         requireActiveUser: true,
         requireActiveClient: true,
@@ -536,7 +536,7 @@ describe('Admin Users API', () => {
 
       // Assert
       expect(authorizeUser).toHaveBeenCalledWith(mockRequest, {
-        requiredRole: UserRole.ADMIN,
+        requiredRole: UserRole.SUPER_ADMIN,
         requiredPermissions: [PermissionLevel.WRITE],
         requireActiveUser: true,
         requireActiveClient: true,
@@ -559,7 +559,7 @@ describe('Admin Users API', () => {
 
       // Assert
       expect(authorizeUser).toHaveBeenCalledWith(mockRequest, {
-        requiredRole: UserRole.ADMIN,
+        requiredRole: UserRole.SUPER_ADMIN,
         requiredPermissions: [PermissionLevel.WRITE],
         requireActiveUser: true,
         requireActiveClient: true,
@@ -582,7 +582,7 @@ describe('Admin Users API', () => {
 
       // Assert
       expect(authorizeUser).toHaveBeenCalledWith(mockRequest, {
-        requiredRole: UserRole.ADMIN,
+        requiredRole: UserRole.SUPER_ADMIN,
         requiredPermissions: [PermissionLevel.DELETE],
         requireActiveUser: true,
         requireActiveClient: true,

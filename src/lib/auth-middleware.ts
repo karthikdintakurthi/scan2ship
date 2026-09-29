@@ -290,7 +290,11 @@ export function hasRequiredRole(user: AuthenticatedUser, requiredRole: UserRole)
 
   console.log(`🔒 [ROLE_CHECK] User role: ${user.role}, level: ${userRoleLevel}`);
   console.log(`🔒 [ROLE_CHECK] Required role: ${requiredRole}, level: ${requiredRoleLevel}`);
-  console.log(`🔒 [ROLE_CHECK] Comparison: ${userRoleLevel} >= ${requiredRoleLevel} = ${userRoleLevel >= requiredRoleLevel}`);
+
+  if (userRoleLevel === undefined || requiredRoleLevel === undefined) {
+    console.error(`🚨 [ROLE_CHECK] Unknown role (user: ${user.role}, required: ${requiredRole}); denying access`);
+    return false;
+  }
 
   return userRoleLevel >= requiredRoleLevel;
 }
@@ -328,8 +332,9 @@ export async function authorizeUser(
   request: NextRequest,
   options: AuthorizationOptions = {}
 ): Promise<{ user: AuthenticatedUser; response?: NextResponse } | { user: null; response: NextResponse }> {
+  // An explicitly passed but undefined role must be denied, not replaced by the default.
+  const requiredRole = 'requiredRole' in options ? options.requiredRole! : UserRole.USER;
   const {
-    requiredRole = UserRole.USER,
     requiredPermissions = [],
     requireActiveUser = true,
     requireActiveClient = true,
@@ -415,18 +420,6 @@ export async function authorizeUser(
 }
 
 /**
- * Admin-only authorization
- */
-export async function authorizeAdmin(request: NextRequest): Promise<{ user: AuthenticatedUser; response?: NextResponse } | { user: null; response: NextResponse }> {
-  return authorizeUser(request, {
-    requiredRole: UserRole.ADMIN,
-    requiredPermissions: [PermissionLevel.ADMIN],
-    requireActiveUser: true,
-    requireActiveClient: true
-  });
-}
-
-/**
  * Super admin authorization
  */
 export async function authorizeSuperAdmin(request: NextRequest): Promise<{ user: AuthenticatedUser; response?: NextResponse } | { user: null; response: NextResponse }> {
@@ -463,8 +456,8 @@ export async function canAccessResource(
     return true;
   }
 
-  // Admins can access resources from their client
-  if (userRole === UserRole.ADMIN) {
+  // Client admins can access resources from their client
+  if (userRole === UserRole.CLIENT_ADMIN) {
     const user = await prisma.users.findUnique({
       where: { id: userId },
       select: { clientId: true }

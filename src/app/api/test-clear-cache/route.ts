@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.SUPER_ADMIN,
       requiredPermissions: [PermissionLevel.ADMIN],
       requireActiveUser: true,
       requireActiveClient: true

@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.SUPER_ADMIN,
       requiredPermissions: [PermissionLevel.ADMIN],
       requireActiveUser: true,
       requireActiveClient: false  // System config should be accessible regardless of client status
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.SUPER_ADMIN,
       requiredPermissions: [PermissionLevel.ADMIN],
       requireActiveUser: true,
       requireActiveClient: false  // System config should be accessible regardless of client status
@@ -272,7 +272,7 @@ export async function PUT(request: NextRequest) {
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.SUPER_ADMIN,
       requiredPermissions: [PermissionLevel.ADMIN],
       requireActiveUser: true,
       requireActiveClient: false  // System config should be accessible regardless of client status

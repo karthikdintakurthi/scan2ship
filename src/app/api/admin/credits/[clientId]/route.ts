@@ -24,7 +24,7 @@ export async function GET(
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.SUPER_ADMIN,
       requiredPermissions: [PermissionLevel.READ],
       requireActiveUser: true,
       requireActiveClient: true
@@ -88,7 +88,7 @@ export async function POST(
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.SUPER_ADMIN,
       requiredPermissions: [PermissionLevel.WRITE],
       requireActiveUser: true,
       requireActiveClient: true
@@ -168,7 +168,7 @@ export async function PUT(
 
     // Authorize admin user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.ADMIN,
+      requiredRole: UserRole.SUPER_ADMIN,
       requiredPermissions: [PermissionLevel.WRITE],
       requireActiveUser: true,
       requireActiveClient: true
