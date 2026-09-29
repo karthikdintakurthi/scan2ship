@@ -265,10 +265,10 @@ Each PR is independently shippable and carries route-level tests. Ordered by exp
 6. **Credential exposure (done in `bb01fce`).** Authorize all cross-app mapping handlers and return key-free DTOs; pickup reads return `hasApiKey`; settings forms keep an existing key when left blank; remove raw-key logging. Rotate Delhivery and Catalog keys after release.
 7. **Credits (done in `0936240` and `cb3096c`).** Pending recharge requests with a unique UTR and admin approval; conditional credit decrement; order creation stops ignoring debit failures.
 8. **Public tracking (done in `23f289a`).** Minimal masked output and IP rate limiting.
-9. **Shopify and Delhivery webhook (on hold).** Authenticated Shopify initiation, strict shop-domain validation, shop bound to state, HMAC check; shared-secret header on the Delhivery webhook with tenant-scoped updates.
+9. **Shopify and Delhivery webhook (skipped for now).** Authenticated Shopify initiation, strict shop-domain validation, shop bound to state, HMAC check; shared-secret header on the Delhivery webhook with tenant-scoped updates.
 
-10. **Partner API keys (on hold).** Store only a hash of each key and show the raw key once at creation; stop returning keys from `GET /api/api-keys`; accept only known permission scopes and never `*`; record the issuing user; keep expiry and revocation.
-11. **Catalog proxy permissions (on hold).** `/api/catalog` accepts any action with READ permission, including `reduce_inventory` and `restore_inventory`. Require WRITE for inventory changes and reject unknown actions.
+10. **Partner API keys (done in `84968b6`).** Store only a hash of each key and show the raw key once at creation; stop returning keys from `GET /api/api-keys`; accept only known permission scopes and never `*`; record the issuing user; keep expiry and revocation.
+11. **Catalog proxy permissions (done in `09a3be1`).** `/api/catalog` accepts any action with READ permission, including `reduce_inventory` and `restore_inventory`. Require WRITE for inventory changes and reject unknown actions.
 
 ### Findings from implementing PRs 5–8
 
@@ -278,6 +278,12 @@ Each PR is independently shippable and carries route-level tests. Ordered by exp
 - **Fulfillment is not charged.** `orders/[id]/fulfill` and `retry-delhivery` book Delhivery shipments without deducting credits.
 - **UTR is optional on recharge requests.** Admin approval is the control, but requests without a UTR are harder to verify; consider requiring one in the recharge form.
 - **Parallel Jest workers crash loading the Next SWC binary** in this environment; the suites pass with `--runInBand`. CI should run in band until this is understood.
+
+### Findings from implementing PRs 10–11
+
+- **`api_keys` has drifted.** The local table has an integer `id` and an integer `clientId`, while tenant IDs are strings and `schema.prisma` says `String`, so issuing API keys cannot work against that database. PR 10's migration only adds columns and rewrites values, so it applies whatever the column types are; confirm the production table shape before relying on partner keys.
+- **Every tenant role has WRITE.** `child_user` holds READ, WRITE, and DELETE, so permission-level checks like "requires WRITE" do not separate roles today. PR 11 therefore binds inventory reduction to an accessible order instead of relying on the permission alone.
+- **Catalog reductions are not idempotent on the Scan2Ship side.** Repeating `reduce_inventory` for the same order sends the same `scan2ship_order_<id>` reference; whether Catalog ignores the repeat depends on the Catalog app.
 
 ### Phase 1–3 outline
 
