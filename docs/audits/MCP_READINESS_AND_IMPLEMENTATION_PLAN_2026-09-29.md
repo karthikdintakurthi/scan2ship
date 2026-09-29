@@ -2,6 +2,8 @@
 
 Date: 2026-09-29 · Repository commit: `6c639f6`
 
+> Historical baseline and implementation log. For the current `feature/mcp-implementation` assessment at `3d13739`, see the [branch re-audit](/Users/karthiknaidudintakurthi/Documents/GitHub/scan2ship/docs/audits/MCP_BRANCH_REAUDIT_3d13739.md). Several findings below have since been fixed or removed; the re-audit records remaining defects and current verification results.
+
 ## Recommendation
 
 Build a remote MCP server that lets customers connect their own AI assistants to their Scan2Ship account. Start with order search, shipment status, shipping estimates, and account configuration. Add shipment creation and pickup booking after authorization, billing, and retry handling are repaired.
