@@ -216,6 +216,18 @@ export function operationView(op: shipment_operations) {
   };
 }
 
+/** Why a previewed courier or pickup location can no longer be used, or null. */
+async function staleShipmentChoice(principal: McpPrincipal, orderData: Record<string, unknown>): Promise<string | null> {
+  const options = await listShippingOptions(principal.user);
+  if (!options.courierServices.some((row) => sameText(row.code, String(orderData.courier_service)))) {
+    return `Courier "${orderData.courier_service}" is no longer active`;
+  }
+  if (!options.pickupLocations.some((row) => row.value === orderData.pickup_location)) {
+    return `Pickup location "${orderData.pickup_location}" is no longer available to you`;
+  }
+  return null;
+}
+
 export async function findOwnOperation(principal: McpPrincipal, id: string) {
   return prisma.shipment_operations.findFirst({
     where: { id, tenantId: principal.tenantId, userId: principal.userId, channel: CHANNEL },
@@ -269,6 +281,19 @@ export async function createShipment(principal: McpPrincipal, previewId: string)
   // createOrder takes the DTDC number now (not at preview), so abandoned previews
   // do not use one up, and returns it if the order is not created
   const { [AUTO_DTDC_SLIP]: autoSlip, ...orderData } = operation.payload as Record<string, unknown>;
+
+  // Settings may have changed since the preview: the courier must still be
+  // active and the pickup location still one this user may use
+  const stale = await staleShipmentChoice(principal, orderData).catch(
+    (error) => `Could not re-check the courier and pickup location: ${error instanceof Error ? error.message : String(error)}`
+  );
+  if (stale) {
+    const updated = await prisma.shipment_operations.update({
+      where: { id: operation.id },
+      data: { status: 'failed', error: stale },
+    });
+    return { ...operationView(updated), hint: 'Nothing was charged. Prepare the shipment again with a currently available option.' };
+  }
 
   let outcome: Awaited<ReturnType<typeof createOrder>>;
   try {

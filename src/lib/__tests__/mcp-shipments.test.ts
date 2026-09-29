@@ -291,6 +291,19 @@ describe('create_shipment', () => {
     expect(createOrderMock).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ['the courier was deactivated', { courierServices: [] }, /Courier "delhivery" is no longer active/],
+    ['the pickup location was unassigned', { pickupLocations: [] }, /Pickup location "main-warehouse" is no longer available/],
+  ])('refuses to create when %s after the preview, charging nothing', async (_case, change, message) => {
+    const id = await preview();
+    const current = await (listShippingOptions as jest.Mock)();
+    (listShippingOptions as jest.Mock).mockResolvedValue({ ...current, ...change });
+
+    const result = await createShipment(principalFor(), id);
+    expect(result).toMatchObject({ status: 'failed', error: expect.stringMatching(message), hint: expect.stringMatching(/Nothing was charged/) });
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
+
   it('enforces the daily limit on assistant-created orders', async () => {
     process.env.MCP_DAILY_SHIPMENT_LIMIT = '1';
     const first = await preview();

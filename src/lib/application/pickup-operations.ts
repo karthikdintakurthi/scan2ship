@@ -168,6 +168,27 @@ export async function schedulePickup(principal: McpPrincipal, previewId: string)
   if (!operation) throw new McpToolError('not_found', 'Preview not found');
   const payload = operation.payload as PickupPayload;
 
+  // Assignments may have changed since the preview: every location must still
+  // be one this user may use
+  let stale: string | null;
+  try {
+    const permitted = await prisma.pickup_locations.findMany({
+      where: await pickupAccessWhere(principal.user),
+      select: { value: true },
+    });
+    const revoked = payload.locations.filter((value) => !permitted.some((row) => row.value === value));
+    stale = revoked.length > 0 ? `No longer available to you: ${revoked.join(', ')}` : null;
+  } catch (error) {
+    stale = `Could not re-check the pickup locations: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  if (stale) {
+    const updated = await prisma.shipment_operations.update({
+      where: { id: operation.id },
+      data: { status: 'failed', error: stale },
+    });
+    return { ...operationView(updated), hint: 'Nothing was sent to Delhivery. Prepare the pickup again.' };
+  }
+
   let outcome: Awaited<ReturnType<typeof requestPickups>>;
   try {
     outcome = await requestPickups(principal.user, payload);

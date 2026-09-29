@@ -232,10 +232,29 @@ describe('MCP pickups', () => {
 
   it('marks an unexpected failure mid-booking for reconciliation, not retry', async () => {
     const { previewId } = await preparePickup(principal(), INPUT);
-    (prisma.pickup_locations.findMany as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+    const findMany = prisma.pickup_locations.findMany as jest.Mock;
+    // The confirmation re-check passes; the booking step then fails
+    findMany.mockImplementationOnce(findMany.getMockImplementation()!).mockRejectedValueOnce(new Error('db down'));
     const result = await schedulePickup(principal(), previewId);
     expect(result).toMatchObject({ status: 'reconciliation_required', note: expect.stringMatching(/do not request a duplicate pickup/) });
     expect(await schedulePickup(principal(), previewId)).toMatchObject({ status: 'reconciliation_required', replayed: true });
+  });
+
+  it('refuses a location that stopped being available after the preview, without calling Delhivery', async () => {
+    const { previewId } = await preparePickup(principal(), { ...INPUT, pickupLocations: ['Main Warehouse', 'Branch'] });
+    const findMany = prisma.pickup_locations.findMany as jest.Mock;
+    findMany.mockResolvedValueOnce([LOCATIONS[0]]);
+
+    const result = await schedulePickup(principal(), previewId);
+    expect(result).toMatchObject({ status: 'failed', error: 'No longer available to you: branch', hint: expect.stringMatching(/Nothing was sent/) });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fails without booking when the re-check itself cannot run', async () => {
+    const { previewId } = await preparePickup(principal(), INPUT);
+    (prisma.pickup_locations.findMany as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+    expect(await schedulePickup(principal(), previewId)).toMatchObject({ status: 'failed', error: expect.stringMatching(/Could not re-check/) });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('keeps shipment and pickup previews apart', async () => {
