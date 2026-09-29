@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { generateApiKey, parseApiKeyExpiry, parseApiKeyScopes, toApiKeyDto } from '@/lib/application/api-key-provisioning';
 
 // GET /api/api-keys - List API keys for the client
 export async function GET(request: NextRequest) {
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
-        key: true,
+        keyPrefix: true,
         permissions: true,
         lastUsedAt: true,
         expiresAt: true,
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     });
 
-    const response = NextResponse.json({ apiKeys });
+    const response = NextResponse.json({ apiKeys: apiKeys.map(toApiKeyDto) });
     securityHeaders(response);
     return response;
   } catch (error) {
@@ -78,10 +79,10 @@ export async function POST(request: NextRequest) {
       return securityResponse;
     }
 
-    // Authorize user
+    // Keys act for the whole tenant, so only tenant admins may issue them
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
-      requiredPermissions: [PermissionLevel.WRITE],
+      requiredRole: UserRole.CLIENT_ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
       requireActiveUser: true,
       requireActiveClient: true
     });
@@ -93,45 +94,46 @@ export async function POST(request: NextRequest) {
 
     const user = authResult.user!;
 
-    const { name, permissions = ['orders:read'], expiresInDays } = await request.json();
+    const { name, permissions = ['orders:read'], expiresInDays } = (await request.json()) ?? {};
 
-    if (!name) {
+    if (!name || typeof name !== 'string') {
       return NextResponse.json({ error: 'API key name is required' }, { status: 400 });
     }
 
-    // Generate API key
-    const apiKey = `sk_${crypto.randomBytes(32).toString('hex')}`;
-    const secret = crypto.randomBytes(32).toString('hex');
+    const scopes = parseApiKeyScopes(permissions);
+    if (!scopes.ok) {
+      return NextResponse.json({ error: scopes.error }, { status: 400 });
+    }
 
-    // Calculate expiration date
-    const expiresAt = expiresInDays 
-      ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
-      : null;
+    const expiry = parseApiKeyExpiry(expiresInDays);
+    if (!expiry.ok) {
+      return NextResponse.json({ error: expiry.error }, { status: 400 });
+    }
+
+    const { raw, hash, prefix } = generateApiKey();
 
     const newApiKey = await prisma.api_keys.create({
       data: {
         id: crypto.randomUUID(),
         name,
-        key: apiKey,
-        secret,
+        key: hash,
+        keyPrefix: prefix,
+        createdById: user.id,
         clientId: user.clientId,
-        permissions,
-        expiresAt
+        permissions: scopes.value,
+        expiresAt: expiry.value,
+        updatedAt: new Date()
       }
     });
 
     const response = NextResponse.json({
       success: true,
+      message: 'Copy this key now. It will not be shown again.',
       apiKey: {
-        id: newApiKey.id,
-        name: newApiKey.name,
-        key: newApiKey.key,
-        secret: newApiKey.secret, // Only returned on creation
-        permissions: newApiKey.permissions,
-        expiresAt: newApiKey.expiresAt,
-        createdAt: newApiKey.createdAt
+        ...toApiKeyDto(newApiKey),
+        key: raw
       }
-    });
+    }, { status: 201 });
     securityHeaders(response);
     return response;
   } catch (error) {

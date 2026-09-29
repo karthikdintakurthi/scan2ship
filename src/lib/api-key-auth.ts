@@ -2,10 +2,24 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
+export const API_KEY_SCOPES = ['orders:read', 'orders:write', 'courier-services:read', 'courier-services:write'] as const;
+export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
+
+const HASH_PREFIX = 'sha256:';
+
+/** Keys are stored only as this hash; the raw key is shown once at creation. */
+export function hashApiKey(rawKey: string): string {
+  return HASH_PREFIX + crypto.createHash('sha256').update(rawKey, 'utf8').digest('hex');
+}
+
+export function isApiKeyScope(value: unknown): value is ApiKeyScope {
+  return typeof value === 'string' && (API_KEY_SCOPES as readonly string[]).includes(value);
+}
+
 export interface AuthenticatedApiKey {
   id: string;
   name: string;
-  key: string;
+  keyPrefix: string | null;
   clientId: string;
   permissions: string[];
   lastUsedAt: Date | null;
@@ -20,14 +34,14 @@ export async function authenticateApiKey(request: NextRequest): Promise<Authenti
     return null;
   }
 
-  const apiKey = authHeader.substring(7);
-  
-  // SECURITY: Hardcoded API key removed for security
-  // All API keys must be stored in database and properly managed
-  
+  const apiKey = authHeader.substring(7).trim();
+  if (!apiKey) {
+    return null;
+  }
+
   try {
     const keyRecord = await prisma.api_keys.findUnique({
-      where: { key: apiKey },
+      where: { key: hashApiKey(apiKey) },
       include: {
         clients: true
       }
@@ -61,7 +75,7 @@ export async function authenticateApiKey(request: NextRequest): Promise<Authenti
     return {
       id: keyRecord.id,
       name: keyRecord.name,
-      key: keyRecord.key,
+      keyPrefix: keyRecord.keyPrefix,
       clientId: keyRecord.clientId,
       permissions: keyRecord.permissions,
       lastUsedAt: keyRecord.lastUsedAt,
@@ -74,8 +88,9 @@ export async function authenticateApiKey(request: NextRequest): Promise<Authenti
   }
 }
 
-export function hasPermission(apiKey: AuthenticatedApiKey, requiredPermission: string): boolean {
-  return apiKey.permissions.includes(requiredPermission) || apiKey.permissions.includes('*');
+/** Exact scope match only; wildcard grants are not honored. */
+export function hasPermission(apiKey: AuthenticatedApiKey, requiredPermission: ApiKeyScope): boolean {
+  return apiKey.permissions.includes(requiredPermission);
 }
 
 export function validateHmacSignature(

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
-import { authenticateApiKey } from '@/lib/api-key-auth';
+import { authenticateApiKey, hasPermission } from '@/lib/api-key-auth';
 
 interface RateCalculationRequest {
   origin: {
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check permissions
-    if (!apiKey.permissions.includes('orders:read')) {
+    if (!hasPermission(apiKey, 'orders:read')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
@@ -255,6 +255,10 @@ export async function GET(request: NextRequest) {
     const apiKey = await authenticateApiKey(request);
     if (!apiKey) {
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+    }
+
+    if (!hasPermission(apiKey, 'orders:read')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
     // Get courier services for the client

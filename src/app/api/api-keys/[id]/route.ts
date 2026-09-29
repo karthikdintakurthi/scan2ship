@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { parseApiKeyScopes, toApiKeyDto } from '@/lib/application/api-key-provisioning';
 
 // PUT /api/api-keys/[id] - Update API key
 export async function PUT(
@@ -24,8 +25,8 @@ export async function PUT(
 
     // Authorize user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
-      requiredPermissions: [PermissionLevel.WRITE],
+      requiredRole: UserRole.CLIENT_ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
       requireActiveUser: true,
       requireActiveClient: true
     });
@@ -38,7 +39,16 @@ export async function PUT(
     const user = authResult.user!;
 
     const { id } = await params;
-    const { name, permissions, isActive } = await request.json();
+    const { name, permissions, isActive } = (await request.json()) ?? {};
+
+    let scopes: string[] | undefined;
+    if (permissions !== undefined) {
+      const parsed = parseApiKeyScopes(permissions);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      scopes = parsed.value;
+    }
 
     const apiKey = await prisma.api_keys.findFirst({
       where: { 
@@ -55,7 +65,7 @@ export async function PUT(
       where: { id },
       data: {
         ...(name && { name }),
-        ...(permissions && { permissions }),
+        ...(scopes && { permissions: scopes }),
         ...(isActive !== undefined && { isActive }),
         updatedAt: new Date()
       }
@@ -63,17 +73,7 @@ export async function PUT(
 
     const response = NextResponse.json({
       success: true,
-      apiKey: {
-        id: updatedApiKey.id,
-        name: updatedApiKey.name,
-        key: updatedApiKey.key,
-        permissions: updatedApiKey.permissions,
-        lastUsedAt: updatedApiKey.lastUsedAt,
-        expiresAt: updatedApiKey.expiresAt,
-        isActive: updatedApiKey.isActive,
-        createdAt: updatedApiKey.createdAt,
-        updatedAt: updatedApiKey.updatedAt
-      }
+      apiKey: toApiKeyDto(updatedApiKey)
     });
     securityHeaders(response);
     return response;
@@ -105,8 +105,8 @@ export async function DELETE(
 
     // Authorize user
     const authResult = await authorizeUser(request, {
-      requiredRole: UserRole.USER,
-      requiredPermissions: [PermissionLevel.DELETE],
+      requiredRole: UserRole.CLIENT_ADMIN,
+      requiredPermissions: [PermissionLevel.ADMIN],
       requireActiveUser: true,
       requireActiveClient: true
     });

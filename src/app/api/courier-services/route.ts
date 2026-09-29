@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
-import { authenticateApiKey } from '@/lib/api-key-auth';
+import { authenticateApiKey, hasPermission } from '@/lib/api-key-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,6 +38,11 @@ export async function GET(request: NextRequest) {
       const apiKey = await authenticateApiKey(request);
       
       if (apiKey) {
+        if (!hasPermission(apiKey, 'courier-services:read')) {
+          const response = NextResponse.json({ error: 'API key lacks the courier-services:read permission' }, { status: 403 });
+          securityHeaders(response);
+          return response;
+        }
         // API key authentication successful
         clientId = apiKey.clientId;
         console.log(`🔑 [API_COURIER_SERVICES_GET] API key authentication successful for client: ${clientId}`);
@@ -143,6 +148,11 @@ export async function POST(request: NextRequest) {
       const apiKey = await authenticateApiKey(request);
       
       if (apiKey) {
+        if (!hasPermission(apiKey, 'courier-services:write')) {
+          const response = NextResponse.json({ error: 'API key lacks the courier-services:write permission' }, { status: 403 });
+          securityHeaders(response);
+          return response;
+        }
         // API key authentication successful
         clientId = apiKey.clientId;
         console.log(`🔑 [API_COURIER_SERVICES_POST] API key authentication successful for client: ${clientId}`);
@@ -265,6 +275,11 @@ export async function PUT(request: NextRequest) {
       const apiKey = await authenticateApiKey(request);
       
       if (apiKey) {
+        if (!hasPermission(apiKey, 'courier-services:write')) {
+          const response = NextResponse.json({ error: 'API key lacks the courier-services:write permission' }, { status: 403 });
+          securityHeaders(response);
+          return response;
+        }
         // API key authentication successful
         clientId = apiKey.clientId;
         console.log(`🔑 [API_COURIER_SERVICES_PUT] API key authentication successful for client: ${clientId}`);

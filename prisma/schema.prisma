@@ -21,7 +21,10 @@ model analytics_events {
 model api_keys {
   id          String    @id
   name        String
+  /// "sha256:<hex>" of the raw key; the raw key is never stored
   key         String    @unique
+  keyPrefix   String?
+  createdById String?
   secret      String?
   clientId    String
   isActive    Boolean   @default(true)
