@@ -302,11 +302,13 @@ export async function createShipment(principal: McpPrincipal, previewId: string)
   // The order exists but its carrier details were not saved: it is charged, so
   // it must be reconciled rather than retried.
   const orderId = typeof outcome.body.orderId === 'number' ? outcome.body.orderId : null;
+  // Delhivery may have booked it (timeout, 5xx): not a failure, and not safe to retry
+  const outcomeUnknown = outcome.body.outcome === 'unknown';
   const reason = [outcome.body.error, outcome.body.details].filter(Boolean).join(': ');
   const updated = await prisma.shipment_operations.update({
     where: { id: operation.id },
     data: {
-      status: orderId ? 'reconciliation_required' : 'failed',
+      status: orderId || outcomeUnknown ? 'reconciliation_required' : 'failed',
       orderId,
       error: reason || 'Order could not be created',
     },

@@ -46,6 +46,25 @@ interface DelhiveryCreateOrderResponse {
   error?: string;
 }
 
+/** Longest we wait for Delhivery; keeps a booking within Vercel's 30-second function limit. */
+const DELHIVERY_TIMEOUT_MS = 20_000;
+
+/**
+ * Delhivery may or may not have acted on the request: it timed out, the network
+ * failed, it answered 5xx, or its success reply could not be read. For a
+ * booking this means a waybill may exist, so the request must not be retried
+ * or treated as a failure; it needs reconciliation.
+ */
+export class DelhiveryOutcomeUnknownError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DelhiveryOutcomeUnknownError';
+  }
+}
+
+/** Delhivery definitely did not act on the request (4xx). */
+class DelhiveryRejectedError extends Error {}
+
 export class DelhiveryService {
   private baseUrl: string;
   private maxRetries: number;
@@ -60,7 +79,18 @@ export class DelhiveryService {
     console.log('  Note: API Key will be taken from pickup location configuration')
   }
 
-  private async makeRequest(endpoint: string, options: RequestInit, apiKey: string, retryCount = 0): Promise<any> {
+  /**
+   * @param retry Retry transient failures. Only for requests that are safe to
+   *   repeat (e.g. cancellation); never for creating a shipment, where a retry
+   *   after an unknown outcome can book a second waybill.
+   */
+  private async makeRequest(
+    endpoint: string,
+    options: RequestInit,
+    apiKey: string,
+    { retry }: { retry: boolean },
+    retryCount = 0
+  ): Promise<any> {
     try {
       // Ensure the correct header format for Delhivery API
       const finalHeaders = {
@@ -96,10 +126,19 @@ export class DelhiveryService {
       console.log('  Request Body:', options.body || 'No body');
       console.log('  Retry Count:', retryCount);
       
-      const response = await fetch(fullUrl, {
-        ...options,
-        headers: finalHeaders,
-      });
+      let response: Response;
+      try {
+        response = await fetch(fullUrl, {
+          ...options,
+          headers: finalHeaders,
+          signal: AbortSignal.timeout(DELHIVERY_TIMEOUT_MS),
+        });
+      } catch (networkError) {
+        // Timed out or the connection failed: the request may have been processed
+        throw new DelhiveryOutcomeUnknownError(
+          `No response from Delhivery: ${networkError instanceof Error ? networkError.message : String(networkError)}`
+        );
+      }
 
       console.log('📡 Delhivery API Response Details:');
       console.log('  Status:', response.status);
@@ -107,20 +146,28 @@ export class DelhiveryService {
       console.log('  Response Headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
 
       if (!response.ok) {
-        const errorText = await response.text();
+        const errorText = await response.text().catch(() => '');
         console.log('  Error Response Body:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        const message = `HTTP ${response.status}: ${response.statusText} - ${errorText}`;
+        // A server error may come after Delhivery acted; a client error means it did not
+        throw response.status >= 500 ? new DelhiveryOutcomeUnknownError(message) : new DelhiveryRejectedError(message);
       }
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        throw new DelhiveryOutcomeUnknownError('Delhivery accepted the request but its reply could not be read');
+      }
       console.log('  Response Body:', JSON.stringify(result, null, 2));
       return result;
     } catch (error) {
-      console.error('❌ Delhivery API request failed:', error);
-      if (retryCount < this.maxRetries) {
+      console.error('❌ Delhivery API request failed:', error instanceof Error ? error.message : String(error));
+      // Rejections are final; only transient failures of repeatable requests are retried
+      if (retry && !(error instanceof DelhiveryRejectedError) && retryCount < this.maxRetries) {
         console.log(`🔄 Retrying Delhivery API request... (${retryCount + 1}/${this.maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
-        return this.makeRequest(endpoint, options, apiKey, retryCount + 1);
+        return this.makeRequest(endpoint, options, apiKey, { retry }, retryCount + 1);
       }
       throw error;
     }
@@ -278,7 +325,7 @@ export class DelhiveryService {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: requestBody
-      }, apiKey);
+      }, apiKey, { retry: false });
 
       // Log the response with proper formatting to show array contents
       console.log('✅ Delhivery order created successfully:');
@@ -476,7 +523,9 @@ export class DelhiveryService {
           },
           body: JSON.stringify(cancelPayload)
         },
-        apiKey
+        apiKey,
+        // Cancelling the same waybill twice is harmless
+        { retry: true }
       );
       
       console.log('✅ [DELHIVERY_CANCEL] Order cancelled successfully in Delhivery:', response);

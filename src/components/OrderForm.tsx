@@ -929,6 +929,11 @@ export default function OrderForm({ onOrderSuccess }: OrderFormProps) {
       const result = await response.json()
       
       if (!response.ok) {
+        // Delhivery may have booked it: tell the user to check before retrying
+        if (result.outcome === 'unknown') {
+          throw new Error(`${result.error}. ${result.details}${result.reference ? ` (Reference: ${result.reference})` : ''}`);
+        }
+
         // Handle specific Delhivery API errors
         if (result.error === 'Delhivery API failed') {
           const errorMessage = result.details || result.delhiveryError || 'Delhivery API failed. Please check your pickup location configuration and try again.';

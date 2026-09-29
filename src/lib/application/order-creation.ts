@@ -1,6 +1,6 @@
 import type { Prisma, orders } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { DelhiveryService } from '@/lib/delhivery';
+import { DelhiveryOutcomeUnknownError, DelhiveryService } from '@/lib/delhivery';
 import { generateReferenceNumberWithPrefix, formatReferenceNumberWithPrefix } from '@/lib/reference-number';
 import AnalyticsService from '@/lib/analytics-service';
 import { CreditService, InsufficientCreditsError, type CreditCharge } from '@/lib/credit-service';
@@ -13,9 +13,9 @@ const delhiveryService = new DelhiveryService();
 
 export type CreateOrderResult =
   | { ok: true; order: orders }
-  | { ok: false; status: 400 | 402 | 409 | 500; body: Record<string, unknown> };
+  | { ok: false; status: 400 | 402 | 409 | 500 | 502; body: Record<string, unknown> };
 
-function fail(status: 400 | 402 | 409 | 500, body: Record<string, unknown>): CreateOrderResult {
+function fail(status: 400 | 402 | 409 | 500 | 502, body: Record<string, unknown>): CreateOrderResult {
   return { ok: false, status, body };
 }
 
@@ -261,7 +261,25 @@ export async function createOrder(
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined
       });
-      
+
+      if (error instanceof DelhiveryOutcomeUnknownError) {
+        // Delhivery may have booked the shipment: keep the credit, save nothing,
+        // and have someone check Delhivery before this order is placed again
+        console.error('⚠️ [ORDER_CREATE] Delhivery booking outcome unknown; needs reconciliation:', {
+          transactionId: charge.transactionId,
+          reference: processedOrderData.reference_number,
+        });
+        return fail(502, {
+          success: false,
+          outcome: 'unknown',
+          error: 'Delhivery did not confirm the booking',
+          details:
+            'The shipment may or may not have been created with Delhivery. Check Delhivery for this reference before creating the order again. The credit has not been refunded yet.',
+          reference: processedOrderData.reference_number,
+          transactionId: charge.transactionId,
+        });
+      }
+
       await refundCharge('Delhivery booking failed');
       return fail(400, {
         success: false,

@@ -24,6 +24,7 @@ jest.mock('@/lib/delhivery', () => {
   return {
     delhiveryService: { cancelOrder, createOrder },
     DelhiveryService: jest.fn().mockImplementation(() => ({ cancelOrder, createOrder })),
+    DelhiveryOutcomeUnknownError: class DelhiveryOutcomeUnknownError extends Error {},
   };
 });
 jest.mock('@/lib/pickup-location-config', () => ({ getDelhiveryApiKey: jest.fn() }));

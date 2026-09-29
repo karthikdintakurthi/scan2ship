@@ -276,6 +276,13 @@ describe('create_shipment', () => {
     expect(result).toMatchObject({ status: 'reconciliation_required', orderId: 88, note: expect.stringMatching(/do not create a duplicate/) });
   });
 
+  it('marks an unknown Delhivery outcome for reconciliation, not failure', async () => {
+    createOrderMock.mockResolvedValue({ ok: false, status: 502, body: { outcome: 'unknown', error: 'Delhivery did not confirm the booking', details: 'Check Delhivery' } });
+    const result = await createShipment(principalFor(), await preview());
+    expect(result).toMatchObject({ status: 'reconciliation_required', orderId: null, note: expect.stringMatching(/do not create a duplicate/) });
+    expect(result).not.toHaveProperty('creditsRefunded');
+  });
+
   it('marks an unexpected failure for reconciliation instead of retrying', async () => {
     createOrderMock.mockRejectedValue(new Error('socket hang up'));
     const id = await preview();

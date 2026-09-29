@@ -22,6 +22,7 @@ jest.mock('@/lib/security-middleware', () => ({
 
 jest.mock('@/lib/delhivery', () => ({
   delhiveryService: { createOrder: jest.fn(), cancelOrder: jest.fn() },
+  DelhiveryOutcomeUnknownError: class DelhiveryOutcomeUnknownError extends Error {},
 }));
 jest.mock('@/lib/pickup-location-config', () => ({ getDelhiveryApiKey: jest.fn() }));
 jest.mock('@/lib/webhook-service', () => ({ WebhookService: { triggerWebhooks: jest.fn() } }));

@@ -15,6 +15,7 @@ jest.mock('@/lib/security-middleware', () => ({
 }));
 jest.mock('@/lib/delhivery', () => ({
   delhiveryService: { createOrder: jest.fn() },
+  DelhiveryOutcomeUnknownError: class DelhiveryOutcomeUnknownError extends Error {},
 }));
 jest.mock('@/lib/webhook-service', () => ({ WebhookService: { triggerWebhooks: jest.fn() } }));
 jest.mock('@/lib/credit-service', () => {

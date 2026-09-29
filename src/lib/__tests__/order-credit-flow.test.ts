@@ -12,6 +12,7 @@ jest.mock('@/lib/delhivery', () => {
   return {
     delhiveryService: { createOrder, cancelOrder },
     DelhiveryService: jest.fn().mockImplementation(() => ({ createOrder, cancelOrder })),
+    DelhiveryOutcomeUnknownError: class DelhiveryOutcomeUnknownError extends Error {},
   };
 });
 jest.mock('@/lib/credit-service', () => {

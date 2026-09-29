@@ -15,7 +15,7 @@ jest.mock('@/lib/security-middleware', () => ({
 }));
 jest.mock('@/lib/delhivery', () => {
   const instance = { createOrder: jest.fn(), cancelOrder: jest.fn() };
-  return { DelhiveryService: jest.fn(() => instance), __instance: instance };
+  return { DelhiveryService: jest.fn(() => instance), __instance: instance, DelhiveryOutcomeUnknownError: class DelhiveryOutcomeUnknownError extends Error {} };
 });
 jest.mock('@/lib/analytics-service', () => ({
   __esModule: true,
@@ -400,6 +400,21 @@ describe('POST /api/orders', () => {
       expect((await response.json()).error).toBe('Delhivery API failed');
       expect(CreditService.refundCredits).toHaveBeenCalledTimes(1);
       expect(prisma.orders.create).not.toHaveBeenCalled();
+    });
+
+    it('keeps the credit and reports an unknown outcome when Delhivery may have booked it', async () => {
+      actAs('user');
+      const { DelhiveryOutcomeUnknownError } = jest.requireMock('@/lib/delhivery');
+      delhivery.createOrder.mockRejectedValue(new DelhiveryOutcomeUnknownError('No response from Delhivery: timeout'));
+      const response = await post(DELHIVERY_ORDER);
+      const body = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(body).toMatchObject({ outcome: 'unknown', error: 'Delhivery did not confirm the booking', transactionId: 'txn-1' });
+      expect(body.details).toMatch(/Check Delhivery/);
+      expect(CreditService.refundCredits).not.toHaveBeenCalled();
+      expect(prisma.orders.create).not.toHaveBeenCalled();
+      expect(delhivery.createOrder).toHaveBeenCalledTimes(1);
     });
 
     it('cancels the booked waybill and refunds when the order cannot be saved', async () => {
