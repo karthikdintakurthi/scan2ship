@@ -103,3 +103,22 @@ export async function releaseDtdcSlip(clientId: string, courier: string, slip: s
   }
   console.error('❌ [DTDC_SLIPS] Could not return slip to the unused list; add it back in Settings:', slip);
 }
+
+export type ListedSlipClaim = 'claimed' | 'already_used' | 'not_listed';
+
+/**
+ * For a DTDC number the user supplied: move it to used if it is one of the
+ * account's unused numbers ('claimed'); report 'already_used' if another order
+ * has it (including one that took it a moment ago); otherwise 'not_listed' (a
+ * number from outside the lists, accepted as is).
+ */
+export async function claimListedDtdcSlip(clientId: string, courier: string, slip: string): Promise<ListedSlipClaim> {
+  const { unusedRow, usedRow } = await readSlips(clientId, courier);
+  if (parseList(unusedRow?.value).includes(slip)) {
+    if ((await claimDtdcSlip(clientId, courier, slip)) === slip) return 'claimed';
+    // Lost a race for this number: it is now used by the other order
+    const again = await readSlips(clientId, courier);
+    return parseList(again.usedRow?.value).includes(slip) ? 'already_used' : 'not_listed';
+  }
+  return parseList(usedRow?.value).includes(slip) ? 'already_used' : 'not_listed';
+}

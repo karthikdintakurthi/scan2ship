@@ -214,7 +214,7 @@ describe('create_shipment', () => {
     expect(createOrderMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'user-a' }),
       operations.get(id)!.payload,
-      { creationPattern: 'mcp' }
+      { creationPattern: 'mcp', assignNextDtdcSlip: false }
     );
   });
 

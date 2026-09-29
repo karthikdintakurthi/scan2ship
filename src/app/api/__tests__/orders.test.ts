@@ -279,6 +279,78 @@ describe('POST /api/orders', () => {
     });
   });
 
+  describe('creating a DTDC order', () => {
+    // DTDC numbers live in client_config as comma-separated unused/used lists
+    let slipConfig: Map<string, string>;
+    const slips = () => ({ unused: slipConfig.get('dtdc_slips_unused'), used: slipConfig.get('dtdc_slips_used') });
+
+    beforeEach(() => {
+      slipConfig = new Map([['dtdc_slips_unused', 'D100, D101'], ['dtdc_slips_used', 'D099']]);
+      (prisma.client_config.findMany as jest.Mock).mockImplementation(async ({ where }) =>
+        [...slipConfig.entries()].filter(([key]) => where.key.in.includes(key)).map(([key, value]) => ({ key, value }))
+      );
+      (prisma.client_config.updateMany as jest.Mock).mockImplementation(async ({ where, data }) => {
+        if (!slipConfig.has(where.key) || ('value' in where && slipConfig.get(where.key) !== where.value)) return { count: 0 };
+        slipConfig.set(where.key, data.value);
+        return { count: 1 };
+      });
+    });
+
+    const DTDC_ORDER = { ...VALID_ORDER, courier_service: 'dtdc' };
+
+    it('moves the submitted number from unused to used on the server', async () => {
+      actAs('user');
+      const response = await post({ ...DTDC_ORDER, waybill: 'D100' });
+      expect(response.status).toBe(200);
+      expect(createdOrder().tracking_id).toBe('D100');
+      expect(slips()).toEqual({ unused: 'D101', used: 'D099, D100' });
+    });
+
+    it('refuses a number another order already used, without charging', async () => {
+      actAs('user');
+      const response = await post({ ...DTDC_ORDER, waybill: 'D099' });
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toBe('DTDC tracking number D099 has already been used');
+      expect(CreditService.deductCredits).not.toHaveBeenCalled();
+      expect(prisma.orders.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses the second of two orders that were shown the same number', async () => {
+      actAs('user');
+      expect((await post({ ...DTDC_ORDER, waybill: 'D100' })).status).toBe(200);
+      expect((await post({ ...DTDC_ORDER, waybill: 'D100' })).status).toBe(409);
+      expect(prisma.orders.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('accepts a number from outside the lists and leaves the lists alone', async () => {
+      actAs('user');
+      expect((await post({ ...DTDC_ORDER, waybill: 'MANUAL-7' })).status).toBe(200);
+      expect(createdOrder().tracking_id).toBe('MANUAL-7');
+      expect(slips()).toEqual({ unused: 'D100, D101', used: 'D099' });
+    });
+
+    it('does not assign a number when the form leaves it empty', async () => {
+      actAs('user');
+      expect((await post(DTDC_ORDER)).status).toBe(200);
+      expect(createdOrder().tracking_id).toBeNull();
+      expect(slips().unused).toBe('D100, D101');
+    });
+
+    it('returns the number to the unused list when credits are insufficient', async () => {
+      actAs('user');
+      (CreditService.deductCredits as jest.Mock).mockRejectedValue(new InsufficientCreditsError(1));
+      expect((await post({ ...DTDC_ORDER, waybill: 'D101' })).status).toBe(402);
+      expect(slips()).toEqual({ unused: 'D101, D100', used: 'D099' });
+    });
+
+    it('returns the number when the order cannot be saved', async () => {
+      actAs('user');
+      (prisma.orders.create as jest.Mock).mockRejectedValue(new Error('db down'));
+      expect((await post({ ...DTDC_ORDER, waybill: 'D100' })).status).toBe(500);
+      expect(slips()).toEqual({ unused: 'D100, D101', used: 'D099' });
+    });
+  });
+
   describe('creating a Delhivery order', () => {
     const DELHIVERY_ORDER = { ...VALID_ORDER, courier_service: 'Delhivery' };
 

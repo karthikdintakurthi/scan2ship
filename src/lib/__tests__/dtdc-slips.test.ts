@@ -171,62 +171,49 @@ describe('slip helpers', () => {
   });
 });
 
-describe('shipments with DTDC', () => {
-  it('previews the next unused number without taking it, then takes it on creation', async () => {
+describe('MCP shipments with DTDC', () => {
+  // createOrder (mocked here) claims the number; see the order route tests for that part
+  it('previews the next unused number without taking it, and asks createOrder to assign one', async () => {
     setSlips('dtdc', 'D100, D101');
     const preview = await prepareShipment(principal, input());
     expect(preview.preview.trackingNumber).toMatch(/^D100 \(next unused DTDC number/);
     expect(slips().unused).toBe('D100, D101');
 
-    const created = await createShipment(principal, preview.previewId);
-    expect(created).toMatchObject({ status: 'succeeded', result: { trackingId: 'D100' } });
-    expect(createOrderMock.mock.calls[0][1]).toMatchObject({ tracking_id: 'D100' });
-    expect(createOrderMock.mock.calls[0][1]).not.toHaveProperty('_assignNextDtdcSlip');
-    expect(slips()).toEqual({ unused: 'D101', used: 'D100' });
+    await createShipment(principal, preview.previewId);
+    const [, orderData, options] = createOrderMock.mock.calls[0];
+    expect(options).toEqual({ creationPattern: 'mcp', assignNextDtdcSlip: true });
+    expect(orderData).not.toHaveProperty('_assignNextDtdcSlip');
+    expect(orderData).not.toHaveProperty('tracking_id');
   });
 
-  it('uses the DTDC variant\'s own list', async () => {
+  it('previews the next number from the DTDC variant\'s own list', async () => {
     setSlips('dtdc', 'D100');
     setSlips('dtdc_plus', 'P500');
     const preview = await prepareShipment(principal, input({ courierCode: 'dtdc_plus' }));
-    await createShipment(principal, preview.previewId);
-    expect(createOrderMock.mock.calls[0][1]).toMatchObject({ tracking_id: 'P500' });
-    expect(slips('dtdc').unused).toBe('D100');
+    expect(preview.preview.trackingNumber).toMatch(/^P500 /);
   });
 
-  it('creates the order without a tracking number when none are left', async () => {
+  it('says so when no numbers are left', async () => {
     setSlips('dtdc', '');
     const preview = await prepareShipment(principal, input());
     expect(preview.preview.trackingNumber).toMatch(/^none: no unused DTDC numbers/);
-    const created = await createShipment(principal, preview.previewId);
-    expect(created).toMatchObject({ status: 'succeeded' });
-    expect(createOrderMock.mock.calls[0][1]).not.toHaveProperty('tracking_id');
   });
 
-  it("uses the user's number and marks it used if it is one of the account's slips", async () => {
+  it("passes the user's own number instead of assigning one", async () => {
     setSlips('dtdc', 'D100, D101');
     const preview = await prepareShipment(principal, input({ trackingNumber: 'D101' }));
     await createShipment(principal, preview.previewId);
-    expect(createOrderMock.mock.calls[0][1]).toMatchObject({ tracking_id: 'D101' });
-    expect(slips()).toEqual({ unused: 'D100', used: 'D101' });
+    const [, orderData, options] = createOrderMock.mock.calls[0];
+    expect(orderData).toMatchObject({ tracking_id: 'D101' });
+    expect(options).toEqual({ creationPattern: 'mcp', assignNextDtdcSlip: false });
   });
 
-  it('returns the number when the order is not created', async () => {
-    setSlips('dtdc', 'D100, D101');
-    createOrderMock.mockResolvedValue({ ok: false, status: 402, body: { error: 'Insufficient credits' } });
-    const preview = await prepareShipment(principal, input());
-    expect(await createShipment(principal, preview.previewId)).toMatchObject({ status: 'failed' });
-    expect(slips()).toEqual({ unused: 'D100, D101', used: '' });
-  });
-
-  it('leaves India Post tracking optional and never touches DTDC slips', async () => {
-    setSlips('dtdc', 'D100');
+  it('leaves India Post tracking optional and never assigns a DTDC number', async () => {
     const withNumber = await prepareShipment(principal, input({ courierCode: 'india_post', trackingNumber: 'EE123456789IN' }));
     const without = await prepareShipment(principal, input({ courierCode: 'india_post' }));
     expect(withNumber.preview.trackingNumber).toBe('EE123456789IN');
     expect(without.preview.trackingNumber).toBeNull();
     await createShipment(principal, without.previewId);
-    expect(createOrderMock.mock.calls[0][1]).not.toHaveProperty('tracking_id');
-    expect(slips().unused).toBe('D100');
+    expect(createOrderMock.mock.calls[0][2]).toEqual({ creationPattern: 'mcp', assignNextDtdcSlip: false });
   });
 });

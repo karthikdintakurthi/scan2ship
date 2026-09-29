@@ -4,7 +4,7 @@ import { CreditService } from '@/lib/credit-service';
 import { getCreditBalanceReadOnly } from '@/lib/application/credits';
 import { createOrder, validateOrderInput } from '@/lib/application/order-creation';
 import { listShippingOptions } from '@/lib/application/shipping';
-import { claimDtdcSlip, isDtdcCourier, peekNextDtdcSlip, releaseDtdcSlip } from '@/lib/application/dtdc-slips';
+import { isDtdcCourier, peekNextDtdcSlip } from '@/lib/application/dtdc-slips';
 import type { PrepareShipmentInput } from '@/lib/application/schemas';
 import { areMcpWritesEnabled, mcpDailyShipmentLimit } from '@/lib/mcp/config';
 import { newId, sha256Hex } from '@/lib/mcp/crypto';
@@ -254,31 +254,13 @@ export async function createShipment(principal: McpPrincipal, previewId: string)
     );
   }
 
-  // Take the DTDC number now (not at preview) so abandoned previews do not use one up
+  // createOrder takes the DTDC number now (not at preview), so abandoned previews
+  // do not use one up, and returns it if the order is not created
   const { [AUTO_DTDC_SLIP]: autoSlip, ...orderData } = operation.payload as Record<string, unknown>;
-  const courierCode = String(orderData.courier_service ?? '');
-  let claimedSlip: string | null = null;
-  if (isDtdcCourier(courierCode)) {
-    try {
-      if (autoSlip) {
-        claimedSlip = await claimDtdcSlip(principal.tenantId, courierCode);
-        if (claimedSlip) orderData.tracking_id = claimedSlip;
-      } else if (typeof orderData.tracking_id === 'string') {
-        // A number the user gave is marked used if it is one of the account's slips
-        claimedSlip = await claimDtdcSlip(principal.tenantId, courierCode, orderData.tracking_id);
-      }
-    } catch (error) {
-      const updated = await prisma.shipment_operations.update({
-        where: { id: operation.id },
-        data: { status: 'failed', error: error instanceof Error ? error.message : String(error) },
-      });
-      return operationView(updated);
-    }
-  }
 
   let outcome: Awaited<ReturnType<typeof createOrder>>;
   try {
-    outcome = await createOrder(principal.user, orderData, { creationPattern: 'mcp' });
+    outcome = await createOrder(principal.user, orderData, { creationPattern: 'mcp', assignNextDtdcSlip: Boolean(autoSlip) });
   } catch (error) {
     // Unknown state: the credit or the carrier call may have happened
     const updated = await prisma.shipment_operations.update({
@@ -308,10 +290,6 @@ export async function createShipment(principal: McpPrincipal, previewId: string)
   // The order exists but its carrier details were not saved: it is charged, so
   // it must be reconciled rather than retried.
   const orderId = typeof outcome.body.orderId === 'number' ? outcome.body.orderId : null;
-  if (!orderId && claimedSlip) {
-    // No order was created, so the DTDC number is still unused
-    await releaseDtdcSlip(principal.tenantId, courierCode, claimedSlip);
-  }
   const reason = [outcome.body.error, outcome.body.details].filter(Boolean).join(': ');
   const updated = await prisma.shipment_operations.update({
     where: { id: operation.id },

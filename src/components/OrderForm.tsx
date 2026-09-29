@@ -414,68 +414,6 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
     }
   }
 
-  // Function to move used DTDC tracking number from unused to used section
-  const moveDtdcTrackingNumberToUsed = async (trackingNumber: string, courierType: string = 'dtdc') => {
-    try {
-      const token = localStorage.getItem('authToken')
-      if (!token) return
-
-      // First, get current DTDC slips configuration
-      const getResponse = await fetch(`/api/dtdc-slips?courier=${courierType}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!getResponse.ok) {
-        console.error(`❌ [DTDC_MOVE] Failed to fetch current ${courierType} slips configuration`)
-        return
-      }
-
-      const currentData = await getResponse.json()
-      if (!currentData.success || !currentData.dtdcSlips) {
-        console.error(`❌ [DTDC_MOVE] Invalid ${courierType} slips data`)
-        return
-      }
-
-      const { unused, used } = currentData.dtdcSlips
-      
-      // Remove the tracking number from unused section
-      const unusedNumbers = unused.split(',').map((num: string) => num.trim()).filter((num: string) => num !== trackingNumber)
-      const newUnused = unusedNumbers.join(', ')
-      
-      // Add the tracking number to used section
-      const usedNumbers = used.split(',').map((num: string) => num.trim()).filter(Boolean)
-      usedNumbers.push(trackingNumber)
-      const newUsed = usedNumbers.join(', ')
-
-      // Update the DTDC slips configuration
-      const updateResponse = await fetch('/api/dtdc-slips', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          dtdcSlips: {
-            ...currentData.dtdcSlips,
-            unused: newUnused,
-            used: newUsed
-          },
-          courierType: courierType
-        })
-      })
-
-      if (updateResponse.ok) {
-        console.log(`✅ [DTDC_MOVE] Successfully moved ${courierType} tracking number to used section:`, trackingNumber)
-      } else {
-        console.error(`❌ [DTDC_MOVE] Failed to update ${courierType} slips configuration`)
-      }
-    } catch (error) {
-      console.error(`❌ [DTDC_MOVE] Error moving ${courierType} tracking number to used section:`, error)
-    }
-  }
-
   const processAddress = async () => {
     if (!addressDetail.trim()) {
       setAddressProcessingError('Please enter an address to process')
@@ -1049,6 +987,14 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
           throw new Error(`Delhivery Error: ${errorMessage}`);
         }
         
+        // Another order took this DTDC number first: fill in the next one to retry with
+        const submittedCourier = typeof formData.courier_service === 'string' ? formData.courier_service.toLowerCase() : ''
+        if (response.status === 409 && ['dtdc', 'dtdc_cod', 'dtdc_plus'].includes(submittedCourier)) {
+          setFormData(prev => ({ ...prev, tracking_number: '' }))
+          await autoFillDtdcTrackingNumber(submittedCourier)
+          throw new Error(`${result.error}. The next available number has been filled in; please submit again.`)
+        }
+
         // Handle other API errors
         throw new Error(result.error || result.details || 'Failed to create order')
       }
@@ -1102,11 +1048,7 @@ export default function OrderForm({ selectedProducts = [], onOrderSuccess }: Ord
         // Refresh credit balance immediately after successful order creation
         refreshCredits();
         
-        // Move used DTDC tracking number from unused to used section if applicable
-        const courierService = formData.courier_service && typeof formData.courier_service === 'string' ? formData.courier_service.toLowerCase() : '';
-        if ((courierService === 'dtdc' || courierService === 'dtdc_cod' || courierService === 'dtdc_plus') && formData.tracking_number.trim()) {
-          await moveDtdcTrackingNumberToUsed(formData.tracking_number, courierService)
-        }
+        // The server moved the DTDC number to "used" when it created the order
         
         // Scroll to top of the page for better UX when entering next order
         window.scrollTo({ top: 0, behavior: 'smooth' })

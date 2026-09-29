@@ -7,14 +7,15 @@ import { CreditService, InsufficientCreditsError, type CreditCharge } from '@/li
 import { pickCreatableOrderFields } from '@/lib/application/order-fields';
 import { WebhookService } from '@/lib/webhook-service';
 import type { AuthenticatedUser } from '@/lib/auth-middleware';
+import { claimDtdcSlip, claimListedDtdcSlip, isDtdcCourier, releaseDtdcSlip } from '@/lib/application/dtdc-slips';
 
 const delhiveryService = new DelhiveryService();
 
 export type CreateOrderResult =
   | { ok: true; order: orders }
-  | { ok: false; status: 400 | 402 | 500; body: Record<string, unknown> };
+  | { ok: false; status: 400 | 402 | 409 | 500; body: Record<string, unknown> };
 
-function fail(status: 400 | 402 | 500, body: Record<string, unknown>): CreateOrderResult {
+function fail(status: 400 | 402 | 409 | 500, body: Record<string, unknown>): CreateOrderResult {
   return { ok: false, status, body };
 }
 
@@ -63,7 +64,11 @@ export function validateOrderInput(orderData: Record<string, unknown>): CreateOr
 export async function createOrder(
   user: AuthenticatedUser,
   orderData: Record<string, any>,
-  options: { creationPattern?: string } = {}
+  options: {
+    creationPattern?: string;
+    /** DTDC orders without a tracking number take the next unused number from Settings */
+    assignNextDtdcSlip?: boolean;
+  } = {}
 ): Promise<CreateOrderResult> {
   const client = user.client;
 
@@ -167,11 +172,42 @@ export async function createOrder(
   // Log the processed data for debugging
   console.log('🔍 [ORDER_CREATE] Processed order data:', processedOrderData);
 
+  // DTDC tracking numbers come from the account's list in Settings. Claim the
+  // number here, on the server, so two orders can never get the same one; it is
+  // released below if this order is not created.
+  const courierCode = typeof orderData.courier_service === 'string' ? orderData.courier_service : '';
+  let claimedSlip: string | null = null;
+  if (isDtdcCourier(courierCode)) {
+    const given = typeof processedOrderData.tracking_id === 'string' ? processedOrderData.tracking_id.trim() : '';
+    if (given) {
+      const claim = await claimListedDtdcSlip(client.id, courierCode, given);
+      if (claim === 'already_used') {
+        return fail(409, {
+          error: `DTDC tracking number ${given} has already been used`,
+          details: 'Use the next available number and try again.'
+        });
+      }
+      if (claim === 'claimed') claimedSlip = given;
+    } else if (options.assignNextDtdcSlip) {
+      claimedSlip = await claimDtdcSlip(client.id, courierCode);
+      if (claimedSlip) processedOrderData.tracking_id = claimedSlip;
+    }
+  }
+  const releaseSlip = async () => {
+    if (!claimedSlip) return;
+    try {
+      await releaseDtdcSlip(client.id, courierCode, claimedSlip);
+    } catch (releaseError) {
+      console.error('❌ [ORDER_CREATE] Could not return DTDC number to the unused list:', { slip: claimedSlip, releaseError });
+    }
+  };
+
   // Take the credit before booking so a shipment is never booked unpaid; refund it if the order is not created
   let charge: CreditCharge;
   try {
     charge = await CreditService.deductCredits(client.id, orderCreditCost, 'Order creation', 'ORDER', user.id);
   } catch (creditError) {
+    await releaseSlip();
     if (creditError instanceof InsufficientCreditsError) {
       return fail(402, {
         error: 'Insufficient credits',
@@ -294,6 +330,7 @@ export async function createOrder(
 
     if (!order) {
       await refundCharge('order could not be saved');
+      await releaseSlip();
       return fail(500, { error: 'Failed to create order' });
     }
 
