@@ -808,11 +808,10 @@ export default function OrderList() {
     try {
       console.log('🔄 [DELHIVERY_UPDATE] Updating Delhivery order:', order.delhivery_waybill_number)
       
-      // Prepare Delhivery update payload according to official documentation
-      // Note: pickupLocation is internal Scan2Ship field, not sent to Delhivery
+      // The server resolves the waybill and carrier key from the stored order
       // Note: shipment dimensions are not sent to Delhivery update API
       const delhiveryPayload: any = {
-        waybill: order.delhivery_waybill_number,
+        orderId: order.id,
         pt: order.is_cod ? 'COD' : 'Pre-paid',
         cod: order.is_cod ? (order.cod_amount || 0) : 0,
         weight: order.weight || 100, // Weight in grams
@@ -827,21 +826,16 @@ export default function OrderList() {
         country: order.country
       }
 
-      console.log('📦 [DELHIVERY_UPDATE] Clean Delhivery Payload (no internal fields):', delhiveryPayload)
+      console.log('📦 [DELHIVERY_UPDATE] Delhivery update payload:', delhiveryPayload)
 
-      // Call Delhivery API to update order
-      // Include pickupLocation for API key lookup only
-      const apiPayload = {
-        ...delhiveryPayload,
-        pickupLocation: order.pickup_location // Internal field for API key lookup
-      }
-      
+      const token = localStorage.getItem('authToken')
       const delhiveryResponse = await fetch('/api/delhivery/update-order', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(apiPayload),
+        body: JSON.stringify(delhiveryPayload),
       })
 
       if (delhiveryResponse.ok) {

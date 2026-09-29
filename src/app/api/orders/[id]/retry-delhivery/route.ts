@@ -3,11 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { delhiveryService } from '@/lib/delhivery'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { findAccessibleOrder, parseOrderId } from '@/lib/application/policy';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let accessibleOrderId: number | undefined
   try {
     // Apply security middleware
     const securityResponse = await applySecurityMiddleware(
@@ -34,17 +36,15 @@ export async function POST(
       return authResult.response;
     }
 
-    const { id } = await params
-    const orderId = parseInt(id)
+    const orderId = parseOrderId((await params).id)
     
     // Get the order
-    const order = await prisma.orders.findUnique({
-      where: { id: orderId }
-    })
+    const order = orderId ? await findAccessibleOrder(authResult.user!, orderId) : null
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
+    accessibleOrderId = order.id
 
     if (!order.courier_service || typeof order.courier_service !== 'string' || order.courier_service.toLowerCase() !== 'delhivery') {
       return NextResponse.json({ error: 'Order is not a Delhivery order' }, { status: 400 })
@@ -109,7 +109,7 @@ export async function POST(
       let updatedOrder;
       try {
         updatedOrder = await prisma.orders.update({
-          where: { id: orderId },
+          where: { id: order.id },
           data: {
             delhivery_waybill_number: delhiveryResponse.waybill_number,
             delhivery_order_id: delhiveryResponse.order_id,
@@ -138,7 +138,7 @@ export async function POST(
 
       // Verify the update actually worked by fetching the order again
               const verificationOrder = await prisma.orders.findUnique({
-        where: { id: orderId },
+        where: { id: order.id },
         select: {
           id: true,
           tracking_id: true,
@@ -158,7 +158,7 @@ export async function POST(
     } else {
       // Update order with failure details
       await prisma.orders.update({
-        where: { id: orderId },
+        where: { id: order.id },
         data: {
           delhivery_api_status: 'failed',
           delhivery_api_error: delhiveryResponse.error,
@@ -177,16 +177,17 @@ export async function POST(
   } catch (error) {
     console.error('Error retrying Delhivery order:', error)
     
-    // Update order with error details
-    await prisma.orders.update({
-      where: { id: orderId },
-      data: {
-        delhivery_api_status: 'failed',
-        delhivery_api_error: error instanceof Error ? error.message : 'Unknown error',
-        delhivery_retry_count: { increment: 1 },
-        last_delhivery_attempt: new Date(),
-      },
-    })
+    if (accessibleOrderId) {
+      await prisma.orders.update({
+        where: { id: accessibleOrderId },
+        data: {
+          delhivery_api_status: 'failed',
+          delhivery_api_error: error instanceof Error ? error.message : 'Unknown error',
+          delhivery_retry_count: { increment: 1 },
+          last_delhivery_attempt: new Date(),
+        },
+      })
+    }
 
     return NextResponse.json({
       error: 'Failed to retry Delhivery order',

@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { delhiveryService } from '@/lib/delhivery';
 import { ShopifyApiService } from '@/lib/shopify-api';
 import { WebhookService } from '@/lib/webhook-service';
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
+import { findAccessibleOrder, parseOrderId } from '@/lib/application/policy';
 
 interface FulfillResponse {
   success: boolean;
@@ -18,12 +20,23 @@ interface FulfillResponse {
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<FulfillResponse>> {
   try {
-    const orderId = parseInt(params.id);
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.CHILD_USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
+    });
+
+    if (authResult.response) {
+      return authResult.response as NextResponse<FulfillResponse>;
+    }
+
+    const orderId = parseOrderId((await params).id);
     
-    if (isNaN(orderId)) {
+    if (!orderId) {
       return NextResponse.json({
         success: false,
         message: 'Invalid order ID',
@@ -36,8 +49,7 @@ export async function POST(
     // Get the order details
     let order;
     try {
-      order = await prisma.orders.findUnique({
-        where: { id: orderId },
+      order = await findAccessibleOrder(authResult.user!, orderId, {
         include: {
           clients: true
         }

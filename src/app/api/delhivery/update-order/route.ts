@@ -1,131 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware'
+import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware'
+import { findAccessibleOrder } from '@/lib/application/policy'
+import { getDelhiveryApiKey } from '@/lib/pickup-location-config'
 
-const prisma = new PrismaClient()
+const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
+
+// Customer and package fields the caller may change on an existing Delhivery shipment.
+const EDITABLE_SHIPMENT_FIELDS = ['pt', 'cod', 'weight', 'name', 'phone', 'address', 'city', 'state', 'pincode', 'country'] as const
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { 
-      waybill, 
-      pt, 
-      cod, 
-      weight, 
-      pickupLocation,
-      // Additional fields from Delhivery API documentation
-      name,
-      phone,
-      address,
-      city,
-      state,
-      pincode,
-      country
-    } = body
+    const securityResponse = await applySecurityMiddleware(
+      request,
+      new NextResponse(),
+      { rateLimit: 'api', cors: true, securityHeaders: true }
+    )
 
-    console.log('🔄 [DELHIVERY_UPDATE_API] Updating order:', waybill)
-    console.log('🔄 [DELHIVERY_UPDATE_API] Pickup location:', pickupLocation)
-
-    // Validate required fields
-    if (!waybill) {
-      return NextResponse.json({ error: 'Waybill number is required' }, { status: 400 })
+    if (securityResponse) {
+      securityHeaders(securityResponse)
+      return securityResponse
     }
 
-    if (!pickupLocation) {
-      return NextResponse.json({ error: 'Pickup location is required' }, { status: 400 })
-    }
-
-    // Fetch Delhivery API key from pickup location
-    console.log('🔑 [DELHIVERY_UPDATE_API] Fetching Delhivery API key for pickup location:', pickupLocation)
-    
-    const pickupLocationData = await prisma.pickup_locations.findFirst({
-      where: {
-        value: pickupLocation
-      },
-      select: {
-        delhiveryApiKey: true,
-        label: true
-      }
+    const authResult = await authorizeUser(request, {
+      requiredRole: UserRole.CHILD_USER,
+      requiredPermissions: [PermissionLevel.WRITE],
+      requireActiveUser: true,
+      requireActiveClient: true
     })
 
-    if (!pickupLocationData || !pickupLocationData.delhiveryApiKey) {
-      console.error('❌ [DELHIVERY_UPDATE_API] No Delhivery API key found for pickup location:', pickupLocation)
-      return NextResponse.json({ 
-        error: `No Delhivery API key configured for pickup location: ${pickupLocation}` 
+    if (authResult.response) {
+      securityHeaders(authResult.response)
+      return authResult.response
+    }
+
+    const body = await request.json()
+    const orderId = Number(body?.orderId)
+
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) {
+      return NextResponse.json({ error: 'A valid orderId is required' }, { status: 400 })
+    }
+
+    const order = await findAccessibleOrder(authResult.user!, orderId, {
+      select: { id: true, clientId: true, pickup_location: true, delhivery_waybill_number: true }
+    })
+
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    if (!order.delhivery_waybill_number) {
+      return NextResponse.json({ error: 'Order has no Delhivery waybill' }, { status: 400 })
+    }
+
+    const delhiveryToken = await getDelhiveryApiKey(order.pickup_location, order.clientId)
+
+    if (!delhiveryToken) {
+      return NextResponse.json({
+        error: `No Delhivery API key configured for pickup location: ${order.pickup_location}`
       }, { status: 400 })
     }
 
-    const delhiveryToken = pickupLocationData.delhiveryApiKey
-    console.log('✅ [DELHIVERY_UPDATE_API] Found Delhivery API key for pickup location:', pickupLocationData.label)
-    console.log('🔑 [DELHIVERY_UPDATE_API] Full API Key being used:', delhiveryToken)
-    console.log('🔑 [DELHIVERY_UPDATE_API] API Key length:', delhiveryToken.length)
-    console.log('🔑 [DELHIVERY_UPDATE_API] API Key type:', typeof delhiveryToken)
-    console.log('🔑 [DELHIVERY_UPDATE_API] API Key first 10 chars:', delhiveryToken.substring(0, 10))
-    console.log('🔑 [DELHIVERY_UPDATE_API] API Key last 10 chars:', delhiveryToken.substring(delhiveryToken.length - 10))
-
-    // Always use production Delhivery API URL
-    const delhiveryUrl = 'https://track.delhivery.com/api/p/edit'
-
-    // Prepare Delhivery API payload according to official documentation
-    // Note: clientId and pickupLocation are internal Scan2Ship fields, not sent to Delhivery
-    // Note: shipment dimensions are not sent to Delhivery update API
-    const delhiveryPayload: any = {
-      waybill,
-      pt,
-      cod,
-      weight
+    const delhiveryPayload: Record<string, unknown> = { waybill: order.delhivery_waybill_number }
+    for (const field of EDITABLE_SHIPMENT_FIELDS) {
+      if (body[field] !== undefined && body[field] !== null && body[field] !== '') {
+        delhiveryPayload[field] = body[field]
+      }
     }
 
-    // Add customer details if provided (for address updates)
-    if (name) {
-      delhiveryPayload.name = name
-    }
-    if (phone) {
-      delhiveryPayload.phone = phone
-    }
-    if (address) {
-      delhiveryPayload.address = address
-    }
-    if (city) {
-      delhiveryPayload.city = city
-    }
-    if (state) {
-      delhiveryPayload.state = state
-    }
-    if (pincode) {
-      delhiveryPayload.pincode = pincode
-    }
-    if (country) {
-      delhiveryPayload.country = country
-    }
+    console.log('🔄 [DELHIVERY_UPDATE_API] Updating waybill', order.delhivery_waybill_number, 'for order', order.id, 'fields:', Object.keys(delhiveryPayload).join(', '))
 
-    console.log('📦 [DELHIVERY_UPDATE_API] Calling Delhivery Production API:', delhiveryUrl)
-    console.log('📦 [DELHIVERY_UPDATE_API] Payload:', delhiveryPayload)
-    console.log('📦 [DELHIVERY_UPDATE_API] API Token (first 8 chars):', delhiveryToken.substring(0, 8) + '...')
-    console.log('🔐 [DELHIVERY_UPDATE_API] Authorization Header:', `Token ${delhiveryToken}`)
-    console.log('🔐 [DELHIVERY_UPDATE_API] Full Headers:', {
-      'Authorization': `Token ${delhiveryToken}`,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    })
-
-    // Call Delhivery API
     let delhiveryResponse: Response
     try {
-      const requestHeaders = {
-        'Authorization': `Token ${delhiveryToken}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
-      
-      console.log('🚀 [DELHIVERY_UPDATE_API] Making fetch request with headers:')
-      console.log('   Authorization:', `Token ${delhiveryToken}`)
-      console.log('   Accept:', 'application/json')
-      console.log('   Content-Type:', 'application/json')
-      console.log('   Full Headers Object:', requestHeaders)
-      
-      delhiveryResponse = await fetch(delhiveryUrl, {
+      delhiveryResponse = await fetch(DELHIVERY_EDIT_URL, {
         method: 'POST',
-        headers: requestHeaders,
+        headers: {
+          'Authorization': `Token ${delhiveryToken}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(delhiveryPayload)
       })
     } catch (fetchError) {
@@ -138,37 +91,25 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('📦 [DELHIVERY_UPDATE_API] Delhivery response status:', delhiveryResponse.status)
-    console.log('📦 [DELHIVERY_UPDATE_API] Delhivery response statusText:', delhiveryResponse.statusText)
-    console.log('📦 [DELHIVERY_UPDATE_API] Delhivery response headers:', Object.fromEntries(delhiveryResponse.headers.entries()))
-    console.log('📦 [DELHIVERY_UPDATE_API] Response URL:', delhiveryResponse.url)
-    console.log('📦 [DELHIVERY_UPDATE_API] Response type:', delhiveryResponse.type)
-    console.log('📦 [DELHIVERY_UPDATE_API] Response redirected:', delhiveryResponse.redirected)
 
-    // Handle non-JSON responses
     let delhiveryResult: any
     const contentType = delhiveryResponse.headers.get('content-type')
-    
+
     if (contentType && contentType.includes('application/json')) {
       try {
         delhiveryResult = await delhiveryResponse.json()
       } catch (jsonError) {
         console.error('❌ [DELHIVERY_UPDATE_API] JSON parse error:', jsonError)
-        const responseText = await delhiveryResponse.text()
-        console.error('❌ [DELHIVERY_UPDATE_API] Raw response:', responseText)
-        delhiveryResult = { error: 'Invalid JSON response from Delhivery API', rawResponse: responseText }
+        delhiveryResult = { error: 'Invalid JSON response from Delhivery API' }
       }
     } else {
-      // Handle non-JSON responses (HTML, plain text, etc.)
       const responseText = await delhiveryResponse.text()
-      console.log('📦 [DELHIVERY_UPDATE_API] Non-JSON response:', responseText)
-      delhiveryResult = { 
-        error: 'Non-JSON response from Delhivery API', 
+      delhiveryResult = {
+        error: 'Non-JSON response from Delhivery API',
         contentType: contentType,
-        rawResponse: responseText 
+        rawResponse: responseText
       }
     }
-    
-    console.log('📦 [DELHIVERY_UPDATE_API] Processed response:', delhiveryResult)
 
     if (delhiveryResponse.ok) {
       return NextResponse.json({

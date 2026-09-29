@@ -1,9 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { applySecurityMiddleware, securityHeaders } from '@/lib/security-middleware';
 import { authorizeUser, UserRole, PermissionLevel } from '@/lib/auth-middleware';
 import { delhiveryService } from '@/lib/delhivery';
 import { getCatalogApiKey } from '@/lib/cross-app-auth';
+import { findAccessibleOrder, parseOrderId } from '@/lib/application/policy';
+
+// Fields the order edit form may change. Tenant, creator, sub-group, billing,
+// and carrier state are deliberately excluded.
+const EDITABLE_ORDER_FIELDS = [
+  'name',
+  'mobile',
+  'address',
+  'city',
+  'state',
+  'country',
+  'pincode',
+  'courier_service',
+  'pickup_location',
+  'package_value',
+  'weight',
+  'total_items',
+  'is_cod',
+  'cod_amount',
+  'reference_number',
+  'reseller_name',
+  'reseller_mobile',
+  'tracking_id',
+] as const;
 
 export async function GET(
   request: NextRequest,
@@ -35,11 +60,8 @@ export async function GET(
       return authResult.response;
     }
 
-    const { id } = await params
-    const orderId = parseInt(id)
-    const order = await prisma.orders.findUnique({
-      where: { id: orderId }
-    })
+    const orderId = parseOrderId((await params).id)
+    const order = orderId ? await findAccessibleOrder(authResult.user!, orderId) : null
 
     if (!order) {
       return NextResponse.json(
@@ -88,61 +110,37 @@ export async function PUT(
       return authResult.response;
     }
 
-    const { id } = await params
-    const orderId = parseInt(id)
-    
-    // Log request headers
-    console.log('📋 [API_ORDERS_PUT] Request Headers:');
-    console.log('  Content-Type:', request.headers.get('content-type'));
-    console.log('  Authorization:', request.headers.get('authorization') ? 'Bearer [REDACTED]' : 'Not provided');
-    console.log('  User-Agent:', request.headers.get('user-agent'));
-    console.log('  X-Forwarded-For:', request.headers.get('x-forwarded-for'));
-    console.log('  X-Real-IP:', request.headers.get('x-real-ip'));
-    console.log('  Referer:', request.headers.get('referer'));
-    console.log('  Origin:', request.headers.get('origin'));
-    console.log('  Accept:', request.headers.get('accept'));
-    console.log('  Accept-Language:', request.headers.get('accept-language'));
-    console.log('  Accept-Encoding:', request.headers.get('accept-encoding'));
-    
-    // Log all headers for debugging
-    const allHeaders: Record<string, string> = {};
-    request.headers.forEach((value, key) => {
-      allHeaders[key] = value;
-    });
-    console.log('📋 [API_ORDERS_PUT] All Request Headers:', JSON.stringify(allHeaders, null, 2));
-    
-    const body = await request.json()
-    
-    // Log the update payload
-    console.log('📦 [API_ORDERS_PUT] Update Order Payload:');
-    console.log('  Order ID:', orderId);
-    console.log('  Payload Size:', JSON.stringify(body).length, 'characters');
-    console.log('  Payload Structure:', JSON.stringify(body, null, 2));
-    
-    // Log individual fields for better debugging
-    console.log('🔍 [API_ORDERS_PUT] Payload Fields:');
-    Object.entries(body).forEach(([key, value]) => {
-      console.log(`  ${key}:`, value);
-    });
-    
-    // Log client information if available
-    if (authResult.user?.client) {
-      console.log('👤 [API_ORDERS_PUT] Client Information:');
-      console.log('  Client ID:', authResult.user.client.id);
-      console.log('  User ID:', authResult.user.id);
-      console.log('  User Email:', authResult.user.email);
+    const orderId = parseOrderId((await params).id)
+    const existing = orderId ? await findAccessibleOrder(authResult.user!, orderId, { select: { id: true } }) : null
+    if (!existing) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
-    
-    const order = await prisma.orders.update({
-      where: { id: orderId },
-      data: body
-    })
 
-    // Log the updated order
-    console.log('✅ [API_ORDERS_PUT] Order Updated Successfully:');
-    console.log('  Updated Order ID:', order.id);
-    console.log('  Updated Fields:', Object.keys(body).join(', '));
-    console.log('  Updated Order Data:', JSON.stringify(order, null, 2));
+    const body = await request.json()
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Request body must be an object' }, { status: 400 })
+    }
+
+    const rejectedFields = Object.keys(body).filter(
+      (field) => !(EDITABLE_ORDER_FIELDS as readonly string[]).includes(field)
+    )
+    if (rejectedFields.length > 0) {
+      return NextResponse.json(
+        { error: `These fields cannot be updated: ${rejectedFields.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    const data: Prisma.ordersUpdateInput = Object.fromEntries(
+      EDITABLE_ORDER_FIELDS.filter((field) => field in body).map((field) => [field, body[field]])
+    )
+
+    console.log('📦 [API_ORDERS_PUT] Updating order', existing.id, 'fields:', Object.keys(data).join(', '))
+
+    const order = await prisma.orders.update({
+      where: { id: existing.id },
+      data
+    })
 
     return NextResponse.json(order)
   } catch (error) {
@@ -189,52 +187,12 @@ export async function DELETE(
       return authResult.response;
     }
 
-    const { id } = await params
-    const orderId = parseInt(id)
+    const orderId = parseOrderId((await params).id)
     const user = authResult.user!;
     const client = authResult.user!.client;
-    
-    // Build where clause with client isolation and role-based filtering
-    const whereClause: any = {
-      id: orderId,
-      clientId: client.id // Ensure client isolation
-    };
 
-    // Role-based filtering for child users
-    if (user.role === 'child_user') {
-      // Get user's sub-group name
-      try {
-        const userSubGroup = await prisma.user_sub_groups.findFirst({
-          where: { userId: user.id },
-          select: {
-            subGroups: {
-              select: { name: true }
-            }
-          }
-        });
-        const userSubGroupName = userSubGroup?.subGroups?.name;
-        
-        if (userSubGroupName) {
-          // Child users can delete orders from their sub-group OR their own orders
-          whereClause.OR = [
-            { sub_group: userSubGroupName },
-            { created_by: user.id }
-          ];
-        } else {
-          // If no sub-group assigned, only delete their own orders
-          whereClause.created_by = user.id;
-        }
-      } catch (error) {
-        console.error('Error fetching user sub-group for order deletion:', error);
-        // Fallback to user's own orders if sub-group query fails
-        whereClause.created_by = user.id;
-      }
-    }
-    // Other roles (user, client_admin, super_admin, master_admin) can delete all client orders
-    
-    // First, fetch the order to check if it's a Delhivery order and get necessary details
-    const order = await prisma.orders.findFirst({
-      where: whereClause,
+    // Fetch the order within the user's access scope, with the details needed for cancellation
+    const order = orderId ? await findAccessibleOrder(user, orderId, {
       select: {
         id: true,
         courier_service: true,
@@ -243,7 +201,7 @@ export async function DELETE(
         clientId: true,
         products: true // Include products for inventory restoration
       }
-    });
+    }) : null;
 
     if (!order) {
       const errorMessage = user.role === 'child_user' 
@@ -380,10 +338,10 @@ export async function DELETE(
 
     // Delete the order from database
     await prisma.orders.delete({
-      where: { id: orderId }
+      where: { id: order.id }
     });
 
-    console.log(`✅ [API_ORDERS_DELETE] Order ${orderId} deleted successfully`);
+    console.log(`✅ [API_ORDERS_DELETE] Order ${order.id} deleted successfully`);
 
     return NextResponse.json({ 
       message: 'Order deleted successfully',
