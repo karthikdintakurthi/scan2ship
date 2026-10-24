@@ -160,7 +160,7 @@ Examples of special character cleanup:
     const prompt = getEnhancedPrompt(basePrompt);
 
     const requestBody = {
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'user',
